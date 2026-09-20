@@ -1,0 +1,15 @@
+# python
+__pycache__/
+*.pyc
+*.egg-info/
+src/steroids.egg-info/
+.venv/
+
+# node
+node_modules/
+
+# local state (rebuilt at runtime, not committed)
+# skill-index.json is a local cache — rebuild with `steroids --reindex`
+skill-index.json
+served.jsonl
+memory.json
