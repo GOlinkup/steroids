@@ -1,5 +1,6 @@
-/* Steroids demo mascot — pixel blob + living-face FSM canvas hero.
- * ART: 100% original, drawn in code below (no external assets, no PNG).
+/* Steroids demo mascot — orange pill + living-face FSM canvas hero.
+ * ART: 100% original capsule (warm Claude-Code orange is color only —
+ * NEVER the starburst mark), drawn in code below (no external assets).
  * License: CC0 — do whatever you want with the pixels.
  * Zero dependencies. Shape lock: transparent strip (only clearRect, no
  * scene/backdrop painted), circular blob, big eyes, dark-theme rim light.
@@ -23,24 +24,23 @@
   var ctx = cv.getContext("2d");
   var S = 6;                 // pixel size
   var W = 0, H = 104;        // strip height fixed
-  var PX = 12, PY = 13;      // sprite grid
+  var PX = 16, PY = 12;      // pill grid (capsule, wider than tall)
 
-  // Body map: o=outline O=body E=eye-white .=transparent
-  // Rim light + pupils + cheeks + legs are painted per-state on top.
+  // Pill map: o=outline O=body .=transparent (eyes painted by eye())
+  // Rim light + pupils + cheeks + arms + legs are painted per-state on top.
   var BODY = [
-    "....oooo....",
-    "..ooOOOOoo..",
-    ".oOOOOOOOOo.",
-    ".oOOOOOOOOo.",
-    "oOOOOOOOOOOo",
-    "oOEEEOEEEOOo",
-    "oOEEEOEEEOOo",
-    "oOEEEOEEEOOo",
-    "oOOOOOOOOOOo",
-    "oOOOOOOOOOOo",
-    ".oOOOOOOOOo.",
-    "..ooOOOOoo..",
-    "............"
+    ".....oooooo.....",
+    "...ooOOOOOOoo...",
+    "..oOOOOOOOOOOo..",
+    ".oOOOOOOOOOOOOo.",
+    ".oOOOOOOOOOOOOo.",
+    "oOOOOOOOOOOOOOOo",
+    "oOOOOOOOOOOOOOOo",
+    "oOOOOOOOOOOOOOOo",
+    "oOOOOOOOOOOOOOOo",
+    ".oOOOOOOOOOOOOo.",
+    "..oOOOOOOOOOOo..",
+    "...ooOOOOOOoo..."
   ];
   var PAL = { o: "#5b3a1e", O: "#e8823c", E: "#fff8ee" };
   var RIM = "#ffd9a8", BLUSH = "#f27d7d", PUPIL = "#23202a";
@@ -89,7 +89,7 @@
     }
     if (m.watch) return { x: 0, y: -1 }; // watches the input field above
     if (m.cursor) {
-      var sx = m.x + (PX * S) / 2, sy = baseY() + 6 * S;
+      var sx = m.x + (PX * S) / 2, sy = baseY() + 5 * S;
       var dx = m.cursor.x - sx, dy = m.cursor.y - sy;
       var d = Math.sqrt(dx * dx + dy * dy) || 1;
       ox = Math.max(-1, Math.min(1, Math.round(dx / d)));
@@ -130,31 +130,40 @@
       }
     }
     var st = m.state, f = m.frame, po = pupilOff();
-    if (st === "think") { eye(ox + 2, oy + 5, "up"); eye(ox + 7, oy + 5, "up"); }
-    else if (st === "busy") { eye(ox + 2, oy + 5, "wide"); eye(ox + 7, oy + 5, "wide"); }
-    else if (m.blink > 0) { eye(ox + 2, oy + 5, "shut"); eye(ox + 7, oy + 5, "shut"); }
-    else { eye(ox + 2, oy + 5, "open", po); eye(ox + 7, oy + 5, "open", po); }
+    if (st === "think") { eye(ox + 4, oy + 4, "up"); eye(ox + 9, oy + 4, "up"); }
+    else if (st === "busy") { eye(ox + 4, oy + 4, "wide"); eye(ox + 9, oy + 4, "wide"); }
+    else if (m.blink > 0) { eye(ox + 4, oy + 4, "shut"); eye(ox + 9, oy + 4, "shut"); }
+    else { eye(ox + 4, oy + 4, "open", po); eye(ox + 9, oy + 4, "open", po); }
 
     // blush when bashful (hover)
     if (m.hover) {
-      px(ox + 1, oy + 8, BLUSH); px(ox + 2, oy + 8, BLUSH);
-      px(ox + 9, oy + 8, BLUSH); px(ox + 10, oy + 8, BLUSH);
+      px(ox + 2, oy + 7, BLUSH); px(ox + 3, oy + 7, BLUSH);
+      px(ox + 12, oy + 7, BLUSH); px(ox + 13, oy + 7, BLUSH);
     }
+    // buffed arms: hang at the sides, flex up when excited/busy
+    var flex = (m.bounceT > 0 || st === "busy");
+    var ay = oy + (flex ? 2 : 5);
+    ctx.fillStyle = "#e8823c";
+    ctx.fillRect((ox - 1) * S, ay * S, S, S * 3);
+    ctx.fillRect((ox + PX) * S, ay * S, S, S * 3);
+    ctx.fillStyle = "#5b3a1e";
+    ctx.fillRect((ox - 1) * S, (ay + (flex ? 0 : 2)) * S, S, S);
+    ctx.fillRect((ox + PX) * S, (ay + (flex ? 0 : 2)) * S, S, S);
     // legs: idle = both down, walk = alternate lift
     ctx.fillStyle = "#5b3a1e";
     var liftL = (st === "walk" && f === 1), liftR = (st === "walk" && f === 0);
-    ctx.fillRect((ox + 3) * S, (oy + 11 + (liftL ? -1 : 0)) * S, S, S);
-    ctx.fillRect((ox + 8) * S, (oy + 11 + (liftR ? -1 : 0)) * S, S, S);
+    ctx.fillRect((ox + 5) * S, (oy + 11 + (liftL ? -1 : 0)) * S, S, S);
+    ctx.fillRect((ox + 10) * S, (oy + 11 + (liftR ? -1 : 0)) * S, S, S);
 
     // think bubble: animated dots (real thinking state, not decoration)
     if (st === "think") {
       ctx.fillStyle = "#8b949e";
       var n = 1 + (Math.floor(m.thinkT / 300) % 3), i;
-      for (i = 0; i < n; i++) ctx.fillRect((ox + 9 + i * 2) * S, (oy - 2 - i) * S, S, S);
+      for (i = 0; i < n; i++) ctx.fillRect((ox + 12 + i * 2) * S, (oy - 2 - i) * S, S, S);
       ctx.fillStyle = "#e6e9f0";
-      ctx.fillRect((ox + 8) * S, (oy - 6) * S, S * 5, S * 3);
+      ctx.fillRect((ox + 11) * S, (oy - 6) * S, S * 5, S * 3);
       ctx.fillStyle = "#5b3a1e";
-      for (i = 0; i < n; i++) ctx.fillRect((ox + 9 + i) * S, (oy - 5) * S, S, S);
+      for (i = 0; i < n; i++) ctx.fillRect((ox + 12 + i) * S, (oy - 5) * S, S, S);
     }
     // busy motion ticks
     if (st === "busy") {
@@ -167,8 +176,8 @@
       ctx.fillStyle = "#8b949e";
       var z = Math.floor(m.sleepZ / 500) % 3;
       ctx.font = "10px ui-monospace,monospace";
-      ctx.fillText("z", (ox + 10) * S, (oy - 1 - z) * S);
-      if (z === 2) ctx.fillText("z", (ox + 11) * S, (oy - 3) * S);
+      ctx.fillText("z", (ox + 13) * S, (oy - 1 - z) * S);
+      if (z === 2) ctx.fillText("z", (ox + 14) * S, (oy - 3) * S);
     }
   }
 
