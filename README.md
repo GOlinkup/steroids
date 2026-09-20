@@ -16,12 +16,13 @@ bash install.sh                               # deploy binary + hooks (optional)
 
 ## Results (verified 2026-09-20, 366 skills)
 
-| Eval | n | precision@1 | precision@3 | exclusion-leaks |
-|---|---|---|---|---|
-| Blind (in-script GOLDEN, `tests/blind_eval_100.py`) | 149 | 0.832 | 0.960 | 0 |
-| Live probe (`tests/live_probe.py`) | 16 | 0.938 | 0.812 | 3 |
+| Eval | n | precision@1 | precision@3 | exclusion-leaks | MRR | MAP |
+|---|---|---|---|---|---|---|
+| Blind (in-script GOLDEN, `tests/blind_eval_100.py`) | 149 | 0.933 | 0.993 | 0 | — | — |
+| Live probe (`tests/live_probe.py`) | 16 | 0.938 | 0.812 | 3 | — | — |
+| Blind second set, stranger-style (`tests/blind_eval_second.py`) | 315 | 0.886 | 0.962 | 0 | 0.927 | 0.912 |
 
-Re-run any time: `python3 tests/blind_eval_100.py`, `python3 tests/live_probe.py`.
+Re-run any time: `python3 tests/blind_eval_100.py`, `python3 tests/live_probe.py`, `python3 tests/blind_eval_second.py`.
 
 ## Multi-harness support
 
