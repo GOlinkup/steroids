@@ -1,0 +1,37 @@
+{
+  "verified_only": true,
+  "min_stars": 1000,
+  "max_recommendations": 3,
+  "index_dirs": [
+    "~/.agents/skills",
+    "~/.claude/skills",
+    "~/.claude/.agents/skills",
+    "~/.config/opencode/skills",
+    "~/.gemini/antigravity-cli/builtin/skills",
+    "~/.codex/skills",
+    "~/claude-obsidian/skills",
+    "~/flutter/.agents/skills",
+    "./.agents/skills",
+    "./.claude/skills",
+    "./skills"
+  ],
+  "glue": ["onto", "main", "file", "files", "folder", "folders", "repo", "code", "thing", "stuff"],
+  "skills": {
+    "design-system": ["tokens", "palette", "typography", "spacing", "audit"],
+    "frontend-patterns": ["ui", "layout", "theme", "component"],
+    "dart-flutter-patterns": ["flutter", "dart", "widget", "mobile", "app"],
+    "browser-qa": ["screenshot", "visual", "e2e"],
+    "frontend-design-direction": ["hero", "landing", "branding"],
+    "canvas": ["canvas", "obsidian", "mindmap", "spatial"],
+    "code-review": ["review", "pr", "diff", "standards", "spec"],
+    "resolving-merge-conflicts": ["merge", "conflict", "rebase"],
+    "agy-customizations": ["antigravity", "agy", "customization", "hook", "rule", "plugin"],
+    "antigravity-guide": ["antigravity", "agy", "guide", "cli"]
+  },
+  "neg": {
+    "json-canvas": [["obsidian", "mindmap", "spatial", "board", "canvas"], ["json", "format", "schema", "parse"]],
+    "agy-customizations": [["guide", "setup", "cli"], ["customization", "hook", "rule", "plugin", "custom"]],
+    "video-editing": [["remotion", "react", "chart", "caption"], ["premiere", "cut", "timeline", "export", "ffmpeg", "clip"]],
+    "manim-video": [["remotion", "react"], ["manim", "python", "math", "animation", "scene"]]
+  }
+}
