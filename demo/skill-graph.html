@@ -25,6 +25,7 @@ header .sub{color:#8b949e;font-size:12px;overflow:hidden;text-overflow:ellipsis;
 #details .kw{display:inline-block;background:#1a2230;border:1px solid #2a3342;border-radius:5px;padding:2px 8px;margin:2px;font-size:12px;line-height:1.5}
 #details .kw:hover{border-color:#3b4763}
 #details .dim{color:#8b949e;line-height:1.5}
+#mascot{width:100%;height:104px;display:block;border-bottom:1px solid #1e2430;cursor:grab;touch-action:none;image-rendering:pixelated}
 footer{padding:6px 16px;border-top:1px solid #1e2430;color:#8b949e;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:700px){
 header{flex-wrap:wrap;padding:8px 12px;gap:8px}
@@ -39,6 +40,7 @@ footer{font-size:11px;padding:5px 12px}
 </head>
 <body>
 <header><h1>Steroids Skill Graph</h1><span class="sub" id="headline"></span><input id="search" placeholder="search skills…"></header>
+<canvas id="mascot"></canvas>
 <div id="wrap"><canvas id="canvas"></canvas><aside id="details"><p class="dim">Click a node for details.</p></aside></div>
 <footer>drag node to move · scroll to zoom · drag background to pan</footer>
 <script>
@@ -127,13 +129,19 @@ window.addEventListener("mouseup",function(e){
 cv.addEventListener("wheel",function(e){e.preventDefault();
   var m=pos(e),w0=s2w(m);view.k=Math.min(4,Math.max(0.3,view.k*(e.deltaY<0?1.1:0.9)));
   view.x=w0[0]-(m[0]-W/2)/view.k;view.y=w0[1]-(m[1]-H/2)/view.k;draw();},{passive:false});
-document.getElementById("search").addEventListener("input",function(e){q=e.target.value.toLowerCase();draw();});
+var searchT=null;
+document.getElementById("search").addEventListener("input",function(e){q=e.target.value.toLowerCase();
+  if(window.Mascot){window.Mascot.think();clearTimeout(searchT);searchT=setTimeout(function(){window.Mascot.idle();},600);}
+  draw();});
 window.addEventListener("resize",function(){fit();draw();});
 init();draw();
+if(window.Mascot)window.Mascot.busy();
 fetch("skill-graph.json").then(function(r){if(!r.ok)throw 0;return r.json();}).then(function(g){
   if(g&&g.nodes&&g.nodes.length){data={nodes:g.nodes.map(function(n){return {id:n.id,keywords:n.keywords,degree:n.degree||0};}),links:g.links||[]};
     sel=null;document.getElementById("details").innerHTML='<p class="dim">Click a node for details.</p>';
-    init();draw();}}).catch(function(){});
+    if(window.Mascot)window.Mascot.busy();
+    init();draw();if(window.Mascot)window.Mascot.idle();}}).catch(function(){if(window.Mascot)window.Mascot.idle();});
 </script>
+<script src="mascot.js"></script>
 </body>
 </html>
