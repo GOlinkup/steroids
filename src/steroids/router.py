@@ -197,6 +197,29 @@ from collections import Counter
 _SEM_CACHE = {}
 
 
+_EMB_MOD = None
+_EMB_TRIED = False
+
+
+def _emb():
+    """File-path load of embed.py — works as repo module AND deployed binary."""
+    global _EMB_MOD, _EMB_TRIED
+    if _EMB_MOD is not None or _EMB_TRIED:
+        return _EMB_MOD
+    _EMB_TRIED = True
+    try:
+        import importlib.util
+        _ep = os.path.join(os.path.dirname(os.path.abspath(__file__)), "embed.py")
+        if not os.path.isfile(_ep):
+            return None
+        _spec = importlib.util.spec_from_file_location("steroids_embed", _ep)
+        _EMB_MOD = importlib.util.module_from_spec(_spec)
+        _spec.loader.exec_module(_EMB_MOD)
+    except Exception:
+        _EMB_MOD = None
+    return _EMB_MOD
+
+
 def _trigrams(tok):
     # ponytail: stdlib typo-robust signal; padded char-3-grams over one token.
     t = "#" + tok + "#"
@@ -296,6 +319,56 @@ def route_query(prompt, rules, idx, accepts=None):
             for tri in _trigrams(tok):
                 qcounter[tri] += 1
         qnorm = sum(n * n for n in qcounter.values()) ** 0.5
+    # ponytail: ONNX semantic signal; silent lexical fallback when unavailable.
+    emb_w = rules.get("embed_weight", 0.0) or 0.0
+    emb_vecs = qvec = None
+    emb = _emb() if emb_w else None
+    if emb is not None:
+        try:
+            # ponytail: descriptions read once per index; keyword fallback inside.
+            global _DESC_MEM
+            try:
+                _DESC_MEM
+            except NameError:
+                _DESC_MEM = {}
+            if _DESC_MEM.get("key") != id(idx):
+                desc = {}
+                for sname, md in skill_files(rules.get("index_dirs", [])):
+                    if sname in idx and sname not in desc:
+                        try:
+                            with open(md, encoding="utf-8", errors="replace") as f:
+                                desc[sname] = extract_desc(f.read(8000))
+                        except OSError:
+                            desc[sname] = ""
+                _DESC_MEM.clear()
+                _DESC_MEM["key"] = id(idx)
+                _DESC_MEM["map"] = desc
+            emb_vecs = emb.get_vectors(idx, emb.build_docs(rules, idx, _DESC_MEM["map"])) or None
+            if emb_vecs:
+                qvec = (emb.embed_texts([prompt]) or [None])[0]
+        except Exception:
+            emb_vecs = qvec = None
+    emb_on = bool(emb_w and emb_vecs and qvec)
+    if emb_on and rules.get("embed_defer_above"):
+        # ponytail: when keywords speak clearly (strong top hit = keyword
+        # dump), skip semantics for this query; consult them only when
+        # lexical evidence is uncertain. Protects excludes on dense rows.
+        top_hit = 0.0
+        for skill, keys in idx.items():
+            hits = sorted(set(keys) & ptoks)
+            if not hits:
+                continue
+            if skill in neg:
+                bad, good = neg[skill]
+                if not (set(hits) & good) and (set(hits) & bad):
+                    continue
+            namehits = len(set(toks(skill.replace("-", " ").replace("_", " "))) & ptoks)
+            s = round(sum(1.0 / df[h] for h in hits) + min(1.5, 1.0 * namehits)
+                      + min(1.0, 0.2 * accepts.get(skill, 0)), 3)
+            if s > top_hit:
+                top_hit = s
+        if top_hit >= rules["embed_defer_above"]:
+            emb_on = False
     for skill, keys in idx.items():
         hits = sorted(set(keys) & ptoks)
         if hits:
@@ -307,15 +380,22 @@ def route_query(prompt, rules, idx, accepts=None):
             namehits = len(set(toks(skill.replace("-", " ").replace("_", " "))) & ptoks)
             bonus = min(1.5, 1.0 * namehits) + min(1.0, 0.2 * accepts.get(skill, 0))
             score = round(sum(1.0 / df[h] for h in hits) + bonus, 3)
-        elif sem_w:
+        elif sem_w or emb_on:
             score = 0.0
         else:
             continue
         if sem_w:
             score = round(score + sem_w * _trigram_cosine(qcounter, qnorm, sprofiles[skill]), 3)
-            if score <= 0:
-                continue
-        if hits or sem_w:
+        if emb_on:
+            vec = emb_vecs.get(skill)
+            # ponytail: rerank hit skills only. Measured: no-hit emb never
+            # cracks top-3 on 165 eval queries (trigram stays the no-hit
+            # path); gating to hits kills a whole failure class for free.
+            if hits and vec is not None:
+                score = round(score + emb_w * emb.cosine(qvec, vec), 3)
+        if (sem_w or emb_on) and score <= 0:
+            continue
+        if hits or sem_w or emb_on:
             scored.append((score, skill, hits))
 
     scored.sort(key=lambda t: (-t[0], -len(t[2]), t[1]))

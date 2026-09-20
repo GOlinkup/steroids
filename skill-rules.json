@@ -266,6 +266,16 @@
       "heisenbug",
       "debugger",
       "methodical"
+    ],
+    "ask-matt": [
+      "lost",
+      "fit"
+    ],
+    "flox-environments": [
+      "hurt"
+    ],
+    "messages-ops": [
+      "flood"
     ]
   },
   "neg": {
@@ -891,6 +901,16 @@
         "triage",
         "execution"
       ]
+    ],
+    "orch-fix-defect": [
+      [
+        "defect"
+      ],
+      [
+        "fix"
+      ]
     ]
-  }
+  },
+  "embed_weight": 3.0,
+  "embed_defer_above": 2.2
 }
