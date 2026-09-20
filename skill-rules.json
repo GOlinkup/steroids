@@ -16,23 +16,689 @@
     "./.claude/skills",
     "./skills"
   ],
-  "glue": ["onto", "main", "file", "files", "folder", "folders", "repo", "code", "thing", "stuff"],
+  "glue": [
+    "onto",
+    "main",
+    "file",
+    "files",
+    "folder",
+    "folders",
+    "repo",
+    "code",
+    "thing",
+    "stuff"
+  ],
   "skills": {
-    "design-system": ["tokens", "palette", "typography", "spacing", "audit"],
-    "frontend-patterns": ["ui", "layout", "theme", "component"],
-    "dart-flutter-patterns": ["flutter", "dart", "widget", "mobile", "app"],
-    "browser-qa": ["screenshot", "visual", "e2e"],
-    "frontend-design-direction": ["hero", "landing", "branding"],
-    "canvas": ["canvas", "obsidian", "mindmap", "spatial"],
-    "code-review": ["review", "pr", "diff", "standards", "spec"],
-    "resolving-merge-conflicts": ["merge", "conflict", "rebase"],
-    "agy-customizations": ["antigravity", "agy", "customization", "hook", "rule", "plugin"],
-    "antigravity-guide": ["antigravity", "agy", "guide", "cli"]
+    "design-system": [
+      "tokens",
+      "palette",
+      "typography",
+      "spacing",
+      "audit"
+    ],
+    "frontend-patterns": [
+      "ui",
+      "layout",
+      "theme",
+      "component"
+    ],
+    "dart-flutter-patterns": [
+      "listview",
+      "memoize",
+      "flutter",
+      "dart",
+      "widget",
+      "mobile",
+      "app"
+    ],
+    "browser-qa": [
+      "deployed",
+      "flows",
+      "verify",
+      "screenshot",
+      "visual",
+      "e2e"
+    ],
+    "frontend-design-direction": [
+      "hero",
+      "landing",
+      "branding"
+    ],
+    "canvas": [
+      "canvas",
+      "obsidian",
+      "mindmap",
+      "spatial"
+    ],
+    "code-review": [
+      "delete",
+      "straight",
+      "remove",
+      "review",
+      "pr",
+      "diff",
+      "standards",
+      "spec"
+    ],
+    "resolving-merge-conflicts": [
+      "branch",
+      "merge",
+      "conflict",
+      "rebase"
+    ],
+    "agy-customizations": [
+      "antigravity",
+      "agy",
+      "customization",
+      "hook",
+      "rule",
+      "plugin"
+    ],
+    "antigravity-guide": [
+      "antigravity",
+      "agy",
+      "guide",
+      "cli"
+    ],
+    "accessibility": [
+      "sizes",
+      "button",
+      "tap"
+    ],
+    "agent-self-evaluation": [
+      "session",
+      "honestly"
+    ],
+    "agent-sort": [
+      "keep",
+      "forty"
+    ],
+    "ai-first-engineering": [
+      "bots",
+      "chaos"
+    ],
+    "api-connector-builder": [
+      "wire",
+      "thirdparty"
+    ],
+    "archify": [
+      "diagram",
+      "draw",
+      "visual"
+    ],
+    "benchmark": [
+      "faster",
+      "compare"
+    ],
+    "blueprint": [
+      "rambling",
+      "idea"
+    ],
+    "ck": [
+      "session",
+      "persist",
+      "survive"
+    ],
+    "claude-devfleet": [
+      "worktree",
+      "isolated",
+      "parallel"
+    ],
+    "click-path-audit": [
+      "alone",
+      "together",
+      "combination"
+    ],
+    "codehealth-mcp": [
+      "structure",
+      "file",
+      "worse"
+    ],
+    "cost-tracking": [
+      "money",
+      "spend"
+    ],
+    "council": [
+      "sides",
+      "argue",
+      "tradeoff"
+    ],
+    "crosspost": [
+      "announcement",
+      "schedule"
+    ],
+    "data-scraper-agent": [
+      "nightly",
+      "sheet",
+      "save"
+    ],
+    "defuddle": [
+      "strip",
+      "clutter"
+    ],
+    "deployment-patterns": [
+      "rollback",
+      "deploys"
+    ],
+    "diagnosing-bugs": [
+      "crash",
+      "hunt",
+      "intermittent"
+    ],
+    "django-security": [
+      "lock",
+      "auth",
+      "cookies"
+    ],
+    "dmux-workflows": [
+      "tmux",
+      "panes",
+      "side",
+      "parallel"
+    ],
+    "docker-patterns": [
+      "dockerfile"
+    ],
+    "documentation-lookup": [
+      "quoting",
+      "lookup",
+      "instead"
+    ],
+    "domain-modeling": [
+      "vocabulary",
+      "glossary",
+      "settle"
+    ],
+    "fal-ai-media": [
+      "voiceover",
+      "generate"
+    ],
+    "golang-patterns": [
+      "idiomatic",
+      "concurrency"
+    ],
+    "improve-codebase-architecture": [
+      "simplification",
+      "ranked",
+      "cut"
+    ],
+    "manim-video": [
+      "math",
+      "theorem",
+      "proof"
+    ],
+    "nutrient-document-processing": [
+      "merge"
+    ],
+    "postgres-patterns": [
+      "row"
+    ],
+    "pr": [
+      "body",
+      "description"
+    ],
+    "pytorch-patterns": [
+      "stabilize",
+      "reproduce",
+      "different"
+    ],
+    "social-publisher": [
+      "episode",
+      "publish"
+    ],
+    "systematic-debugging": [
+      "heisenbug",
+      "debugger",
+      "methodical"
+    ]
   },
   "neg": {
-    "json-canvas": [["obsidian", "mindmap", "spatial", "board", "canvas"], ["json", "format", "schema", "parse"]],
-    "agy-customizations": [["guide", "setup", "cli"], ["customization", "hook", "rule", "plugin", "custom"]],
-    "video-editing": [["remotion", "react", "chart", "caption"], ["premiere", "cut", "timeline", "export", "ffmpeg", "clip"]],
-    "manim-video": [["remotion", "react"], ["manim", "python", "math", "animation", "scene"]]
+    "json-canvas": [
+      [
+        "obsidian",
+        "mindmap",
+        "spatial",
+        "board",
+        "canvas"
+      ],
+      [
+        "json",
+        "format",
+        "schema",
+        "parse"
+      ]
+    ],
+    "agy-customizations": [
+      [
+        "guide",
+        "setup",
+        "cli"
+      ],
+      [
+        "customization",
+        "hook",
+        "rule",
+        "plugin",
+        "custom"
+      ]
+    ],
+    "video-editing": [
+      [
+        "remotion",
+        "react",
+        "chart",
+        "caption",
+        "cover",
+        "voiceover",
+        "generate"
+      ],
+      [
+        "premiere",
+        "cut",
+        "timeline",
+        "export",
+        "ffmpeg",
+        "clip"
+      ]
+    ],
+    "manim-video": [
+      [
+        "remotion",
+        "react"
+      ],
+      [
+        "manim",
+        "python",
+        "math",
+        "animation",
+        "scene"
+      ]
+    ],
+    "flutter-dart-code-review": [
+      [
+        "review"
+      ],
+      [
+        "flutter",
+        "dart",
+        "widget",
+        "mobile",
+        "app"
+      ]
+    ],
+    "code-review": [
+      [
+        "review"
+      ],
+      [
+        "diff",
+        "standards",
+        "spec",
+        "pr",
+        "branch"
+      ]
+    ],
+    "scientific-thinking-literature-review": [
+      [
+        "review"
+      ],
+      [
+        "literature",
+        "paper",
+        "scholar",
+        "citation"
+      ]
+    ],
+    "prediction-market-risk-review": [
+      [
+        "review"
+      ],
+      [
+        "prediction",
+        "market",
+        "risk",
+        "oracle"
+      ]
+    ],
+    "error-handling": [
+      [
+        "error"
+      ],
+      [
+        "exception",
+        "retry",
+        "circuit",
+        "breaker",
+        "fallback"
+      ]
+    ],
+    "wiki-query": [
+      [
+        "query"
+      ],
+      [
+        "wiki",
+        "vault",
+        "notes",
+        "ask",
+        "mode"
+      ]
+    ],
+    "click-path-audit": [
+      [
+        "audit"
+      ],
+      [
+        "click",
+        "button",
+        "state",
+        "touchpoint",
+        "flow"
+      ]
+    ],
+    "evm-token-decimals": [
+      [
+        "token"
+      ],
+      [
+        "decimal",
+        "evm",
+        "chain",
+        "bridge",
+        "precision"
+      ]
+    ],
+    "token-budget-advisor": [
+      [
+        "token"
+      ],
+      [
+        "budget",
+        "limit",
+        "length",
+        "depth",
+        "cost"
+      ]
+    ],
+    "make-interfaces-feel-better": [
+      [
+        "make"
+      ],
+      [
+        "spacing",
+        "typography",
+        "polish",
+        "interface",
+        "feel"
+      ]
+    ],
+    "wait-what": [
+      [
+        "did",
+        "last"
+      ],
+      [
+        "pitch",
+        "land",
+        "again"
+      ]
+    ],
+    "agent-sort": [
+      [
+        "sort"
+      ],
+      [
+        "skill",
+        "install",
+        "plugin",
+        "rank",
+        "recommend"
+      ]
+    ],
+    "i-have-adhd": [
+      [
+        "have"
+      ],
+      [
+        "adhd",
+        "focus",
+        "attention",
+        "distract"
+      ]
+    ],
+    "canary-watch": [
+      [
+        "watch"
+      ],
+      [
+        "deploy",
+        "healthy",
+        "smoke",
+        "release",
+        "post"
+      ]
+    ],
+    "network-interface-health": [
+      [
+        "health"
+      ],
+      [
+        "interface",
+        "crc",
+        "flap",
+        "duplex",
+        "counter",
+        "port"
+      ]
+    ],
+    "terminal-ops": [
+      [
+        "proof"
+      ],
+      [
+        "terminal",
+        "command",
+        "repo",
+        "execute",
+        "ci"
+      ]
+    ],
+    "analyze-github-flake": [
+      [
+        "flake"
+      ],
+      [
+        "github",
+        "action",
+        "workflow",
+        "ci"
+      ]
+    ],
+    "setup-ts-deep-modules": [
+      [
+        "module",
+        "seam"
+      ],
+      [
+        "typescript",
+        "cruiser",
+        "deep",
+        "entry",
+        "package"
+      ]
+    ],
+    "setup-pre-commit": [
+      [
+        "commit"
+      ],
+      [
+        "husky",
+        "hook",
+        "lint",
+        "staged"
+      ]
+    ],
+    "brand-voice": [
+      [
+        "blunt"
+      ],
+      [
+        "voice",
+        "style",
+        "tone",
+        "post",
+        "write"
+      ]
+    ],
+    "perl-security": [
+      [
+        "tap",
+        "tiny"
+      ],
+      [
+        "perl",
+        "taint",
+        "dbi",
+        "injection"
+      ]
+    ],
+    "fsharp-testing": [
+      [
+        "dotnet",
+        "integration"
+      ],
+      [
+        "fsharp",
+        "property",
+        "bas"
+      ]
+    ],
+    "domain-modeling": [
+      [
+        "domain",
+        "model"
+      ],
+      [
+        "vocabulary",
+        "glossary",
+        "context",
+        "language"
+      ]
+    ],
+    "rust-testing": [
+      [
+        "property"
+      ],
+      [
+        "rust",
+        "ownership",
+        "lifetime",
+        "borrow"
+      ]
+    ],
+    "resolving-merge-conflicts": [
+      [
+        "merge"
+      ],
+      [
+        "conflict",
+        "rebase",
+        "branch",
+        "marker"
+      ]
+    ],
+    "flutter-cherry-pick": [
+      [
+        "branch",
+        "merge",
+        "merg"
+      ],
+      [
+        "cherry",
+        "pick",
+        "harvest"
+      ]
+    ],
+    "android-clean-architecture": [
+      [
+        "clean"
+      ],
+      [
+        "android",
+        "kotlin",
+        "module",
+        "compose"
+      ]
+    ],
+    "rebuilding-flutter-tool": [
+      [
+        "rebuild"
+      ],
+      [
+        "tool",
+        "broken",
+        "doctor",
+        "fix"
+      ]
+    ],
+    "competitive-report-structure": [
+      [
+        "structure"
+      ],
+      [
+        "competitor",
+        "report",
+        "benchmark",
+        "matrix"
+      ]
+    ],
+    "competitive-platform-analysis": [
+      [
+        "platform"
+      ],
+      [
+        "competitor",
+        "benchmark",
+        "landscape",
+        "position"
+      ]
+    ],
+    "orch-change-feature": [
+      [
+        "feature",
+        "exist"
+      ],
+      [
+        "orch",
+        "change",
+        "pipeline",
+        "gated"
+      ]
+    ],
+    "orch-add-feature": [
+      [
+        "feature",
+        "exist"
+      ],
+      [
+        "orch",
+        "add",
+        "pipeline",
+        "gated"
+      ]
+    ],
+    "council-multi-model": [
+      [
+        "model",
+        "review",
+        "same"
+      ],
+      [
+        "council",
+        "codex",
+        "external",
+        "synthesis"
+      ]
+    ]
   }
 }
