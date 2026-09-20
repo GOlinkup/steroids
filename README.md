@@ -5,12 +5,23 @@ Universal skill router plugin for AI coding harnesses. **Steroids is not a model
 ## 30-second quickstart
 
 ```bash
-bash install.sh
-steroids --count
-steroids "build a flutter mobile app"
+git clone <repo> steroids && cd steroids
+python3 src/steroids/router.py --count        # Indexed skills: 366 (~0.3s)
+python3 src/steroids/router.py "build a flutter mobile app"
+# -> build,flutter -> dart-flutter-patterns/...
+bash install.sh                               # deploy binary + hooks (optional)
 ```
 
 `steroids "query"` prints a short hint like `build,flutter -> dart-flutter-patterns/...`. Load what applies, skip the rest.
+
+## Results (verified 2026-09-20, 366 skills)
+
+| Eval | n | precision@1 | precision@3 | exclusion-leaks |
+|---|---|---|---|---|
+| Blind (in-script GOLDEN, `tests/blind_eval_100.py`) | 149 | 0.832 | 0.960 | 0 |
+| Live probe (`tests/live_probe.py`) | 16 | 0.938 | 0.812 | 3 |
+
+Re-run any time: `python3 tests/blind_eval_100.py`, `python3 tests/live_probe.py`.
 
 ## Multi-harness support
 
