@@ -1,0 +1,59 @@
+```mermaid
+flowchart TB
+    subgraph SOURCES["prompt sources"]
+        OC["OpenCode plugin\nsteroids-plugin.ts\nchat.message (2k chars, 5s dedup)\nsession.created / compacting"]
+        AG["Antigravity\nPreInvocation hook\n--antigravity-hook\n<USER_REQUEST>, invoc 1 only"]
+        CC["Claude Code\nUserPromptSubmit\n--claude-hook"]
+        CLI["terminal CLI\nargs / stdin / --json"]
+    end
+
+    subgraph ROUTER["router.py → ~/.local/bin/steroids"]
+        T["toks + stem\nstopword + glue filter"]
+        IDX["get_index\nmtime-keyed cache\n+ rules keyword overrides"]
+        RQ["route_query\nkw: sum(1/df) per hit\n+ name bonus ≤1.5\n+ memory bonus ≤1.0\nNEG gate (generic w/o domain = skip)\n+ trigram-cosine × semantic_weight\nsort, top max_recommendations=3"]
+        MEM["learn\ntranscript Skill accepts\n→ memory.json"]
+        LOG["log_impression\nserved.jsonl\nSHA12 + 10s dedup"]
+    end
+
+    subgraph OUT["outputs"]
+        HINT["hint: trigs → names\nconsole.log / ephemeralMessage / stdout"]
+    end
+
+    subgraph GRAPH["graph lane"]
+        EXP["--export → graph_export.py\ntop_k 8, min_shared 2, max_degree 6"]
+        JSON["demo/skill-graph.json\n366 nodes / 582 links"]
+        DEMO["demo/skill-graph.html\nzero-dep canvas, SAMPLE fallback\nfetch json when served"]
+    end
+
+    subgraph EVAL["eval lane"]
+        TE["test_eval.py — 12-row golden"]
+        BL["blind_eval_100.py — 100+ paraphrase rows\nP@1 / P@3 / leaks"]
+        LP["live_probe.py — 16 blind queries\nvs live 366 index"]
+        ER["eval_report.py — one-page table"]
+    end
+
+    subgraph CANVASL["canvas lane (decorative)"]
+        TK["canvas.py → steroids2d.py\ntkinter 420×320, 5 blobs\nlabels from real index"]
+    end
+
+    subgraph STORES["stores ~/.config/opencode/plugins/steroids/"]
+        SI["skill-index.json"]
+        SR["skill-rules.json"]
+        MM["memory.json"]
+        SJ["served.jsonl"]
+    end
+
+    OC & AG & CC & CLI --> T --> IDX --> RQ --> HINT
+    RQ --> LOG
+    AG --> MEM
+    IDX <-.-> SI
+    RQ <-.-> SR
+    MEM <-.-> MM
+    LOG --> SJ
+    IDX --> EXP --> JSON --> DEMO
+    RQ -.-> TE & BL & LP --> ER
+    SI -.-> TK
+
+    style RQ fill:#0d4,stroke:#7ee787,color:#000
+    style DEMO fill:#16f,stroke:#7ee787,color:#fff
+```
