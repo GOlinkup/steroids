@@ -42,7 +42,7 @@ footer{font-size:11px;padding:5px 12px}
 <header><h1>Steroids Skill Graph</h1><span class="sub" id="headline"></span><input id="search" placeholder="search skills…"></header>
 <canvas id="mascot"></canvas>
 <div id="wrap"><canvas id="canvas"></canvas><aside id="details"><p class="dim">Click a node for details.</p></aside></div>
-<footer>drag node to move · scroll to zoom · drag background to pan</footer>
+<footer>drag node to move · scroll to zoom · drag background to pan · double-click to reset view</footer>
 <script>
 var SAMPLE={nodes:[
 {id:"frontend-patterns",keywords:["ui","layout","theme","component","react"],degree:3},
@@ -76,7 +76,7 @@ function init(){
     return {id:n.id,kw:n.keywords,x:Math.cos(a)*200+Math.random()*40,y:Math.sin(a)*200+Math.random()*40,vx:0,vy:0};});
   linkIdx={}; data.links.forEach(function(l){linkIdx[l.source+"|"+l.target]=l.weight;linkIdx[l.target+"|"+l.source]=l.weight;});
   for(var t=0;t<60;t++) tick();
-  headline(); fit();
+  headline(); fit(); fitView();
 }
 function deg(id){var d=0;data.links.forEach(function(l){if(l.source===id||l.target===id)d++;});return d;}
 function byId(id){for(var i=0;i<nodes.length;i++) if(nodes[i].id===id) return nodes[i];}
@@ -91,6 +91,15 @@ function tick(){
 }
 function fit(){var r=cv.getBoundingClientRect();W=r.width;H=r.height;
   var dpr=window.devicePixelRatio||1;cv.width=W*dpr;cv.height=H*dpr;ctx.setTransform(dpr,0,0,dpr,0,0);}
+function fitView(){ // fit the FULL graph on load / double-click: nobody lands in soup
+  if(!nodes.length)return;
+  var x0=1e9,y0=1e9,x1=-1e9,y1=-1e9,i;
+  for(i=0;i<nodes.length;i++){var n=nodes[i];
+    if(n.x<x0)x0=n.x;if(n.x>x1)x1=n.x;if(n.y<y0)y0=n.y;if(n.y>y1)y1=n.y;}
+  var bw=Math.max(60,x1-x0+160),bh=Math.max(60,y1-y0+120);
+  view.x=(x0+x1)/2;view.y=(y0+y1)/2;
+  view.k=Math.min(1.5,Math.max(0.3,Math.min(W/bw,H/bh)));
+}
 function w2s(p){return [(p[0]-view.x)*view.k+W/2,(p[1]-view.y)*view.k+H/2];}
 function s2w(p){return [(p[0]-W/2)/view.k+view.x,(p[1]-H/2)/view.k+view.y];}
 function match(n){return !q||n.id.toLowerCase().indexOf(q)>-1;}
@@ -105,7 +114,7 @@ function draw(){
     ctx.fillStyle=n===sel?"#7ee787":"#1f6feb";
     ctx.beginPath();ctx.arc(p[0],p[1],r,0,6.283);ctx.fill();
     ctx.fillStyle=m?"#e6e9f0":"#6e7681";ctx.font="11px system-ui,sans-serif";
-    ctx.fillText(n.id,p[0]+r+4,p[1]+4);ctx.globalAlpha=1;});
+    if(view.k<=1.6||n===sel)ctx.fillText(n.id,p[0]+r+4,p[1]+4);ctx.globalAlpha=1;});
 }
 function headline(){document.getElementById("headline").textContent=
   "generated from your live index — "+data.nodes.length+" skills";}
@@ -127,8 +136,9 @@ window.addEventListener("mouseup",function(e){
     if(Math.abs(m[0]-downAt[0])+Math.abs(m[1]-downAt[1])<4){sel=drag;show(drag);draw();}}
   drag=null;panning=null;cv.style.cursor="grab";});
 cv.addEventListener("wheel",function(e){e.preventDefault();
-  var m=pos(e),w0=s2w(m);view.k=Math.min(4,Math.max(0.3,view.k*(e.deltaY<0?1.1:0.9)));
+  var m=pos(e),w0=s2w(m);view.k=Math.min(2,Math.max(0.3,view.k*(e.deltaY<0?1.1:0.9)));
   view.x=w0[0]-(m[0]-W/2)/view.k;view.y=w0[1]-(m[1]-H/2)/view.k;draw();},{passive:false});
+cv.addEventListener("dblclick",function(){view.x=0;view.y=0;fitView();draw();});
 var searchT=null;
 document.getElementById("search").addEventListener("input",function(e){q=e.target.value.toLowerCase();
   if(window.Mascot){window.Mascot.think();clearTimeout(searchT);searchT=setTimeout(function(){window.Mascot.idle();},600);}
