@@ -32,8 +32,8 @@ flowchart TB
         ER["eval_report.py — one-page table"]
     end
 
-    subgraph CANVASL["canvas lane (decorative)"]
-        TK["canvas.py → steroids2d.py\ntkinter 420×320, 5 blobs\nlabels from real index"]
+    subgraph CANVASL["canvas lane — RETIRED (human-approved)"]
+        TK["canvas.py DELETED — demo/skill-graph.html\nis the single visual surface"]
     end
 
     subgraph STORES["stores ~/.config/opencode/plugins/steroids/"]
@@ -52,7 +52,6 @@ flowchart TB
     LOG --> SJ
     IDX --> EXP --> JSON --> DEMO
     RQ -.-> TE & BL & LP --> ER
-    SI -.-> TK
 
     style RQ fill:#0d4,stroke:#7ee787,color:#000
     style DEMO fill:#16f,stroke:#7ee787,color:#fff
