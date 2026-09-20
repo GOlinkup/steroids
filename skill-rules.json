@@ -118,6 +118,8 @@
       "chaos"
     ],
     "api-connector-builder": [
+      "codebase",
+      "another",
       "wire",
       "thirdparty"
     ],
@@ -135,14 +137,19 @@
       "idea"
     ],
     "ck": [
+      "reexplain",
+      "alive",
       "session",
       "persist",
       "survive"
     ],
     "claude-devfleet": [
+      "fleet",
+      "dispatch",
+      "parallel",
+      "once",
       "worktree",
-      "isolated",
-      "parallel"
+      "isolated"
     ],
     "click-path-audit": [
       "alone",
@@ -191,12 +198,18 @@
       "cookies"
     ],
     "dmux-workflows": [
+      "drive",
+      "cli",
       "tmux",
       "panes",
       "side",
       "parallel"
     ],
     "docker-patterns": [
+      "holes",
+      "write",
+      "usual",
+      "without",
       "dockerfile"
     ],
     "documentation-lookup": [
@@ -210,10 +223,13 @@
       "settle"
     ],
     "fal-ai-media": [
+      "launch",
       "voiceover",
       "generate"
     ],
     "golang-patterns": [
+      "error",
+      "handling",
       "idiomatic",
       "concurrency"
     ],
@@ -303,8 +319,7 @@
     ],
     "manim-video": [
       [
-        "remotion",
-        "react"
+        "video"
       ],
       [
         "manim",
@@ -351,7 +366,8 @@
     ],
     "prediction-market-risk-review": [
       [
-        "review"
+        "review",
+        "handle"
       ],
       [
         "prediction",
@@ -386,10 +402,10 @@
     ],
     "click-path-audit": [
       [
-        "audit"
+        "audit",
+        "click"
       ],
       [
-        "click",
         "button",
         "state",
         "touchpoint",
@@ -493,10 +509,10 @@
     ],
     "terminal-ops": [
       [
-        "proof"
+        "proof",
+        "terminal"
       ],
       [
-        "terminal",
         "command",
         "repo",
         "execute",
@@ -698,6 +714,182 @@
         "codex",
         "external",
         "synthesis"
+      ]
+    ],
+    "swift-concurrency-6-2": [
+      [
+        "concurrency"
+      ],
+      [
+        "swift",
+        "actor",
+        "protocol",
+        "concurrent",
+        "isolated",
+        "observable"
+      ]
+    ],
+    "rust-patterns": [
+      [
+        "concurrency",
+        "error"
+      ],
+      [
+        "rust",
+        "borrow",
+        "ownership",
+        "lifetime"
+      ]
+    ],
+    "codebase-design": [
+      [
+        "another",
+        "codebase"
+      ],
+      [
+        "seam",
+        "module",
+        "hexagonal",
+        "pattern",
+        "boundary"
+      ]
+    ],
+    "api-design": [
+      [
+        "rest",
+        "api"
+      ],
+      [
+        "endpoint",
+        "name",
+        "error",
+        "paging",
+        "design"
+      ]
+    ],
+    "agent-eval": [
+      [
+        "worktree"
+      ],
+      [
+        "compare",
+        "pass",
+        "rate",
+        "consistency",
+        "eval"
+      ]
+    ],
+    "data-scraper-agent": [
+      [
+        "track",
+        "agent",
+        "run"
+      ],
+      [
+        "scrape",
+        "sheet",
+        "price",
+        "schedule",
+        "monitor"
+      ]
+    ],
+    "terminal-opener": [
+      [
+        "terminal"
+      ],
+      [
+        "open",
+        "window",
+        "visible",
+        "launch",
+        "argv"
+      ]
+    ],
+    "architecture-decision-records": [
+      [
+        "architecture"
+      ],
+      [
+        "decision",
+        "record",
+        "adr",
+        "rationale"
+      ]
+    ],
+    "agent-architecture-audit": [
+      [
+        "architecture"
+      ],
+      [
+        "agent",
+        "audit",
+        "memory",
+        "wrapper",
+        "loop"
+      ]
+    ],
+    "improve-codebase-architecture": [
+      [
+        "architecture"
+      ],
+      [
+        "improve",
+        "deep",
+        "module",
+        "seam",
+        "opportunity"
+      ]
+    ],
+    "tasteforge-video": [
+      [
+        "image",
+        "video"
+      ],
+      [
+        "taste",
+        "style",
+        "plate",
+        "overlay",
+        "grade"
+      ]
+    ],
+    "remotion-video-creation": [
+      [
+        "video",
+        "cover"
+      ],
+      [
+        "remotion",
+        "react",
+        "chart",
+        "caption",
+        "transition"
+      ]
+    ],
+    "unified-memory": [
+      [
+        "memory"
+      ],
+      [
+        "vault",
+        "unified",
+        "share",
+        "palace",
+        "transfer",
+        "agent"
+      ]
+    ],
+    "project-flow-ops": [
+      [
+        "keep",
+        "project"
+      ],
+      [
+        "linear",
+        "github",
+        "duplicate",
+        "triage",
+        "execution"
       ]
     ]
   }
