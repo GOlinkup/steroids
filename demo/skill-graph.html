@@ -114,7 +114,7 @@ function draw(){
     ctx.fillStyle=n===sel?"#7ee787":"#1f6feb";
     ctx.beginPath();ctx.arc(p[0],p[1],r,0,6.283);ctx.fill();
     ctx.fillStyle=m?"#e6e9f0":"#6e7681";ctx.font="11px system-ui,sans-serif";
-    if(view.k<=1.6||n===sel)ctx.fillText(n.id,p[0]+r+4,p[1]+4);ctx.globalAlpha=1;});
+    if((view.k>=0.8&&view.k<=1.6)||n===sel)ctx.fillText(n.id,p[0]+r+4,p[1]+4);ctx.globalAlpha=1;});
 }
 function headline(){document.getElementById("headline").textContent=
   "generated from your live index — "+data.nodes.length+" skills";}
