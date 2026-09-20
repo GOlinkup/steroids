@@ -52,14 +52,22 @@
     hover: false, hoverT: 0,      // bashful timer
     cursor: null,                 // {x,y} in strip coords, real mousemove
     watch: false,                 // user in the search field
-    bounceT: 0, squashT: 0, startleT: 0,
+    bounceT: 0, squashT: 0, startleT: 0, anticT: 0,
+    glide: 0, lastPX: 0, lastPT: 0, // drag momentum
+    prev: null, blend: 0,         // 150ms cross-blend snapshot
     sleepZ: 0
   };
   function setState(s) {
+    if (s !== m.state) {
+      // snapshot for cross-blend: every state pair eases, never hard-cuts
+      m.prev = { state: m.state, frame: m.frame, x: m.x, dir: m.dir, blink: m.blink > 0 };
+      m.blend = 150;
+    }
     m.state = s; m.frame = 0; m.ft = 0;
     if (s === "idle") m.idleT = 0;
-    if (s === "think") m.thinkT = 0;
+    if (s === "think") { m.thinkT = 0; m.anticT = 220; } // anticipation crouch
     if (s !== "sleep") m.sleepZ = 0;
+    if (s !== "drag") m.glide = 0;
   }
   function wake() {
     if (m.state === "sleep") setState("idle");
@@ -116,7 +124,7 @@
     ctx.fillRect(ux * S, uy * S, S, S);
   }
 
-  function drawSprite(ox, oy, flip) {
+  function drawSprite(ox, oy, flip, st, f, blinkOn, ghost) {
     var gx, gy, ch;
     for (gy = 0; gy < PY; gy++) {
       for (gx = 0; gx < PX; gx++) {
@@ -129,14 +137,14 @@
         px(ox + dx, oy + gy, c);
       }
     }
-    var st = m.state, f = m.frame, po = pupilOff();
+    var po = ghost ? { x: 0, y: 0 } : pupilOff();
     if (st === "think") { eye(ox + 4, oy + 4, "up"); eye(ox + 9, oy + 4, "up"); }
     else if (st === "busy") { eye(ox + 4, oy + 4, "wide"); eye(ox + 9, oy + 4, "wide"); }
-    else if (m.blink > 0) { eye(ox + 4, oy + 4, "shut"); eye(ox + 9, oy + 4, "shut"); }
+    else if (blinkOn) { eye(ox + 4, oy + 4, "shut"); eye(ox + 9, oy + 4, "shut"); }
     else { eye(ox + 4, oy + 4, "open", po); eye(ox + 9, oy + 4, "open", po); }
 
-    // blush when bashful (hover)
-    if (m.hover) {
+    // blush when bashful (hover) — skipped on cross-blend ghosts
+    if (m.hover && !ghost) {
       px(ox + 2, oy + 7, BLUSH); px(ox + 3, oy + 7, BLUSH);
       px(ox + 12, oy + 7, BLUSH); px(ox + 13, oy + 7, BLUSH);
     }
@@ -155,8 +163,8 @@
     ctx.fillRect((ox + 5) * S, (oy + 11 + (liftL ? -1 : 0)) * S, S, S);
     ctx.fillRect((ox + 10) * S, (oy + 11 + (liftR ? -1 : 0)) * S, S, S);
 
-    // think bubble: animated dots (real thinking state, not decoration)
-    if (st === "think") {
+    // think bubble appears AFTER the anticipation crouch, never with it
+    if (st === "think" && !ghost && m.anticT <= 0) {
       ctx.fillStyle = "#8b949e";
       var n = 1 + (Math.floor(m.thinkT / 300) % 3), i;
       for (i = 0; i < n; i++) ctx.fillRect((ox + 12 + i * 2) * S, (oy - 2 - i) * S, S, S);
@@ -165,14 +173,14 @@
       ctx.fillStyle = "#5b3a1e";
       for (i = 0; i < n; i++) ctx.fillRect((ox + 12 + i) * S, (oy - 5) * S, S, S);
     }
-    // busy motion ticks
-    if (st === "busy") {
+    // busy motion ticks (skipped on ghosts)
+    if (st === "busy" && !ghost) {
       ctx.fillStyle = f ? "#7ee787" : "#1f6feb";
       ctx.fillRect((ox - 2) * S, (oy + 3) * S, S, S * 2);
       ctx.fillRect((ox + PX + 1) * S, (oy + 3) * S, S, S * 2);
     }
-    // sleep Z's drift up
-    if (st === "sleep") {
+    // sleep Z's drift up (skipped on ghosts)
+    if (st === "sleep" && !ghost) {
       ctx.fillStyle = "#8b949e";
       var z = Math.floor(m.sleepZ / 500) % 3;
       ctx.font = "10px ui-monospace,monospace";
@@ -183,23 +191,36 @@
 
   function draw(t) {
     ctx.clearRect(0, 0, W, H); // transparent: no scene painted, ever
-    var bobY = 0;
-    if (m.state === "walk") bobY = (m.frame === 0 ? -2 : 0);
-    if (m.state === "busy") bobY = Math.sin(t / 90) * 2;
+    var bobY = 0, scX = 1, scY = 1;
+    var st = m.state;
+    if (st === "idle") scY = 1 + Math.sin(t / 1000) * 0.02;          // breathe
+    if (st === "sleep") scY = 1 + Math.sin(t / 1500) * 0.035;        // slow breathe
+    if (st === "walk") {                                              // stretch + squash
+      bobY = (m.frame === 0 ? -2 : 0);
+      scX = (m.frame === 0 ? 1.06 : 0.96); scY = (m.frame === 0 ? 0.94 : 1.04);
+    }
+    if (st === "busy") bobY = Math.sin(t / 90) * 2;
+    if (st === "think" && m.anticT > 0) scY = 0.9;                    // anticipation crouch
     if (m.bounceT > 0) bobY -= Math.abs(Math.sin(m.bounceT / 90)) * 10;
-    // squash (drop landing) / startle (busy kick): vertical scale pop
-    var sq = 1;
-    if (m.squashT > 0) sq = 0.85;
-    if (m.startleT > 0) sq = 1.1;
+    if (m.squashT > 0) { scX = 1.12; scY = 0.85; }                    // landing squash
+    if (m.startleT > 0) { scX = 0.94; scY = 1.1; }                    // startle pop
     var sx = Math.round(m.x / S), sy = Math.round((baseY() + bobY) / S);
-    if (sq !== 1) {
+    var cxp = m.x + (PX * S) / 2, bot = baseY() + PY * S;
+    // cross-blend ghost: previous state fades out under the current one
+    if (m.prev && m.blend > 0) {
       ctx.save();
-      var cxp = m.x + (PX * S) / 2, bot = baseY() + PY * S;
-      ctx.translate(cxp, bot); ctx.scale(1, sq); ctx.translate(-cxp, -bot);
-      drawSprite(sx, sy, m.dir < 0);
+      ctx.globalAlpha = (m.blend / 150) * 0.5;
+      var gx = Math.round(m.prev.x / S);
+      drawSprite(gx, sy, m.prev.dir < 0, m.prev.state, m.prev.frame, m.prev.blink, true);
+      ctx.restore();
+    }
+    if (scX !== 1 || scY !== 1) {
+      ctx.save();
+      ctx.translate(cxp, bot); ctx.scale(scX, scY); ctx.translate(-cxp, -bot);
+      drawSprite(sx, sy, m.dir < 0, st, m.frame, m.blink > 0, false);
       ctx.restore();
     } else {
-      drawSprite(sx, sy, m.dir < 0);
+      drawSprite(sx, sy, m.dir < 0, st, m.frame, m.blink > 0, false);
     }
     ctx.fillStyle = "#6e7681";
     ctx.font = "10px ui-monospace,monospace";
@@ -220,7 +241,17 @@
     if (m.bounceT > 0) m.bounceT -= dt;
     if (m.squashT > 0) m.squashT -= dt;
     if (m.startleT > 0) m.startleT -= dt;
+    if (m.anticT > 0) m.anticT -= dt;
+    if (m.blend > 0) { m.blend -= dt; if (m.blend <= 0) m.prev = null; }
     if (m.hover) m.hoverT += dt; else m.hoverT = 0;
+    // drag momentum: released fast = glide with friction, then settle
+    if (m.state === "drag" && !dragging && m.glide !== 0) {
+      m.x += m.glide * dt / 1000;
+      m.glide *= Math.pow(0.02, dt / 1000); // friction
+      if (m.x < 0) { m.x = 0; m.glide = 0; }
+      if (m.x > W - PX * S) { m.x = W - PX * S; m.glide = 0; }
+      if (Math.abs(m.glide) < 30) { m.glide = 0; m.squashT = 180; setState("idle"); }
+    }
 
     if (m.state === "walk") {
       var dx = m.tx - m.x;
@@ -266,20 +297,28 @@
     return Math.max(0, Math.min(W - PX * S, e.clientX - r.left - (PX * S) / 2));
   }
   cv.addEventListener("pointerdown", function (e) {
-    dragging = true; wake(); m.tx = m.x;
+    dragging = true; wake(); m.tx = m.x; m.glide = 0;
     try { cv.setPointerCapture(e.pointerId); } catch (err) {}
     setState("drag");
     m.x = toX(e);
     e.preventDefault();
   });
   cv.addEventListener("pointermove", function (e) {
-    if (dragging) { m.x = toX(e); m.dir = 1; }
+    if (dragging) {
+      var nx = toX(e), now = performance.now();
+      if (m.lastPT > 0 && now > m.lastPT) m.glide = (nx - m.lastPX) / ((now - m.lastPT) / 1000);
+      m.lastPX = nx; m.lastPT = now;
+      m.x = nx; m.dir = 1;
+    }
   });
   function drop() {
     if (!dragging) return;
     dragging = false;
-    m.squashT = 180; // landing squash
-    setState("idle");
+    m.lastPT = 0;
+    if (Math.abs(m.glide) < 60) { // slow release: stop dead + squash
+      m.glide = 0; m.squashT = 180;
+      setState("idle");
+    } // fast release: loop() glides it home, squash on settle
   }
   cv.addEventListener("pointerup", drop);
   cv.addEventListener("pointercancel", drop);
