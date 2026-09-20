@@ -14,6 +14,7 @@ python3 src/steroids/router.py --count        # Indexed skills: 366 (~0.3s)
 python3 src/steroids/router.py "build a flutter mobile app"
 # -> build,flutter -> dart-flutter-patterns/...
 bash install.sh                               # deploy binary + hooks (optional)
+bash scripts/demo-serve.sh                # demo on :8903, auto-closes with the CLI
 ```
 
 `steroids "query"` prints a short hint like `build,flutter -> dart-flutter-patterns/...`. Load what applies, skip the rest.
