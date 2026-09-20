@@ -192,6 +192,47 @@ NEG = {
 }
 
 
+from collections import Counter
+
+_SEM_CACHE = {}
+
+
+def _trigrams(tok):
+    # ponytail: stdlib typo-robust signal; padded char-3-grams over one token.
+    t = "#" + tok + "#"
+    return [t[i:i + 3] for i in range(len(t) - 2)]
+
+
+def _sem_profiles(idx):
+    """Trigram Counters per skill, cached per index object (offline, stdlib)."""
+    key = id(idx)
+    hit = _SEM_CACHE.get(key)
+    if hit is not None and hit[0] == len(idx):
+        return hit[1]
+    profs = {}
+    for skill, keys in idx.items():
+        c = Counter()
+        for tok in keys:
+            for tri in _trigrams(tok):
+                c[tri] += 1
+        profs[skill] = (c, sum(n * n for n in c.values()) ** 0.5)
+    _SEM_CACHE.clear()
+    _SEM_CACHE[key] = (len(idx), profs)
+    return profs
+
+
+def _trigram_cosine(qcounter, qnorm, sprof):
+    scounter, snorm = sprof
+    if not qnorm or not snorm:
+        return 0.0
+    dot = 0
+    for tri, n in qcounter.items():
+        m = scounter.get(tri)
+        if m:
+            dot += n * m
+    return dot / (qnorm * snorm) if dot else 0.0
+
+
 def rule_neg(rules):
     """Hardcoded NEG defaults + skill-rules.json overrides (stemmed)."""
     neg = {s: (set(b), set(g)) for s, (b, g) in NEG.items()}
@@ -246,6 +287,15 @@ def route_query(prompt, rules, idx, accepts=None):
 
     scored = []
     neg = rule_neg(rules)
+    sem_w = rules.get("semantic_weight", 0.0) or 0.0
+    sprofiles = _sem_profiles(idx) if sem_w else None
+    qcounter = qnorm = None
+    if sprofiles:
+        qcounter = Counter()
+        for tok in ptoks:
+            for tri in _trigrams(tok):
+                qcounter[tri] += 1
+        qnorm = sum(n * n for n in qcounter.values()) ** 0.5
     for skill, keys in idx.items():
         hits = sorted(set(keys) & ptoks)
         if hits:
@@ -257,6 +307,15 @@ def route_query(prompt, rules, idx, accepts=None):
             namehits = len(set(toks(skill.replace("-", " ").replace("_", " "))) & ptoks)
             bonus = min(1.5, 1.0 * namehits) + min(1.0, 0.2 * accepts.get(skill, 0))
             score = round(sum(1.0 / df[h] for h in hits) + bonus, 3)
+        elif sem_w:
+            score = 0.0
+        else:
+            continue
+        if sem_w:
+            score = round(score + sem_w * _trigram_cosine(qcounter, qnorm, sprofiles[skill]), 3)
+            if score <= 0:
+                continue
+        if hits or sem_w:
             scored.append((score, skill, hits))
 
     scored.sort(key=lambda t: (-t[0], -len(t[2]), t[1]))
