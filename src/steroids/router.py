@@ -613,6 +613,14 @@ def fetch_text(url, timeout=10, max_bytes=20000):
     except Exception:
         return None
 
+SHELL_MARKERS = ("loading", "enable javascript", "just a moment",
+                 "checking your browser", "cloudflare", "nreum", "__next_f")
+
+def looks_like_shell(text):
+    # ponytail: >=2 JS-shell markers in the head = bot-wall/SPA shell, not content.
+    head = (text or "")[:2000].lower()
+    return sum(1 for m in SHELL_MARKERS if m in head) >= 2
+
 def resolve_mcp(need, rules):
     # ponytail: static map only; execution stays agent-side (no MCP client in stdlib).
     entry = (rules.get("mcp_needs") or {}).get(need)
@@ -621,18 +629,21 @@ def resolve_mcp(need, rules):
     return None
 
 def gather(prompt, rules, idx, needs=None, accepts=None):
-    # ponytail: route -> needs -> MCP-first, fetch-second, ask-last.
+    # ponytail: route -> needs -> MCP-first, fetch-second, browser-third, ask-last.
     top = route_query(prompt, rules, idx, accepts)
     needs = get_needs(rules) if needs is None else needs
     urls = extract_urls(prompt)
-    evidence, seen = {}, 0
+    evidence, unfetched, seen = {}, [], 0
     for u in urls:
         text = fetch_text(u)
-        if text:
+        if text and not looks_like_shell(text):
             evidence[u] = text
             seen += 1
+        else:
+            unfetched.append(u)
         if seen >= 3:
             break
+    browser = (rules.get("browser_fallback") or {}).get("server", "playwright")
     out_needs = {}
     routes = {}
     missing = []
@@ -646,8 +657,10 @@ def gather(prompt, rules, idx, needs=None, accepts=None):
                 hit = resolve_mcp(r, rules)
                 if hit:
                     routes[r] = hit
-                elif urls:
+                elif evidence:
                     routes[r] = {"kind": "fetch", "server": "", "tool": ""}
+                elif urls:
+                    routes[r] = {"kind": "browser", "server": browser, "tool": ""}
                 else:
                     routes[r] = {"kind": "ask", "server": "", "tool": ""}
                     if r not in missing:
@@ -657,6 +670,7 @@ def gather(prompt, rules, idx, needs=None, accepts=None):
         "needs": out_needs,
         "routes": routes,
         "evidence": evidence,
+        "unfetched": unfetched,
         "missing": missing[:5],
     }
 

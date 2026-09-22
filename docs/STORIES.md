@@ -8,7 +8,7 @@ End-to-end: skill declares `needs:` → Steroids fetches evidence (MCP-first, br
 - [x] P00a `needs:` declarations — parse from SKILL.md frontmatter into index; close: annotated skills (pdf, notion-spec-to-implementation, deep-research, exa-search), unit test.
 - [x] P00b URL fetch + attach — extract URLs from prompt, fetch (timeout + size cap, stdlib), attach text; close: `steroids --gather` demo, no-network graceful fallback.
 - [x] P00c MCP-first routing — need matched to MCP server when available; close: 1 real MCP need resolved end-to-end.
-- [ ] P00d Browser fallback — no MCP? headless fetch of JS/logged-out pages; close: 1 catalog-style page fetched.
+- [x] P00d Browser fallback — no MCP? headless fetch of JS/logged-out pages; close: 1 catalog-style page fetched.
 - [ ] P00e Proof gates — skill declares `proof:`; chain blocks on red; close: 1 two-step chain golden.
 - [ ] P00f Full loop demo — "build X" goes research→build→verify unassisted; close: recorded demo.
 

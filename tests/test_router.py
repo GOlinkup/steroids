@@ -154,6 +154,24 @@ class TestRouter(unittest.TestCase):
             self.assertIn([], texts)
             self.assertIn(["topic-or-url"], texts)
 
+    def test_shell_detect(self):
+        self.assertTrue(router.looks_like_shell("Loading Mixamo ;window.NREUM foo cloudflare check"))
+        self.assertFalse(router.looks_like_shell("Example Domain documentation examples"))
+        self.assertFalse(router.looks_like_shell(None))
+        self.assertFalse(router.looks_like_shell("single loading mention only"))
+
+    def test_gather_browser_fallback(self):
+        idx = {"pdf": ["pdf", "file"]}
+        rules = {"glue": [], "max_recommendations": 3,
+                 "browser_fallback": {"server": "playwright"}}
+        out = router.gather("read this pdf http://127.0.0.1:1/blocked.pdf",
+                            rules, idx, needs={"pdf": ["source-file-or-url"]})
+        self.assertEqual(out["evidence"], {})
+        self.assertEqual(out["unfetched"], ["http://127.0.0.1:1/blocked.pdf"])
+        self.assertEqual(out["routes"]["source-file-or-url"]["kind"], "browser")
+        self.assertEqual(out["routes"]["source-file-or-url"]["server"], "playwright")
+        self.assertEqual(out["missing"], [])
+
 
 if __name__ == "__main__":
     unittest.main()
