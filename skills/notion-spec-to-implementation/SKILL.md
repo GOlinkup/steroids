@@ -4,6 +4,7 @@ description: Turn Notion specs into implementation plans, tasks, and progress tr
 metadata:
   short-description: Turn Notion specs into implementation plans, tasks, and progress tracking
 needs: [spec-url-or-page, target-repo]
+proof: [plan-rendered, tasks-created]
 ---
 
 # Spec to Implementation

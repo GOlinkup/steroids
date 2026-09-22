@@ -77,19 +77,19 @@ def extract_desc(head):
             return val
     return ""
 
-def extract_needs(head):
-    # ponytail: frontmatter `needs:` only; inline/flow/multiline-list; lowercase slugs.
+def extract_list(head, field):
+    # ponytail: frontmatter `field:` only; inline/flow/multiline-list; lowercase slugs.
     m = re.search(r"^---\s*\n(.*?)\n---", head, re.S)
     fm = m.group(1) if m else head[:2000]
-    m = re.search(r"^needs:[ \t]*\[(.*?)\]", fm, re.M | re.S)
+    m = re.search(r"^" + field + r":[ \t]*\[(.*?)\]", fm, re.M | re.S)
     if m:
         raw = m.group(1)
     else:
-        m = re.search(r"^needs:[ \t]*(.+)$", fm, re.M)
+        m = re.search(r"^" + field + r":[ \t]*(.+)$", fm, re.M)
     if m:
         raw = m.group(1).strip()
     else:
-        m = re.search(r"^needs:[ \t]*$", fm, re.M)
+        m = re.search(r"^" + field + r":[ \t]*$", fm, re.M)
         if not m:
             return []
         lines = re.findall(r"^\s*-\s*(.+)$", fm[m.end():], re.M)
@@ -101,23 +101,30 @@ def extract_needs(head):
             out.append(slug)
     return out[:8]
 
-NEEDS_CACHE_PATH = os.path.join(os.path.dirname(CACHE_PATH), "skill-needs.json")
+def extract_needs(head):
+    return extract_list(head, "needs")
 
-def get_needs(rules, force_rebuild=False):
-    # ponytail: sidecar cache; never touches the routing index.
+def extract_proof(head):
+    return extract_list(head, "proof")
+
+NEEDS_CACHE_PATH = os.path.join(os.path.dirname(CACHE_PATH), "skill-needs.json")
+PROOF_CACHE_PATH = os.path.join(os.path.dirname(CACHE_PATH), "skill-proof.json")
+
+def _scan_field(rules, field, cache_path, force_rebuild=False):
+    # ponytail: shadowed names prefer the copy that declares the field.
     try:
         if not force_rebuild:
-            with open(NEEDS_CACHE_PATH, encoding="utf-8") as f:
+            with open(cache_path, encoding="utf-8") as f:
                 cache = json.load(f)
-            if isinstance(cache.get("needs"), dict):
-                return cache["needs"]
+            if isinstance(cache.get(field), dict):
+                return cache[field]
     except Exception:
         pass
-    # ponytail: shadowed names prefer the copy that declares needs:.
+    parse = extract_proof if field == "proof" else extract_needs
     by_name = {}
     for name, md in skill_files_all(rules.get("index_dirs", [])):
         by_name.setdefault(name, []).append(md)
-    needs = {}
+    found_map = {}
     for name, paths in by_name.items():
         for md in paths:
             try:
@@ -125,17 +132,24 @@ def get_needs(rules, force_rebuild=False):
                     head = f.read(8000)
             except OSError:
                 continue
-            found = extract_needs(head)
+            found = parse(head)
             if found:
-                needs[name] = found
+                found_map[name] = found
                 break
     try:
-        os.makedirs(os.path.dirname(NEEDS_CACHE_PATH), exist_ok=True)
-        with open(NEEDS_CACHE_PATH, "w", encoding="utf-8") as f:
-            json.dump({"needs": needs}, f)
+        os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+        with open(cache_path, "w", encoding="utf-8") as f:
+            json.dump({field: found_map}, f)
     except OSError:
         pass
-    return needs
+    return found_map
+
+def get_needs(rules, force_rebuild=False):
+    # ponytail: sidecar cache; never touches the routing index.
+    return _scan_field(rules, "needs", NEEDS_CACHE_PATH, force_rebuild)
+
+def get_proof(rules, force_rebuild=False):
+    return _scan_field(rules, "proof", PROOF_CACHE_PATH, force_rebuild)
 
 def load_rules():
     default_rules = {
@@ -628,10 +642,11 @@ def resolve_mcp(need, rules):
         return {"kind": "mcp", "server": entry["server"], "tool": entry.get("tool", "")}
     return None
 
-def gather(prompt, rules, idx, needs=None, accepts=None):
+def gather(prompt, rules, idx, needs=None, proof=None, accepts=None):
     # ponytail: route -> needs -> MCP-first, fetch-second, browser-third, ask-last.
     top = route_query(prompt, rules, idx, accepts)
     needs = get_needs(rules) if needs is None else needs
+    proof = get_proof(rules) if proof is None else proof
     urls = extract_urls(prompt)
     evidence, unfetched, seen = {}, [], 0
     for u in urls:
@@ -645,14 +660,22 @@ def gather(prompt, rules, idx, needs=None, accepts=None):
             break
     browser = (rules.get("browser_fallback") or {}).get("server", "playwright")
     out_needs = {}
+    out_proof = {}
+    gate = {}
     routes = {}
     missing = []
     for _, skill, _ in top:
+        checks = proof.get(skill, [])
+        if checks:
+            out_proof[skill] = checks
         reqs = needs.get(skill, [])
         if reqs:
             out_needs[skill] = reqs
+            red = []
             for r in reqs:
                 if r in routes:
+                    if routes[r]["kind"] == "ask" and r not in red:
+                        red.append(r)
                     continue
                 hit = resolve_mcp(r, rules)
                 if hit:
@@ -663,16 +686,30 @@ def gather(prompt, rules, idx, needs=None, accepts=None):
                     routes[r] = {"kind": "browser", "server": browser, "tool": ""}
                 else:
                     routes[r] = {"kind": "ask", "server": "", "tool": ""}
+                    red.append(r)
                     if r not in missing:
                         missing.append(r)
+            gate[skill] = ("blocked:" + ",".join(red)) if red else "ready"
+        else:
+            gate[skill] = "ready"
     return {
         "skills": [s for _, s, _ in top],
         "needs": out_needs,
+        "proof": out_proof,
+        "gate": gate,
         "routes": routes,
         "evidence": evidence,
         "unfetched": unfetched,
         "missing": missing[:5],
     }
+
+def chain(plan, rules, idx, needs=None, proof=None, accepts=None):
+    # ponytail: "step one > step two"; chain is go only when every step is ready.
+    steps = [s.strip() for s in plan.split(">")]
+    out = [gather(s, rules, idx, needs, proof, accepts) | {"step": s} for s in steps if s]
+    blocked = next((i for i, g in enumerate(out)
+                    if any(v != "ready" for v in g["gate"].values())), None)
+    return {"steps": out, "verdict": "go" if blocked is None else f"blocked at step {blocked + 1}"}
 
 def open_canvas():
     if os.path.isfile(PY2D_PATH):
@@ -698,6 +735,7 @@ def main():
     parser.add_argument("--claude-hook", action="store_true", help="Run in Claude Code UserPromptSubmit hook mode")
     parser.add_argument("--export", default=None, help="Output path for `graph --export out.json`")
     parser.add_argument("--gather", action="store_true", help="Route plus fetch linked evidence and report unmet needs as JSON")
+    parser.add_argument("--chain", default=None, help='Two-step plan "step one > step two": gather each, verdict go or blocked-at-N')
 
     args, unknown = parser.parse_known_args()
 
@@ -707,6 +745,10 @@ def main():
 
     rules = load_rules()
     idx = get_index(rules, force_rebuild=args.reindex)
+
+    if args.chain:
+        print(json.dumps(chain(args.chain, rules, idx)))
+        return
 
     if args.count:
         print(f"Indexed skills: {len(idx)}")
@@ -785,6 +827,9 @@ def main():
         return
 
     accepts = learn(tp)
+    if args.chain:
+        print(json.dumps(chain(args.chain, rules, idx, accepts=accepts)))
+        return
     if args.gather:
         print(json.dumps(gather(prompt, rules, idx, accepts=accepts)))
         return

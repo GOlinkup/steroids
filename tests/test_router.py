@@ -160,6 +160,30 @@ class TestRouter(unittest.TestCase):
         self.assertFalse(router.looks_like_shell(None))
         self.assertFalse(router.looks_like_shell("single loading mention only"))
 
+    def test_neg_blocks_free_and_city_hijack_on_game_assets(self):
+        # ponytail: bare "free"/"city"/"character" must not summon marketing/SEO/persona skills.
+        rules = dict(RULES, neg={
+            "free-tool-strategy": [["free"], ["marketing", "lead", "seo", "calculator"]],
+            "programmatic-seo": [["city"], ["seo", "directory", "keyword"]],
+            "openclaw-persona-forge": [["character"], ["persona", "lobster", "openclaw"]],
+        })
+        idx = {
+            "free-tool-strategy": ["free", "calculator", "lead"],
+            "programmatic-seo": ["city", "seo", "directory"],
+            "openclaw-persona-forge": ["character", "persona", "lobster"],
+            "game-art": ["asset", "game", "character"],
+        }
+        top = router.route_query("free 3d assets city cars characters", rules, idx)
+        names = [s for _, s, _ in top]
+        self.assertNotIn("free-tool-strategy", names)
+        self.assertNotIn("programmatic-seo", names)
+        self.assertNotIn("openclaw-persona-forge", names)
+        self.assertIn("game-art", names)
+        # legit queries still pass the gate
+        self.assertEqual(router.route_query(
+            "build a free calculator for lead generation", rules, idx)[0][1],
+            "free-tool-strategy")
+
     def test_gather_browser_fallback(self):
         idx = {"pdf": ["pdf", "file"]}
         rules = {"glue": [], "max_recommendations": 3,
@@ -171,6 +195,36 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(out["routes"]["source-file-or-url"]["kind"], "browser")
         self.assertEqual(out["routes"]["source-file-or-url"]["server"], "playwright")
         self.assertEqual(out["missing"], [])
+
+    def test_extract_proof(self):
+        self.assertEqual(
+            router.extract_proof("---\nname: x\nproof: [output-opens, text-extractable]\n---\n"),
+            ["output-opens", "text-extractable"])
+        self.assertEqual(router.extract_proof("---\nname: x\n---\n"), [])
+
+    def test_gate_ready_and_blocked(self):
+        idx = {"pdf": ["pdf", "file"]}
+        base = {"glue": [], "max_recommendations": 3}
+        ready = router.gather("read this pdf http://127.0.0.1:1/x.pdf", base, idx,
+                              needs={"pdf": ["source-file-or-url"]},
+                              proof={"pdf": ["output-opens"]})
+        self.assertEqual(ready["gate"]["pdf"], "ready")
+        self.assertEqual(ready["proof"]["pdf"], ["output-opens"])
+        blocked = router.gather("read this pdf", base, idx,
+                                needs={"pdf": ["source-file-or-url"]},
+                                proof={"pdf": ["output-opens"]})
+        self.assertTrue(blocked["gate"]["pdf"].startswith("blocked:"))
+
+    def test_chain_verdict(self):
+        idx = {"pdf": ["pdf", "file"], "other": ["zzz"]}
+        base = {"glue": [], "max_recommendations": 3}
+        needs = {"pdf": ["source-file-or-url"]}
+        go = router.chain("read this pdf http://127.0.0.1:1/x.pdf > read this pdf http://127.0.0.1:1/y.pdf",
+                          base, idx, needs=needs)
+        self.assertEqual(go["verdict"], "go")
+        stop = router.chain("read this pdf > read this pdf http://127.0.0.1:1/y.pdf",
+                            base, idx, needs=needs)
+        self.assertEqual(stop["verdict"], "blocked at step 1")
 
 
 if __name__ == "__main__":
