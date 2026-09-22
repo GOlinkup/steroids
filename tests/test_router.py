@@ -92,7 +92,12 @@ class TestRouter(unittest.TestCase):
         from http.server import BaseHTTPRequestHandler, HTTPServer
         class H(BaseHTTPRequestHandler):
             def do_GET(self):
-                body = b"<html><head><title>t</title></head><body><p>Hello PDF world</p></body></html>"
+                body = (b"<html><head><title>t</title></head><body><p>Hello PDF world. "
+                        b"Real article text runs several hundred characters so the evidence "
+                        b"threshold keeps it. Cookie walls and login stubs are short and land "
+                        b"in unfetched instead of counting as grounding for the gate. "
+                        b"Extra sentence to clear two hundred characters of readable text.</p>"
+                        b"</body></html>")
                 self.send_response(200)
                 self.send_header("Content-Type", "text/html")
                 self.send_header("Content-Length", str(len(body)))
@@ -118,6 +123,32 @@ class TestRouter(unittest.TestCase):
                                  {"glue": [], "max_recommendations": 3},
                                  idx, needs={"pdf": ["source-file-or-url"]})
             self.assertEqual(out2["missing"], ["source-file-or-url"])
+        finally:
+            srv.shutdown()
+
+    def test_thin_evidence_counts_as_unfetched(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        class H(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = b"<html><body><p>Log in to continue</p></body></html>"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *a):
+                pass
+        srv = HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{srv.server_port}/wall"
+        try:
+            idx = {"pdf": ["pdf", "file"]}
+            out = router.gather(f"read this pdf {url}",
+                                {"glue": [], "max_recommendations": 3},
+                                idx, needs={"pdf": ["source-file-or-url"]})
+            self.assertNotIn(url, out["evidence"])
+            self.assertIn(url, out["unfetched"])
         finally:
             srv.shutdown()
 
@@ -195,6 +226,7 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(out["routes"]["source-file-or-url"]["kind"], "browser")
         self.assertEqual(out["routes"]["source-file-or-url"]["server"], "playwright")
         self.assertEqual(out["missing"], [])
+        self.assertEqual(out["unbacked"], ["source-file-or-url"])
 
     def test_extract_proof(self):
         self.assertEqual(
@@ -226,6 +258,36 @@ class TestRouter(unittest.TestCase):
                             base, idx, needs=needs)
         self.assertEqual(stop["verdict"], "blocked at step 1")
 
+    def test_chain_carries_evidence_forward(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        class H(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = (b"<html><body><p>Long grounded article text. " * 20 + b"</p></body></html>")
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *a):
+                pass
+        srv = HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{srv.server_port}/doc"
+        try:
+            idx = {"pdf": ["pdf", "file"]}
+            base = {"glue": [], "max_recommendations": 3}
+            out = router.chain(f"read this pdf {url} > read this pdf again",
+                               base, idx, needs={"pdf": ["source-file-or-url"]})
+            self.assertEqual(out["verdict"], "go")
+            self.assertIn(url, out["evidence"])
+            step2 = out["steps"][1]
+            self.assertEqual(step2["routes"]["source-file-or-url"]["kind"], "fetch")
+            self.assertEqual(step2["missing"], [])
+            self.assertEqual(step2["unbacked"], [])
+        finally:
+            srv.shutdown()
+
     def test_propose_clusters_unmet(self):
         import tempfile, json
         rows = [
@@ -244,6 +306,31 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(out[0]["count"], 3)
         self.assertIn("mixamo", out[0]["trigs"])
         self.assertTrue(out[0]["suggested_description"].endswith("(Draft — human must verify.)"))
+
+    def test_draft_writes_valid_skeleton(self):
+        import tempfile
+        router.DRAFTS_DIR = tempfile.mkdtemp()
+        try:
+            idx = {"game-art": ["game", "asset", "fbx"]}
+            out = router.draft_skill("mixamo-rig!", ["mixamo", "rig", "fbx"],
+                                     {"glue": [], "max_recommendations": 3}, idx)
+            self.assertTrue(out["ok"])
+            with open(out["path"]) as f:
+                head = f.read(8000)
+            self.assertEqual(router.extract_needs(head), [])
+            desc = router.extract_desc(head)
+            self.assertIn("mixamo", desc)
+            # drafts dir is never an index dir
+            self.assertFalse(any("draft" in d for d in
+                                 ["~/.agents/skills", "./skills", "~/steroids/skills"]))
+            bad = router.draft_skill("mixamo-rig", ["mixamo"], {"glue": []}, idx)
+            self.assertFalse(bad["ok"])  # already exists
+            self.assertFalse(router.draft_skill("!!!", ["x"], {"glue": []}, idx)["ok"])
+            self.assertFalse(router.draft_skill("ok-name", [], {"glue": []}, idx)["ok"])
+        finally:
+            import shutil
+            shutil.rmtree(router.DRAFTS_DIR, ignore_errors=True)
+            router.DRAFTS_DIR = os.path.join(os.path.expanduser("~"), "steroids", "drafts")
 
 
 if __name__ == "__main__":

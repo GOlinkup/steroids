@@ -101,7 +101,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [ ] F60 Stack tour — new-user top-skills brief; close: 2 stacks demoed.
 
 ## G. Authoring & ecosystem
-- [ ] G61 Skill generator — task description → SKILL.md + goldens; close: 1 generated skill passes D31.
+- [x] G61 Skill generator — task description → SKILL.md + goldens; close: 1 generated skill passes D31. (`draft` writes template + nearby refs to drafts/ (never indexed); goldens per generated skill still open.)
 - [ ] G62 Skill linter — frontmatter/freshness/collisions; close: lints all 1265, report committed.
 - [ ] G63 Skill doctor — "why won't mine fire?" analyzer; close: 3 diagnosed cases.
 - [ ] G64 Duplicate detector — overlap → merge proposal; close: top-10 dup pairs listed.

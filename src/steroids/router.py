@@ -117,13 +117,16 @@ def _with_overlay(rules, field, found_map):
         if isinstance(items, list) and items and name not in found_map:
             found_map[name] = [str(i) for i in items][:8]
     return found_map
+
+
+def _scan_field(rules, field, cache_path, force_rebuild=False):
     # ponytail: shadowed names prefer the copy that declares the field.
     try:
         if not force_rebuild:
             with open(cache_path, encoding="utf-8") as f:
                 cache = json.load(f)
             if isinstance(cache.get(field), dict):
-                return cache[field]
+                return _with_overlay(rules, field, cache[field])
     except Exception:
         pass
     parse = extract_proof if field == "proof" else extract_needs
@@ -142,6 +145,7 @@ def _with_overlay(rules, field, found_map):
             if found:
                 found_map[name] = found
                 break
+    found_map = _with_overlay(rules, field, found_map)
     try:
         os.makedirs(os.path.dirname(cache_path), exist_ok=True)
         with open(cache_path, "w", encoding="utf-8") as f:
@@ -648,16 +652,17 @@ def resolve_mcp(need, rules):
         return {"kind": "mcp", "server": entry["server"], "tool": entry.get("tool", "")}
     return None
 
-def gather(prompt, rules, idx, needs=None, proof=None, accepts=None):
+def gather(prompt, rules, idx, needs=None, proof=None, accepts=None, seen_evidence=None):
     # ponytail: route -> needs -> MCP-first, fetch-second, browser-third, ask-last.
     top = route_query(prompt, rules, idx, accepts)
     needs = get_needs(rules) if needs is None else needs
     proof = get_proof(rules) if proof is None else proof
     urls = extract_urls(prompt)
     evidence, unfetched, seen = {}, [], 0
+    min_chars = rules.get("min_evidence_chars", 200)
     for u in urls:
         text = fetch_text(u)
-        if text and not looks_like_shell(text):
+        if text and len(text) >= min_chars and not looks_like_shell(text):
             evidence[u] = text
             seen += 1
         else:
@@ -686,7 +691,7 @@ def gather(prompt, rules, idx, needs=None, proof=None, accepts=None):
                 hit = resolve_mcp(r, rules)
                 if hit:
                     routes[r] = hit
-                elif evidence:
+                elif evidence or seen_evidence:
                     routes[r] = {"kind": "fetch", "server": "", "tool": ""}
                 elif urls:
                     routes[r] = {"kind": "browser", "server": browser, "tool": ""}
@@ -698,6 +703,10 @@ def gather(prompt, rules, idx, needs=None, proof=None, accepts=None):
             gate[skill] = ("blocked:" + ",".join(red)) if red else "ready"
         else:
             gate[skill] = "ready"
+    # ponytail: fetch/browser routes with zero evidence are actionable but ungrounded.
+    grounded = evidence or seen_evidence
+    unbacked = sorted(r for r, h in routes.items()
+                      if h["kind"] in ("fetch", "browser") and not grounded)
     return {
         "skills": [s for _, s, _ in top],
         "needs": out_needs,
@@ -707,15 +716,71 @@ def gather(prompt, rules, idx, needs=None, proof=None, accepts=None):
         "evidence": evidence,
         "unfetched": unfetched,
         "missing": missing[:5],
+        "unbacked": unbacked[:5],
     }
 
 def chain(plan, rules, idx, needs=None, proof=None, accepts=None):
-    # ponytail: "step one > step two"; chain is go only when every step is ready.
+    # ponytail: "step one > step two"; later steps inherit earlier evidence; go only when every step ready.
     steps = [s.strip() for s in plan.split(">")]
-    out = [gather(s, rules, idx, needs, proof, accepts) | {"step": s} for s in steps if s]
+    out, carried, cum_missing, cum_unbacked = [], {}, [], []
+    for s in steps:
+        if not s:
+            continue
+        g = gather(s, rules, idx, needs, proof, accepts, seen_evidence=carried) | {"step": s}
+        out.append(g)
+        carried = {**carried, **g["evidence"]}
+        for m in g["missing"]:
+            if m not in cum_missing:
+                cum_missing.append(m)
+        for u in g.get("unbacked", []):
+            if u not in cum_unbacked:
+                cum_unbacked.append(u)
     blocked = next((i for i, g in enumerate(out)
                     if any(v != "ready" for v in g["gate"].values())), None)
-    return {"steps": out, "verdict": "go" if blocked is None else f"blocked at step {blocked + 1}"}
+    return {"steps": out, "evidence": carried, "missing": cum_missing[:5],
+            "unbacked": cum_unbacked[:5],
+            "verdict": "go" if blocked is None else f"blocked at step {blocked + 1}"}
+
+DRAFTS_DIR = os.path.join(os.path.expanduser("~"), "steroids", "drafts")
+
+def draft_skill(name, trigs, rules, idx, accepts=None):
+    # ponytail: template + nearest-skills references; writes drafts/ which no index_dir covers.
+    slug = re.sub(r"[^a-z0-9]+", "-", name.strip().lower()).strip("-")
+    if not slug or len(slug) > 60:
+        return {"ok": False, "error": "bad name"}
+    clean = [re.sub(r"[^a-z0-9+#]+", "", t.strip().lower()) for t in trigs]
+    clean = [t for t in clean if t][:6]
+    if not clean:
+        return {"ok": False, "error": "no trigger words"}
+    near = [s for _, s, _ in route_query(" ".join(clean), rules, idx, accepts)][:3]
+    title = " ".join(w.capitalize() for w in slug.split("-"))
+    body = (
+        "---\n"
+        f"name: {slug}\n"
+        f"description: Handle tasks about {', '.join(clean)}. (Draft — human must verify.)\n"
+        "needs: []\n"
+        "proof: []\n"
+        "status: draft\n"
+        "---\n\n"
+        f"# {title}\n\n"
+        f"Draft proposed from {len(clean)} repeated unmet trigger(s): {', '.join(clean)}.\n\n"
+        "## When to use\n\n"
+        f"Use when the task involves {', '.join(clean)} and no indexed skill fires.\n\n"
+        "## References\n\n"
+        + ("".join(f"- See also: `{s}`\n" for s in near) or "- (no nearby skills found)\n")
+        + "\n## Approve\n\n"
+        "Human: verify, fill needs/proof, move to `skills/` and commit. Drafts never index.\n"
+    )
+    dest = os.path.join(DRAFTS_DIR, slug, "SKILL.md")
+    try:
+        os.makedirs(os.path.dirname(dest), exist_ok=True)
+        if os.path.exists(dest):
+            return {"ok": False, "error": "draft exists", "path": dest}
+        with open(dest, "w", encoding="utf-8") as f:
+            f.write(body)
+    except OSError as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "path": dest, "nearby": near}
 
 def open_canvas():
     if os.path.isfile(PY2D_PATH):
@@ -759,6 +824,14 @@ def main():
 
     if args.propose:
         print(json.dumps(propose()))
+        return
+
+    if args.prompt and args.prompt[0] == "draft":
+        # ponytail: `steroids draft <slug> <trig>...`; human gate stays shut by default.
+        if len(args.prompt) < 3:
+            print(json.dumps({"ok": False, "error": "usage: steroids draft <slug> <trig>..."}))
+            return
+        print(json.dumps(draft_skill(args.prompt[1], args.prompt[2:], rules, idx)))
         return
 
     if args.count:
