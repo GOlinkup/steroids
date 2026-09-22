@@ -113,16 +113,22 @@ def get_needs(rules, force_rebuild=False):
                 return cache["needs"]
     except Exception:
         pass
+    # ponytail: shadowed names prefer the copy that declares needs:.
+    by_name = {}
+    for name, md in skill_files_all(rules.get("index_dirs", [])):
+        by_name.setdefault(name, []).append(md)
     needs = {}
-    for name, md in skill_files(rules.get("index_dirs", [])):
-        try:
-            with open(md, encoding="utf-8", errors="replace") as f:
-                head = f.read(8000)
-        except OSError:
-            continue
-        found = extract_needs(head)
-        if found:
-            needs[name] = found
+    for name, paths in by_name.items():
+        for md in paths:
+            try:
+                with open(md, encoding="utf-8", errors="replace") as f:
+                    head = f.read(8000)
+            except OSError:
+                continue
+            found = extract_needs(head)
+            if found:
+                needs[name] = found
+                break
     try:
         os.makedirs(os.path.dirname(NEEDS_CACHE_PATH), exist_ok=True)
         with open(NEEDS_CACHE_PATH, "w", encoding="utf-8") as f:
@@ -174,6 +180,22 @@ def load_rules():
         except Exception:
             pass
     return default_rules
+
+def skill_files_all(dirs):
+    # ponytail: skill_files dedups by name; this keeps every copy for needs precedence.
+    out = []
+    for d in dirs:
+        d = os.path.expanduser(d)
+        if not os.path.isdir(d):
+            continue
+        try:
+            for name in sorted(os.listdir(d)):
+                md = os.path.join(d, name, "SKILL.md")
+                if os.path.isfile(md):
+                    out.append((name, md))
+        except OSError:
+            continue
+    return out
 
 def skill_files(dirs):
     out = []
@@ -591,8 +613,15 @@ def fetch_text(url, timeout=10, max_bytes=20000):
     except Exception:
         return None
 
+def resolve_mcp(need, rules):
+    # ponytail: static map only; execution stays agent-side (no MCP client in stdlib).
+    entry = (rules.get("mcp_needs") or {}).get(need)
+    if isinstance(entry, dict) and entry.get("server"):
+        return {"kind": "mcp", "server": entry["server"], "tool": entry.get("tool", "")}
+    return None
+
 def gather(prompt, rules, idx, needs=None, accepts=None):
-    # ponytail: route -> needs -> fetch what the prompt already links; unmet needs become questions.
+    # ponytail: route -> needs -> MCP-first, fetch-second, ask-last.
     top = route_query(prompt, rules, idx, accepts)
     needs = get_needs(rules) if needs is None else needs
     urls = extract_urls(prompt)
@@ -605,16 +634,28 @@ def gather(prompt, rules, idx, needs=None, accepts=None):
         if seen >= 3:
             break
     out_needs = {}
+    routes = {}
     missing = []
     for _, skill, _ in top:
         reqs = needs.get(skill, [])
         if reqs:
             out_needs[skill] = reqs
-            if not urls:
-                missing.extend(r for r in reqs if r not in missing)
+            for r in reqs:
+                if r in routes:
+                    continue
+                hit = resolve_mcp(r, rules)
+                if hit:
+                    routes[r] = hit
+                elif urls:
+                    routes[r] = {"kind": "fetch", "server": "", "tool": ""}
+                else:
+                    routes[r] = {"kind": "ask", "server": "", "tool": ""}
+                    if r not in missing:
+                        missing.append(r)
     return {
         "skills": [s for _, s, _ in top],
         "needs": out_needs,
+        "routes": routes,
         "evidence": evidence,
         "missing": missing[:5],
     }

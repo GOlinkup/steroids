@@ -121,6 +121,39 @@ class TestRouter(unittest.TestCase):
         finally:
             srv.shutdown()
 
+    def test_resolve_mcp_first(self):
+        rules = {"mcp_needs": {"query-or-url": {"server": "exa-web-search", "tool": "web_search"}}}
+        self.assertEqual(router.resolve_mcp("query-or-url", rules),
+                         {"kind": "mcp", "server": "exa-web-search", "tool": "web_search"})
+        self.assertIsNone(router.resolve_mcp("nope", rules))
+        self.assertIsNone(router.resolve_mcp("query-or-url", {}))
+
+    def test_gather_mcp_beats_fetch(self):
+        idx = {"exa-search": ["exa", "search", "query"]}
+        rules = {"glue": [], "max_recommendations": 3,
+                 "mcp_needs": {"query-or-url": {"server": "exa-web-search", "tool": "web_search"}}}
+        out = router.gather("search the web for exa query https://example.com/x",
+                            rules, idx, needs={"exa-search": ["query-or-url"]})
+        self.assertEqual(out["routes"]["query-or-url"]["kind"], "mcp")
+        self.assertEqual(out["missing"], [])
+
+    def test_needs_prefers_annotated_shadow(self):
+        import tempfile
+        with tempfile.TemporaryDirectory() as a, tempfile.TemporaryDirectory() as b:
+            for d, body in ((a, "---\nname: s\n---\n# plain"),
+                            (b, "---\nname: s\nneeds: [topic-or-url]\n---\n# annotated")):
+                os.makedirs(os.path.join(d, "s"))
+                with open(os.path.join(d, "s", "SKILL.md"), "w") as f:
+                    f.write(body)
+            copies = router.skill_files_all([a, b])
+            self.assertEqual(len([c for c in copies if c[0] == "s"]), 2)
+            texts = []
+            for _, md in copies:
+                with open(md) as f:
+                    texts.append(router.extract_needs(f.read()))
+            self.assertIn([], texts)
+            self.assertIn(["topic-or-url"], texts)
+
 
 if __name__ == "__main__":
     unittest.main()
