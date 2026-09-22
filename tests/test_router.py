@@ -68,6 +68,59 @@ class TestRouter(unittest.TestCase):
         top = router.route_query("abcx", dict(RULES, semantic_weight=1.0), idx)
         self.assertEqual(top, [])
 
+    def test_extract_needs(self):
+        self.assertEqual(
+            router.extract_needs("---\nname: x\nneeds: [figma-url, node-id]\n---\n# body"),
+            ["figma-url", "node-id"])
+        self.assertEqual(
+            router.extract_needs("---\nname: x\nneeds: spec-url\n---\n"),
+            ["spec-url"])
+        self.assertEqual(router.extract_needs("---\nname: x\ndescription: y\n---\n"), [])
+        self.assertEqual(
+            router.extract_needs("---\nname: x\nneeds:\n  - a-url\n  - b-file\n---\n"),
+            ["a-url", "b-file"])
+
+    def test_extract_urls(self):
+        self.assertEqual(
+            router.extract_urls("see https://example.com/a and http://x.io/b."),
+            ["https://example.com/a", "http://x.io/b"])
+        self.assertEqual(router.extract_urls("no links here"), [])
+        self.assertEqual(router.extract_urls("bare example.com stays out"), [])
+
+    def test_fetch_and_gather_local(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        class H(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = b"<html><head><title>t</title></head><body><p>Hello PDF world</p></body></html>"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *a):
+                pass
+        srv = HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        url = f"http://127.0.0.1:{srv.server_port}/spec"
+        try:
+            text = router.fetch_text(url)
+            self.assertIn("Hello PDF world", text)
+            self.assertIsNone(router.fetch_text("http://127.0.0.1:1/nope", timeout=1))
+            idx = {"pdf": ["pdf", "file"]}
+            out = router.gather(f"read this pdf {url}",
+                                {"glue": [], "max_recommendations": 3},
+                                idx, needs={"pdf": ["source-file-or-url"]})
+            self.assertIn("pdf", out["skills"])
+            self.assertIn(url, out["evidence"])
+            self.assertEqual(out["missing"], [])
+            out2 = router.gather("read this pdf please",
+                                 {"glue": [], "max_recommendations": 3},
+                                 idx, needs={"pdf": ["source-file-or-url"]})
+            self.assertEqual(out2["missing"], ["source-file-or-url"])
+        finally:
+            srv.shutdown()
+
 
 if __name__ == "__main__":
     unittest.main()

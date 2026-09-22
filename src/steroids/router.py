@@ -77,6 +77,60 @@ def extract_desc(head):
             return val
     return ""
 
+def extract_needs(head):
+    # ponytail: frontmatter `needs:` only; inline/flow/multiline-list; lowercase slugs.
+    m = re.search(r"^---\s*\n(.*?)\n---", head, re.S)
+    fm = m.group(1) if m else head[:2000]
+    m = re.search(r"^needs:[ \t]*\[(.*?)\]", fm, re.M | re.S)
+    if m:
+        raw = m.group(1)
+    else:
+        m = re.search(r"^needs:[ \t]*(.+)$", fm, re.M)
+    if m:
+        raw = m.group(1).strip()
+    else:
+        m = re.search(r"^needs:[ \t]*$", fm, re.M)
+        if not m:
+            return []
+        lines = re.findall(r"^\s*-\s*(.+)$", fm[m.end():], re.M)
+        raw = ", ".join(lines[:8])
+    out = []
+    for part in re.split(r"[,;]", raw):
+        slug = re.sub(r"[^a-z0-9]+", "-", part.strip().lower()).strip("-")
+        if slug and slug not in out:
+            out.append(slug)
+    return out[:8]
+
+NEEDS_CACHE_PATH = os.path.join(os.path.dirname(CACHE_PATH), "skill-needs.json")
+
+def get_needs(rules, force_rebuild=False):
+    # ponytail: sidecar cache; never touches the routing index.
+    try:
+        if not force_rebuild:
+            with open(NEEDS_CACHE_PATH, encoding="utf-8") as f:
+                cache = json.load(f)
+            if isinstance(cache.get("needs"), dict):
+                return cache["needs"]
+    except Exception:
+        pass
+    needs = {}
+    for name, md in skill_files(rules.get("index_dirs", [])):
+        try:
+            with open(md, encoding="utf-8", errors="replace") as f:
+                head = f.read(8000)
+        except OSError:
+            continue
+        found = extract_needs(head)
+        if found:
+            needs[name] = found
+    try:
+        os.makedirs(os.path.dirname(NEEDS_CACHE_PATH), exist_ok=True)
+        with open(NEEDS_CACHE_PATH, "w", encoding="utf-8") as f:
+            json.dump({"needs": needs}, f)
+    except OSError:
+        pass
+    return needs
+
 def load_rules():
     default_rules = {
         "verified_only": True,
@@ -517,6 +571,54 @@ def extract_prompt_from_transcript(tp):
         pass
     return last_prompt
 
+def extract_urls(prompt):
+    # ponytail: http(s) only; bare domains stay out (precision over recall).
+    found = re.findall(r"https?://[^\s) '\"<>]+", prompt)
+    return list(dict.fromkeys(u.rstrip(".,;:!?") for u in found))[:5]
+
+def fetch_text(url, timeout=10, max_bytes=20000):
+    # ponytail: stdlib urllib; any failure (DNS, TLS, timeout, huge) = None, never raise.
+    try:
+        import urllib.request
+        req = urllib.request.Request(url, headers={"User-Agent": "Steroids-gather/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as res:
+            raw = res.read(max_bytes + 1)
+        text = raw[:max_bytes].decode("utf-8", "replace")
+        text = re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>|<!--[\s\S]*?-->", " ", text)
+        text = re.sub(r"<[^>]+>", " ", text)
+        text = re.sub(r"\s+", " ", text).strip()
+        return text[:max_bytes] or None
+    except Exception:
+        return None
+
+def gather(prompt, rules, idx, needs=None, accepts=None):
+    # ponytail: route -> needs -> fetch what the prompt already links; unmet needs become questions.
+    top = route_query(prompt, rules, idx, accepts)
+    needs = get_needs(rules) if needs is None else needs
+    urls = extract_urls(prompt)
+    evidence, seen = {}, 0
+    for u in urls:
+        text = fetch_text(u)
+        if text:
+            evidence[u] = text
+            seen += 1
+        if seen >= 3:
+            break
+    out_needs = {}
+    missing = []
+    for _, skill, _ in top:
+        reqs = needs.get(skill, [])
+        if reqs:
+            out_needs[skill] = reqs
+            if not urls:
+                missing.extend(r for r in reqs if r not in missing)
+    return {
+        "skills": [s for _, s, _ in top],
+        "needs": out_needs,
+        "evidence": evidence,
+        "missing": missing[:5],
+    }
+
 def open_canvas():
     if os.path.isfile(PY2D_PATH):
         try:
@@ -540,6 +642,7 @@ def main():
     parser.add_argument("--antigravity-hook", action="store_true", help="Run in Antigravity PreInvocation hook mode")
     parser.add_argument("--claude-hook", action="store_true", help="Run in Claude Code UserPromptSubmit hook mode")
     parser.add_argument("--export", default=None, help="Output path for `graph --export out.json`")
+    parser.add_argument("--gather", action="store_true", help="Route plus fetch linked evidence and report unmet needs as JSON")
 
     args, unknown = parser.parse_known_args()
 
@@ -627,6 +730,9 @@ def main():
         return
 
     accepts = learn(tp)
+    if args.gather:
+        print(json.dumps(gather(prompt, rules, idx, accepts=accepts)))
+        return
     top = route_query(prompt, rules, idx, accepts)
 
     if top:

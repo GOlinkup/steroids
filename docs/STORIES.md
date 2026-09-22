@@ -3,6 +3,15 @@
 Source: router deep search + eval numbers (149-set P@1 0.705 / P@3 0.859, 315-set P@1 0.803 / P@3 0.917, leaks 0, unit 11/11 @ `6511ad2`).
 Shipped already: abstention gate, short tokens, 12 synonyms, ed1 typo fix, de-hijacked overrides, learn fallback, served cap, embed deploy.
 
+## P00. Grounded execution loop (build FIRST — unlocks the 100)
+End-to-end: skill declares `needs:` → Steroids fetches evidence (MCP-first, browser-fallback) → agent builds from real data → per-step proof gates. Kills hallucination + shortcut-taking at the seam where skills load.
+- [x] P00a `needs:` declarations — parse from SKILL.md frontmatter into index; close: 3 annotated skills, unit test.
+- [x] P00b URL fetch + attach — extract URLs from prompt, fetch (timeout + size cap, stdlib), attach text; close: `steroids --gather` demo, no-network graceful fallback.
+- [ ] P00c MCP-first routing — need matched to MCP server when available; close: 1 real MCP need resolved end-to-end.
+- [ ] P00d Browser fallback — no MCP? headless fetch of JS/logged-out pages; close: 1 catalog-style page fetched.
+- [ ] P00e Proof gates — skill declares `proof:`; chain blocks on red; close: 1 two-step chain golden.
+- [ ] P00f Full loop demo — "build X" goes research→build→verify unassisted; close: recorded demo.
+
 ## How to close a story
 1. Implement minimal diff in `src/steroids/` (+ `skill-rules.json` if data-only).
 2. Add/extend test in `tests/test_router.py` (unit) and golden rows in `tests/blind_eval_100.py` if routing changes.
