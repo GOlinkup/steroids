@@ -26,7 +26,9 @@
     "repo",
     "code",
     "thing",
-    "stuff"
+    "stuff",
+    "them",
+    "mention"
   ],
   "skills": {
     "design-system": [
@@ -106,16 +108,16 @@
       "tap"
     ],
     "agent-self-evaluation": [
-      "session",
-      "honestly"
+      "scorecard",
+      "axes"
     ],
     "agent-sort": [
-      "keep",
-      "forty"
+      "buckets",
+      "trimmed"
     ],
     "ai-first-engineering": [
-      "bots",
-      "chaos"
+      "ownership",
+      "gates"
     ],
     "api-connector-builder": [
       "codebase",

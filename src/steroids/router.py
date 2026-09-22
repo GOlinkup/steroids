@@ -45,8 +45,26 @@ def stem(w):
         return w[:-1]
     return w
 
+# ponytail: expand, don't replace; index+query normalize identically via toks().
+SYN = {
+    "k8s": ("kubernetes",), "go": ("golang",), "js": ("javascript",),
+    "ts": ("typescript",), "py": ("python",), "db": ("database",),
+    "s3": ("aws",), "gh": ("github",), "gql": ("graphql",), "pg": ("postgres",),
+    "mongo": ("mongodb",), "tf": ("terraform",),
+}
+
 def toks(text):
-    return [stem(w) for w in re.findall(r"[a-z][a-z0-9+#]{2,}", text.lower()) if w not in STOP]
+    # ponytail: keep 2-char tech tokens (go/js/ts/ai/db/s3/ui/api); STOP filters noise.
+    out = []
+    for w in re.findall(r"[a-z][a-z0-9+#]{1,}", text.lower()):
+        if w in STOP:
+            continue
+        s = stem(w)
+        out.append(s)
+        for extra in SYN.get(s, ()):
+            if extra not in out:
+                out.append(extra)
+    return out
 
 def extract_desc(head):
     m = re.search(r"^description:\s*(?:[>|]-?)?\s*\n((?:(?:\s{2,}|\t)[^\n]+\n?)+)", head, re.M)
@@ -285,7 +303,11 @@ def learn(transcript_path):
             with open(transcript_path, "rb") as f:
                 f.seek(start)
                 chunk = f.read().decode("utf-8", "replace")
-            for s in re.findall(r'"name":\s*"Skill"[\s\S]{0,300}?"skill":\s*"([^"]+)"', chunk):
+            found = re.findall(r'"name":\s*"Skill"[\s\S]{0,300}?"skill":\s*"([^"]+)"', chunk)
+            # ponytail: fallback for tool-loop shapes without the Skill wrapper.
+            if not found:
+                found = re.findall(r'"skill":\s*"([a-z0-9][a-z0-9_-]{2,60})"', chunk)
+            for s in found:
                 accepts[s] = accepts.get(s, 0) + 1
             offsets[transcript_path] = size
             with open(MEM_PATH, "w", encoding="utf-8") as f:
@@ -293,6 +315,35 @@ def learn(transcript_path):
         except OSError:
             pass
     return accepts
+
+def _ed1_variants(tok):
+    # ponytail: edit-distance-1 set for typo fix; len>=4 only, stdlib.
+    v = set()
+    for i in range(len(tok)):
+        v.add(tok[:i] + tok[i+1:])  # delete
+        if i < len(tok) - 1:
+            v.add(tok[:i] + tok[i+1] + tok[i] + tok[i+2:])  # transpose
+        for c in "abcdefghijklmnopqrstuvwxyz":
+            v.add(tok[:i] + c + tok[i+1:])  # substitute
+    for i in range(len(tok) + 1):
+        for c in "abcdefghijklmnopqrstuvwxyz":
+            v.add(tok[:i] + c + tok[i:])  # insert
+    v.discard(tok)
+    return v
+
+def _typo_fix(ptoks, idx):
+    # ponytail: fix only no-hit tokens len>=4 with exactly one vocab neighbor; else skip.
+    vocab = set()
+    for keys in idx.values():
+        vocab.update(keys)
+    fixed = set(ptoks)
+    for t in ptoks:
+        if len(t) < 4 or t in vocab:
+            continue
+        cands = sorted(_ed1_variants(t) & vocab)
+        if len(cands) == 1:
+            fixed.add(cands[0])
+    return fixed
 
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
@@ -302,6 +353,7 @@ def route_query(prompt, rules, idx, accepts=None):
     ptoks = {t for t in ptoks if t not in glue}
     if not ptoks:
         return []
+    ptoks = _typo_fix(ptoks, idx)
 
     df = {}
     for keys in idx.values():
@@ -399,6 +451,9 @@ def route_query(prompt, rules, idx, accepts=None):
             scored.append((score, skill, hits))
 
     scored.sort(key=lambda t: (-t[0], -len(t[2]), t[1]))
+    # ponytail: abstain on pure-trigram noise; no lexical hit = no recommendation.
+    if scored and not any(h for _, _, h in scored):
+        return []
     top = scored[:rules.get("max_recommendations", 3)]
     return top
 
@@ -429,6 +484,16 @@ def log_impression(prompt, trigs, skills):
                 "trigs": trigs,
                 "skills": skills
             }) + "\n")
+        # ponytail: cap log at 5000 rows; size-gated so the check is ~free.
+        try:
+            if os.path.getsize(LOG_PATH) > 512000:
+                with open(LOG_PATH, encoding="utf-8") as f:
+                    rows = f.readlines()
+                if len(rows) > 5000:
+                    with open(LOG_PATH, "w", encoding="utf-8") as f:
+                        f.writelines(rows[-5000:])
+        except OSError:
+            pass
     except Exception:
         pass
 
