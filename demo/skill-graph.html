@@ -36,13 +36,19 @@ header{flex-wrap:wrap;padding:8px 12px;gap:8px}
 #details h2{font-size:14px;margin-bottom:8px;padding-bottom:6px}
 footer{font-size:11px;padding:5px 12px}
 }
+#zoom{position:fixed;right:288px;bottom:44px;display:flex;flex-direction:column;gap:6px;z-index:5}
+#zoom button{width:34px;height:34px;border-radius:8px;border:1px solid #2a3342;background:#11161f;color:#e6e9f0;font-size:18px;line-height:1;cursor:pointer}
+#zoom button:hover{border-color:#1f6feb}
+#zoom button:active{transform:scale(.94)}
+@media (max-width:700px){#zoom{right:12px;bottom:auto;top:200px}}
 </style>
 </head>
 <body>
 <header><h1>Steroids Skill Graph</h1><span class="sub" id="headline"></span><input id="search" placeholder="search skills…"></header>
 <canvas id="mascot"></canvas>
 <div id="wrap"><canvas id="canvas"></canvas><aside id="details"><p class="dim">Click a node for details.</p></aside></div>
-<footer>drag node to move · scroll to zoom · drag background to pan · double-click to reset view</footer>
+<div id="zoom"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button></div>
+<footer>drag node to move · scroll or +/− to zoom · drag background to pan · double-click to reset view</footer>
 <script>
 var SAMPLE={nodes:[
 {id:"frontend-patterns",keywords:["ui","layout","theme","component","react"],degree:3},
@@ -139,6 +145,11 @@ cv.addEventListener("wheel",function(e){e.preventDefault();
   var m=pos(e),w0=s2w(m);view.k=Math.min(2,Math.max(0.3,view.k*(e.deltaY<0?1.1:0.9)));
   view.x=w0[0]-(m[0]-W/2)/view.k;view.y=w0[1]-(m[1]-H/2)/view.k;draw();},{passive:false});
 cv.addEventListener("dblclick",function(){view.x=0;view.y=0;fitView();draw();});
+function zoomStep(f){var m=[W/2,H/2],w0=s2w(m);
+  view.k=Math.min(2,Math.max(0.3,view.k*f));
+  view.x=w0[0]-(m[0]-W/2)/view.k;view.y=w0[1]-(m[1]-H/2)/view.k;draw();}
+document.getElementById("zin").addEventListener("click",function(){zoomStep(1.25);});
+document.getElementById("zout").addEventListener("click",function(){zoomStep(0.8);});
 var searchT=null;
 document.getElementById("search").addEventListener("input",function(e){q=e.target.value.toLowerCase();
   if(window.Mascot){window.Mascot.think();clearTimeout(searchT);searchT=setTimeout(function(){window.Mascot.idle();},600);}
