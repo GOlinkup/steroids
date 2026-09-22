@@ -1,6 +1,7 @@
 ---
 name: exa-search
 description: Semantic search, similar content discovery, and structured research using Exa API
+needs: [query-or-url]
 ---
 
 # exa-search
