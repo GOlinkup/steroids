@@ -226,6 +226,25 @@ class TestRouter(unittest.TestCase):
                             base, idx, needs=needs)
         self.assertEqual(stop["verdict"], "blocked at step 1")
 
+    def test_propose_clusters_unmet(self):
+        import tempfile, json
+        rows = [
+            {"t": 1, "q": "a1", "trigs": "mixamo,rig,fbx", "skills": ""},
+            {"t": 2, "q": "a2", "trigs": "mixamo,rig,fbx", "skills": ""},
+            {"t": 3, "q": "b1", "trigs": "mixamo,rig,fbx", "skills": ""},
+            {"t": 4, "q": "c1", "trigs": "pdf,read", "skills": "pdf/x"},
+            {"t": 5, "q": "d1", "trigs": "lonely", "skills": ""},
+        ]
+        with tempfile.NamedTemporaryFile("w", suffix=".jsonl", delete=False) as f:
+            for r in rows:
+                f.write(json.dumps(r) + "\n")
+            path = f.name
+        out = router.propose(path, min_count=2)
+        self.assertEqual(len(out), 1)
+        self.assertEqual(out[0]["count"], 3)
+        self.assertIn("mixamo", out[0]["trigs"])
+        self.assertTrue(out[0]["suggested_description"].endswith("(Draft — human must verify.)"))
+
 
 if __name__ == "__main__":
     unittest.main()

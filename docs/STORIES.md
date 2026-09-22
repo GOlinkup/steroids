@@ -1,6 +1,6 @@
 # Steroids Stories — 100-item backlog
 
-Source: router deep search + eval numbers (149-set P@1 0.705 / P@3 0.859, 315-set P@1 0.803 / P@3 0.917, leaks 0, unit 11/11 @ `6511ad2`).
+Source: router deep search + eval numbers (149-set P@1 0.705 / P@3 0.859, 315-set P@1 0.803 / P@3 0.917, leaks 0, unit 20/20 @ `f758d09`).
 Shipped already: abstention gate, short tokens, 12 synonyms, ed1 typo fix, de-hijacked overrides, learn fallback, served cap, embed deploy.
 
 ## P00. Grounded execution loop (build FIRST — unlocks the 100)
@@ -10,6 +10,7 @@ End-to-end: skill declares `needs:` → Steroids fetches evidence (MCP-first, br
 - [x] P00c MCP-first routing — need matched to MCP server when available; close: 1 real MCP need resolved end-to-end.
 - [x] P00d Browser fallback — no MCP? headless fetch of JS/logged-out pages; close: 1 catalog-style page fetched.
 - [x] P00e Proof gates — skill declares `proof:`; chain blocks on red; close: 1 two-step chain golden.
+- [x] P00g `propose` — abstentions logged (attempted trigs, hash-only); clusters ≥2 into draft skill proposals for humans; close: unit + live abstain row. (Generation itself stays human — G61.)
 - [ ] P00f Full loop demo — "build X" goes research→build→verify unassisted; close: recorded demo.
 
 ## How to close a story
@@ -25,6 +26,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 | Date | P@1/149 | P@3/149 | P@1/315 | Leaks | Note |
 |------|---------|---------|---------|-------|------|
 | 2026-09-22 | 0.705 | 0.859 | 0.803 | 0 | baseline @ 6511ad2 |
+| 2026-09-23 | 0.705 | 0.859 | 0.803 | 0 | P00d+P00e + free/city/character NEG, unit 20/20, live 0.875/0.750/2, uncommitted |
 
 ## A. Auto-equip — from suggesting to loading
 - [ ] A01 Confidence auto-inject — top-1 above threshold injects full SKILL.md via hook; close: demo + abstain-rate unchanged.

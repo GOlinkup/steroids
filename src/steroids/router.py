@@ -110,7 +110,13 @@ def extract_proof(head):
 NEEDS_CACHE_PATH = os.path.join(os.path.dirname(CACHE_PATH), "skill-needs.json")
 PROOF_CACHE_PATH = os.path.join(os.path.dirname(CACHE_PATH), "skill-proof.json")
 
-def _scan_field(rules, field, cache_path, force_rebuild=False):
+def _with_overlay(rules, field, found_map):
+    # ponytail: committed overlay covers routing-winning twins that declare nothing.
+    overlay = rules.get("needs_overlay" if field == "needs" else "proof_overlay") or {}
+    for name, items in overlay.items():
+        if isinstance(items, list) and items and name not in found_map:
+            found_map[name] = [str(i) for i in items][:8]
+    return found_map
     # ponytail: shadowed names prefer the copy that declares the field.
     try:
         if not force_rebuild:
@@ -735,6 +741,7 @@ def main():
     parser.add_argument("--claude-hook", action="store_true", help="Run in Claude Code UserPromptSubmit hook mode")
     parser.add_argument("--export", default=None, help="Output path for `graph --export out.json`")
     parser.add_argument("--gather", action="store_true", help="Route plus fetch linked evidence and report unmet needs as JSON")
+    parser.add_argument("--propose", action="store_true", help="Mine abstained prompts (hash-only) into draft skill proposals for humans")
     parser.add_argument("--chain", default=None, help='Two-step plan "step one > step two": gather each, verdict go or blocked-at-N')
 
     args, unknown = parser.parse_known_args()
@@ -748,6 +755,10 @@ def main():
 
     if args.chain:
         print(json.dumps(chain(args.chain, rules, idx)))
+        return
+
+    if args.propose:
+        print(json.dumps(propose()))
         return
 
     if args.count:
@@ -858,10 +869,42 @@ def main():
         else:
             print(hint)
     else:
+        # ponytail: log abstentions too (attempted trigs, hash only) — propose mines these.
+        attempted = ",".join(sorted(set(toks(prompt)) - set(rules.get("glue", [])))[:6])
+        log_impression(prompt, attempted, "")
         if is_antigravity:
             print(json.dumps({}))
         elif args.json:
             print(json.dumps({"triggers": [], "skills": [], "hint": ""}))
+
+def propose(log_path=None, min_count=2):
+    # ponytail: hash-only input; clusters share >=2 attempted trigs; output is a draft for humans.
+    log_path = log_path or LOG_PATH
+    try:
+        with open(log_path, encoding="utf-8") as f:
+            rows = [json.loads(l) for l in f if l.strip()]
+    except OSError:
+        return []
+    unmet = [r for r in rows if not r.get("skills")]
+    groups = {}
+    for r in unmet:
+        key = frozenset(t for t in (r.get("trigs") or "").split(",") if t)
+        if len(key) < 2:
+            continue
+        groups.setdefault(key, []).append(r["q"])
+    out = []
+    for trigs, hashes in groups.items():
+        if len(hashes) < min_count:
+            continue
+        names = sorted(trigs)
+        out.append({
+            "count": len(hashes),
+            "trigs": names,
+            "suggested_name": "-".join(names[:3]),
+            "suggested_description": "Handle tasks about " + ", ".join(names) + ". (Draft — human must verify.)",
+        })
+    out.sort(key=lambda p: -p["count"])
+    return out[:10]
 
 if __name__ == "__main__":
     main()
