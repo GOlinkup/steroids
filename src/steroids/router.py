@@ -1301,6 +1301,53 @@ def open_canvas():
     else:
         print(f"[Steroids] Canvas script not found at {PY2D_PATH}", file=sys.stderr)
 
+def autoinject(top, rules, idx):
+    # ponytail: A01 — confident top-1 injects its full SKILL.md. Threshold 2.0
+    # measured on live index: 85/100 goldens fire; noise battery max 2.15 (one
+    # fires — precision cost logged, abstains never fire since top is empty).
+    if not top:
+        return None
+    score, name, _hits = top[0]
+    if score < rules.get("autoinject_threshold", 2.0):
+        return None
+    for sname, md in skill_files(rules.get("index_dirs", [])):
+        if sname == name:
+            try:
+                with open(md, encoding="utf-8", errors="replace") as f:
+                    return {"skill": name, "score": score, "path": md, "content": f.read()}
+            except OSError:
+                return None
+    return None
+
+def build_loop(spec, rules, idx, demo_dir=None):
+    # ponytail: P00f — one call runs research>build>verify via chain(); the
+    # transcript is the recorded demo (repo demo/, /tmp when deployed).
+    spec = " ".join(spec.split())
+    plan = f"research {spec} > build {spec} > verify {spec}"
+    out = chain(plan, rules, idx)
+    slug = re.sub(r"[^a-z0-9]+", "-", spec.lower()).strip("-")[:40] or "build"
+    record = {"spec": spec, "plan": plan, "verdict": out["verdict"],
+              "t": int(time.time()), "steps": out["steps"],
+              "missing": out["missing"], "unbacked": out["unbacked"]}
+    if demo_dir is None:
+        demo_dir = os.path.join(
+            os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__)))),
+            "demo")
+    path = os.path.join(demo_dir, f"loopdemo-{slug}.json")
+    try:
+        os.makedirs(demo_dir, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(record, f, default=str)
+    except OSError:
+        path = os.path.join("/tmp", f"loopdemo-{slug}.json")
+        try:
+            with open(path, "w", encoding="utf-8") as f:
+                json.dump(record, f, default=str)
+        except OSError:
+            path = ""
+    out = dict(out, spec=spec, record=path)
+    return out
+
 def main():
     parser = argparse.ArgumentParser(
         description="Steroids — Universal AI Skill Router & Accelerator for Antigravity, Claude Code, OpenCode, and CLI."
@@ -1355,6 +1402,14 @@ def main():
             print(json.dumps({"ok": False, "error": "usage: steroids draft <slug> <trig>..."}))
             return
         print(json.dumps(draft_skill(args.prompt[1], args.prompt[2:], rules, idx)))
+        return
+
+    if args.prompt and args.prompt[0] == "build":
+        # ponytail: P00f — `steroids build <spec>` runs research>build>verify unassisted, records it.
+        if len(args.prompt) < 2:
+            print(json.dumps({"ok": False, "error": "usage: steroids build <spec>"}))
+            return
+        print(json.dumps(build_loop(" ".join(args.prompt[1:]), rules, idx), default=str))
         return
 
     if args.count:
@@ -1448,7 +1503,23 @@ def main():
         log_impression(prompt, trigs, names)
 
         hint = f"Possibly relevant skills (load what applies, skip rest): {trigs} -> {names}"
-        if is_antigravity:
+        injected = None
+        if not args.json and (is_antigravity or isinstance(parsed_json, dict) or args.claude_hook):
+            injected = autoinject(top, rules, idx)
+        if injected is not None:
+            body = (f"[Steroids] Auto-loaded skill: {injected['skill']} "
+                    f"(score {injected['score']})\n{injected['content']}")
+            if is_antigravity:
+                print(json.dumps({
+                    "injectSteps": [
+                        {
+                            "ephemeralMessage": body
+                        }
+                    ]
+                }))
+            else:
+                print(body)
+        elif is_antigravity:
             print(json.dumps({
                 "injectSteps": [
                     {
@@ -1509,6 +1580,81 @@ def propose(log_path=None, min_count=2):
         })
     out.sort(key=lambda p: -p["count"])
     return out[:10]
+
+SKILL_RULES_URL = "https://raw.githubusercontent.com/talkstreamsa/steroids/master/skill-rules.json"
+
+def _sha8(raw):
+    return hashlib.sha256(raw).hexdigest()[:8]
+
+def _fetch_bytes(url, timeout=15, max_bytes=1000000):
+    # ponytail: raw bytes, not fetch_text (that strips tags/whitespace meant for evidence HTML).
+    try:
+        import urllib.request
+        req = urllib.request.Request(url, headers={"User-Agent": "Steroids-self-update/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as res:
+            raw = res.read(max_bytes + 1)
+        return raw if len(raw) <= max_bytes else None
+    except Exception:
+        return None
+
+def _validate_skill_rules(raw):
+    try:
+        doc = json.loads(raw.decode("utf-8"))
+    except Exception:
+        return None
+    if not isinstance(doc, dict) or not isinstance(doc.get("skills"), dict):
+        return None
+    return doc
+
+def check_skill_update(url=SKILL_RULES_URL, rules_path=RULES_PATH):
+    # ponytail: read-only; routing never touches the network (flags only).
+    try:
+        with open(rules_path, "rb") as f:
+            local = f.read()
+    except OSError:
+        local = None
+    raw = _fetch_bytes(url)
+    if raw is None:
+        return {"ok": False, "error": "could not fetch " + url}
+    if _validate_skill_rules(raw) is None:
+        return {"ok": False, "error": "remote is not a valid skill-rules.json"}
+    return {"ok": True, "stale": local is None or _sha8(raw) != _sha8(local),
+            "local_sha": _sha8(local) if local is not None else None,
+            "remote_sha": _sha8(raw), "source": url}
+
+def self_update(url=SKILL_RULES_URL, rules_path=RULES_PATH, cache_path=CACHE_PATH):
+    # ponytail: backup before overwrite (never lose local custom rules); drop cache so overrides rebuild.
+    raw = _fetch_bytes(url)
+    if raw is None:
+        return {"ok": False, "error": "could not fetch " + url}
+    doc = _validate_skill_rules(raw)
+    if doc is None:
+        return {"ok": False, "error": "remote is not a valid skill-rules.json"}
+    try:
+        try:
+            with open(rules_path, "rb") as f:
+                old = f.read()
+        except OSError:
+            old = None
+        if old is not None and _sha8(old) == _sha8(raw):
+            return {"ok": True, "updated": False, "sha": _sha8(raw), "skills": len(doc["skills"])}
+        backup = None
+        if old is not None:
+            backup = rules_path + ".bak"
+            with open(backup, "wb") as f:
+                f.write(old)
+        else:
+            os.makedirs(os.path.dirname(rules_path) or ".", exist_ok=True)
+        with open(rules_path, "wb") as f:
+            f.write(raw)
+        try:
+            os.remove(cache_path)
+        except OSError:
+            pass
+    except OSError as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "updated": True, "sha": _sha8(raw),
+            "skills": len(doc["skills"]), "backup": backup}
 
 if __name__ == "__main__":
     main()
