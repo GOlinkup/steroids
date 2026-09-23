@@ -106,5 +106,17 @@ class TestR356Preflight(unittest.TestCase):
         self.assertTrue(r["warnings"])
 
 
+class TestD34Rotation(unittest.TestCase):
+    def test_round_robin(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import rotate_goldens
+        files = ["a", "b", "c"]
+        seen = {rotate_goldens.rotation(k, files)[0] for k in range(6)}
+        self.assertEqual(seen, {"a", "b", "c"})
+        held, active = rotate_goldens.rotation(0, files)
+        self.assertEqual(held, "a")
+        self.assertEqual(active, ["b", "c"])
+
+
 if __name__ == "__main__":
     unittest.main()

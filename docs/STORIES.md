@@ -68,7 +68,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] D31 Per-skill goldens — each skill ships 5 queries, CI enforced; close: 20 skills covered. (Kevin 2026-09-23, r342)
 - [x] D32 Install gate — install.sh refuses deploy on eval regression; close: forced-fail demo. (Kevin 2026-09-23, r338)
 - [x] D33 Adversarial bank — typos/paraphrase per skill; close: 50 rows. (Kevin 2026-09-23, r342)
-- [ ] D34 Golden rotation — monthly held-out swap; close: rotation script + log.
+- [x] D34 Golden rotation — monthly held-out swap; close: rotation script + log. (Kevin 2026-09-23, r342)
 - [x] D35 Live dashboard — nightly P@1/P@3/leaks from served.jsonl; close: first report committed. (Kevin 2026-09-23, r332)
 - [ ] D36 Miss mining — abstention clusters → proposed goldens; close: run on current served log.
 - [ ] D37 Thumb votes — 👍/👎 on hints wired to accepts; close: end-to-end vote flow.
