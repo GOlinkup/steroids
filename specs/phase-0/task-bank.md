@@ -61,4 +61,17 @@ Expected: fix = wider rand in ids.py + 200-run clean hunt (open) +
   grader: looped unittest runs, zero failures
 ```
 
-_slots B-06..B-20 open — paste failures as they happen._
+_slots B-07..B-20 open — paste failures as they happen._
+
+```text
+Task B-06: fresh-HOME install wrote index to the wrong dir
+Type: bugfix
+Session: 2026-09-23 R-1 live-verify (this repo)
+Observed: install created real ~/.config/steroids, so reindex cached
+  skill-index.json there while verify-hooks looked under opencode plugins;
+  masked on live HOME by a symlink. Plus uninstall left skill-needs/proof
+  sidecars, blocking dir removal.
+Expected: git show 14f6b12 -- install.sh (symlink + sidecar cleanup) +
+  grader: HOME=/tmp/fakehome style install, verify-hooks green, uninstall
+  leaves zero traces
+```

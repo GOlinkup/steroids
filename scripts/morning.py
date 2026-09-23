@@ -27,12 +27,18 @@ def main():
     print("ERROR markers:", ", ".join(map(os.path.basename, errs)) or "none")
 
     print("== 2. miss proposals (TBD = you assign) ==")
+    decided = set()
+    dpath = os.path.join(_REPORTS, "decisions.md")
+    if os.path.exists(dpath):
+        decided = set(re.findall(r"`([^`]+)`", open(dpath, encoding="utf-8").read()))
     miss = sorted(glob.glob(os.path.join(_REPORTS, "miss-goldens-*.md")))
     if miss:
         rows = [l.strip() for l in open(miss[-1], encoding="utf-8")
                 if l.strip().startswith("- `")]
-        print(f"{os.path.basename(miss[-1])}: {len(rows)} TBD")
-        for r in rows[:5]:
+        fresh = [r for r in rows
+                 if not any(q in r for q in decided)]
+        print(f"{os.path.basename(miss[-1])}: {len(fresh)} TBD ({len(rows)-len(fresh)} decided)")
+        for r in fresh[:5]:
             print("  approve/reject:", r)
     else:
         print("no proposal files yet")
