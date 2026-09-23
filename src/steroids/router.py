@@ -693,6 +693,23 @@ def merge_team_reports(reports):
     # ponytail: A07 — merge per-specialist findings under skill headers.
     return "\n\n".join(f"## {s}\n\n{t}" for s, t in reports or [])
 
+def ttl_mark(skills, state=None, turns=5):
+    # ponytail: A08 — injected skills live N turns.
+    state = dict(state or {})
+    for s in skills or []:
+        state[s] = turns
+    return state
+
+def ttl_tick(state):
+    # ponytail: A08 — decrement; returns (alive, expired). Pure.
+    alive, expired = {}, []
+    for s, n in (state or {}).items():
+        if n - 1 > 0:
+            alive[s] = n - 1
+        else:
+            expired.append(s)
+    return alive, sorted(expired)
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()

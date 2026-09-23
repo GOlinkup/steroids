@@ -899,6 +899,18 @@ class TestRouter(unittest.TestCase):
         self.assertIn("found B", merged)
         self.assertEqual(router.team_dispatch("x", []), [])
 
+    def test_a08_ttl_expiry(self):
+        st = router.ttl_mark(["a", "b"], turns=3)
+        self.assertEqual(st, {"a": 3, "b": 3})
+        alive, expired = router.ttl_tick(st)
+        self.assertEqual(expired, [])
+        self.assertEqual(alive, {"a": 2, "b": 2})
+        alive, _ = router.ttl_tick(alive)
+        alive, expired = router.ttl_tick(alive)
+        self.assertEqual(alive, {})
+        self.assertEqual(expired, ["a", "b"])
+        self.assertEqual(router.ttl_tick({}), ({}, []))
+
 
 if __name__ == "__main__":
     unittest.main()
