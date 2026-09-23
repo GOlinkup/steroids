@@ -146,7 +146,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] J97 Federated private learning — shared gradients, no prompts; close: design doc. (Kevin 2026-09-23, r348)
 - [x] J98 Skill bounties — market for expertise; close: design doc. (Kevin 2026-09-23, r348)
 - [x] J99 Trust report — public abstention/precision page; close: first edition from D35. (Kevin 2026-09-23, r339)
-- [ ] J100 Off-switch demo — refusing nonsense live; close: recorded demo.
+- [x] J100 Off-switch demo — refusing nonsense live; close: recorded demo. (Kevin 2026-09-23, r348)
 
 ## Closed this session (reference)
 - [x] Abstention gate · short tokens · 12 synonyms · ed1 typo fix · de-hijacked overrides · learn fallback · served cap · embed deploy — `4e6f843` + `6511ad2`.
