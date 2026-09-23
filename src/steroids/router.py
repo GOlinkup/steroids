@@ -445,6 +445,30 @@ def _typo_fix(ptoks, idx):
             fixed.add(cands[0])
     return fixed
 
+def explain_route(prompt, rules, idx, top=None):
+    # ponytail: J93 self-explaining hints. Per pick: matched tokens + score.
+    # Per route: tokens saved = full-index SKILL.md cost minus top-1 cost
+    # (chars//4 estimate, file sizes only, no content reads).
+    if top is None:
+        top = route_query(prompt, rules, idx)
+    sizes = {}
+    try:
+        for sname, md in skill_files(rules.get("index_dirs", [])):
+            if sname in idx and sname not in sizes:
+                try:
+                    sizes[sname] = os.path.getsize(md) // 4
+                except OSError:
+                    sizes[sname] = 0
+    except Exception:
+        pass
+    total = sum(sizes.values())
+    picks = [{"skill": s, "score": sc, "because": sorted(h),
+              "skill_tokens": sizes.get(s, 0)} for sc, s, h in top]
+    saved = total - (picks[0]["skill_tokens"] if picks else 0)
+    return {"picks": picks, "index_tokens": total,
+            "tokens_saved": max(saved, 0)}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
@@ -807,9 +831,23 @@ def main():
     parser.add_argument("--export", default=None, help="Output path for `graph --export out.json`")
     parser.add_argument("--gather", action="store_true", help="Route plus fetch linked evidence and report unmet needs as JSON")
     parser.add_argument("--propose", action="store_true", help="Mine abstained prompts (hash-only) into draft skill proposals for humans")
+    parser.add_argument("--promote", nargs="*", default=None, help="Promote repeated abstentions to draft: steroids --promote <trig1 trig2>")
     parser.add_argument("--chain", default=None, help='Two-step plan "step one > step two": gather each, verdict go or blocked-at-N')
+    parser.add_argument("--mcp", action="store_true", help="Run stdio JSON-RPC server exposing tool recommend_skills")
+    parser.add_argument("--share", action="store_true", help="Export graph to /tmp + print share-ready summary")
+    parser.add_argument("--self-update", action="store_true", help="Fetch latest skill-rules.json from GitHub (offline TF-IDF default untouched)")
+    parser.add_argument("--check", action="store_true", help="Check whether local skill-rules.json is behind GitHub (read-only)")
+    parser.add_argument("--explain", action="store_true", help="Self-explaining hints: why each pick + tokens saved (J93)")
 
     args, unknown = parser.parse_known_args()
+
+    if args.check:
+        print(json.dumps(check_skill_update()))
+        return
+
+    if args.self_update:
+        print(json.dumps(self_update()))
+        return
 
     if args.canvas:
         open_canvas()
@@ -949,6 +987,14 @@ def main():
             print(json.dumps({}))
         elif args.json:
             print(json.dumps({"triggers": [], "skills": [], "hint": ""}))
+
+    if args.explain and prompt:
+        # ponytail: J93 output lives here (pure addition) so --json/hook paths stay untouched.
+        expl = explain_route(prompt, rules, idx, top)
+        for pick in expl["picks"]:
+            why = ", ".join(pick["because"]) if pick["because"] else "semantic-only"
+            print(f"picked {pick['skill']} because tokens: {why} (score {pick['score']})")
+        print(f"tokens saved: ~{expl['tokens_saved']} (top-1 {expl['picks'][0]['skill_tokens'] if expl['picks'] else 0} vs full-index {expl['index_tokens']})")
 
 def propose(log_path=None, min_count=2):
     # ponytail: hash-only input; clusters share >=2 attempted trigs; output is a draft for humans.

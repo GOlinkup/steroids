@@ -139,7 +139,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 ## J. Wild lab
 - [ ] J91 Skill fusion — ephemeral 2-skill hybrid; close: 1 fusion demo.
 - [ ] J92 Dream routing — offline precompute; close: cache-hit demo.
-- [ ] J93 Self-explaining — "picked X because tokens…"; close: hint format shipped.
+- [x] J93 Self-explaining — "picked X because tokens…"; close: hint format shipped. (Kevin 2026-09-23, r330)
 - [ ] J94 Counterfactuals — "without X you'd miss Y"; close: 3 examples.
 - [ ] J95 Time travel — replay past routing; close: CLI flag works.
 - [ ] J96 Router-as-skill — self-indexed meta loop; close: "improve routing" routes inward.
