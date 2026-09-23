@@ -911,6 +911,23 @@ def neglected_nudge(fires, sizes, top_n=5):
     return zero[:top_n]
 
 
+def fuse_skills(name_a, name_b, idx):
+    # ponytail: J91 — ephemeral 2-skill hybrid (keyword union). Never written
+    # to the index or rules; the caller holds the fused entry for one route.
+    ka, kb = set(idx.get(name_a, [])), set(idx.get(name_b, []))
+    fused = sorted(ka | kb)
+    return {"name": f"{name_a}+{name_b}", "keywords": fused,
+            "from": [name_a, name_b], "ephemeral": True}
+
+
+def route_fused(prompt, fused, rules, idx, accepts=None):
+    # ponytail: J91 — route with the fused entry temporarily visible.
+    view = dict(idx)
+    view[fused["name"]] = list(fused["keywords"])
+    return route_query(prompt, rules, view, accepts)
+
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
