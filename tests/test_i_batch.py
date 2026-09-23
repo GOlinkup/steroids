@@ -61,5 +61,18 @@ class TestI83Trace(unittest.TestCase):
         self.assertEqual(top[0][1], "debugger-x")
 
 
+class TestI84Hook(unittest.TestCase):
+    def test_auth_comment(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import precommit_auth_review
+        c = precommit_auth_review.auth_diff_comment('+password = "x"\n+user = 1\n')
+        self.assertIn("security-review", c)
+
+    def test_clean_silent(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import precommit_auth_review
+        self.assertEqual(precommit_auth_review.auth_diff_comment('+print("hi")\n'), "")
+
+
 if __name__ == "__main__":
     unittest.main()
