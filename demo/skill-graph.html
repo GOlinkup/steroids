@@ -122,11 +122,16 @@ function draw(){
     ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(s[0],s[1]);ctx.stroke();});
   nodes.forEach(function(n){var p=w2s([n.x,n.y]),r=(5+deg(n.id)*1.5)*view.k,m=match(n);
     ctx.globalAlpha=m?1:0.25;
-    ctx.fillStyle=n===sel?"#7ee787":"#1f6feb";
+    ctx.fillStyle=n===sel?"#7ee787":fireColor(n.id);
     ctx.beginPath();ctx.arc(p[0],p[1],r,0,6.283);ctx.fill();
     ctx.fillStyle=m?"#e6e9f0":"#6e7681";ctx.font="11px system-ui,sans-serif";
     if((view.k>=0.8&&view.k<=1.6)||n===sel)ctx.fillText(n.id,p[0]+r+4,p[1]+4);ctx.globalAlpha=1;});
 }
+var FIRE=null;
+function fireColor(id){var c=FIRE?FIRE[id]:0;if(!c)return "#1f6feb";
+  // ponytail: F55 served-driven heat — log scale over ~3 decades to orange.
+  var t=Math.min(1,Math.log10(1+c)/3);
+  return "rgb("+Math.round(31+t*224)+","+Math.round(111+t*11)+","+Math.round(235-t*209)+")";}
 function headline(){document.getElementById("headline").textContent=
   "generated from your live index — "+data.nodes.length+" skills";}
 function show(n){
@@ -192,8 +197,9 @@ window.addEventListener("resize",function(){fit();draw();});
 init();draw();
 if(window.Mascot)window.Mascot.busy();
 Promise.all([fetch("skill-graph.json").then(function(r){if(!r.ok)throw 0;return r.json();}),
-  fetch("skill-graph.positions.json").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})]
-  ).then(function(ab){var g=ab[0];window.GRAPH_POS=ab[1]||null;return g;}).then(function(g){
+  fetch("skill-graph.positions.json").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+  fetch("skill-fire.json").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})]
+  ).then(function(ab){var g=ab[0];window.GRAPH_POS=ab[1]||null;FIRE=ab[2]||null;return g;}).then(function(g){
   if(g&&g.nodes&&g.nodes.length){data={nodes:g.nodes.map(function(n){return {id:n.id,keywords:n.keywords,degree:n.degree||0};}),links:g.links||[]};
     sel=null;document.getElementById("details").innerHTML='<p class="dim">Click a node for details.</p>';
     if(window.Mascot)window.Mascot.busy();
