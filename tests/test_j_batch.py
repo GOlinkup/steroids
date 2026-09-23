@@ -155,5 +155,17 @@ class TestD38Hogs(unittest.TestCase):
         self.assertEqual(rows[0]["fires"], 10)
 
 
+class TestD39Latency(unittest.TestCase):
+    def test_harness_small_scale(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import latency_bench
+        idx = latency_bench.synth_idx(10)
+        self.assertEqual(len(idx), 10)
+        m = latency_bench.bench(idx, ["alpha beta", "router skill"])
+        self.assertEqual(m["n"], 2)
+        self.assertGreaterEqual(m["p99"], 0)
+        self.assertGreaterEqual(m["max"], m["p99"])
+
+
 if __name__ == "__main__":
     unittest.main()
