@@ -606,6 +606,30 @@ def route_with_fallback(prompt, rules, idx, accepts=None):
             "fallback": "strict lexical abstained; full route attached"}
 
 
+def diagnose_fire(skill, query, rules, idx, accepts=None):
+    # ponytail: G63 — why won't this skill fire for this query: not-indexed /
+    # fires / no-lexical-hit / neg-blocked / outscored.
+    if skill not in idx:
+        return {"skill": skill, "verdict": "not-indexed",
+                "detail": "no such skill in index"}
+    top = route_query(query, rules, idx, accepts)
+    ranks = [s for _, s, _ in top]
+    if skill in ranks:
+        return {"skill": skill, "verdict": "fires",
+                "detail": f"rank {ranks.index(skill) + 1}"}
+    ptoks = set(toks(query)) - set(rules.get("glue", []))
+    hits = sorted(set(idx[skill]) & ptoks)
+    if not hits:
+        return {"skill": skill, "verdict": "no-lexical-hit",
+                "detail": "zero keyword overlap with query"}
+    bad, good = rule_neg(rules).get(skill, (set(), set()))
+    if not (set(hits) & good) and (set(hits) & bad):
+        return {"skill": skill, "verdict": "neg-blocked",
+                "detail": f"hits {hits} all in NEG bad-set"}
+    return {"skill": skill, "verdict": "outscored",
+            "detail": f"hits {hits} but below top-3"}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
