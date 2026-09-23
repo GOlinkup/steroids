@@ -723,6 +723,19 @@ def audit_query(who=None, path=None):
     return rows
 
 
+PII_RES = (re.compile(r"[a-z0-9._%+-]+@[a-z0-9.-]+\.[a-z]{2,}"),
+           re.compile(r"\+?\d[\d .()-]{7,}\d"))
+
+
+def pii_blocked(prompt, skill, rules):
+    # ponytail: H74 — customer-data prompt (email/phone hit) routed toward
+    # an analytics skill (rules["analytics"]) is blocked. Empty list default
+    # never blocks. Pure check; enforcement at the call site.
+    if skill not in set(rules.get("analytics") or []):
+        return False
+    return any(rx.search(prompt) for rx in PII_RES)
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

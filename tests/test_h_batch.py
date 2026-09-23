@@ -53,5 +53,21 @@ class TestH73Audit(unittest.TestCase):
         self.assertEqual(got[0]["who"], "ann")
 
 
+class TestH74PII(unittest.TestCase):
+    RULES = {"analytics": ["analytics-x"]}
+
+    def test_red_team_blocked(self):
+        self.assertTrue(router.pii_blocked(
+            "analyze churn for jane.doe@example.com last quarter", "analytics-x", self.RULES))
+
+    def test_control_non_analytics_passes(self):
+        self.assertFalse(router.pii_blocked(
+            "analyze churn for jane.doe@example.com last quarter", "code-review", self.RULES))
+
+    def test_control_no_pii_passes(self):
+        self.assertFalse(router.pii_blocked(
+            "analyze quarterly churn trends", "analytics-x", self.RULES))
+
+
 if __name__ == "__main__":
     unittest.main()
