@@ -1161,6 +1161,191 @@ def resolve_mcp(need, rules):
         return {"kind": "mcp", "server": entry["server"], "tool": entry.get("tool", "")}
     return None
 
+def _trace_refs(prompt, limit=5):
+    # ponytail: B19 — File "x", line N + path:line for code extensions only.
+    out = []
+    for m in re.finditer(r'File "([^"]+)", line (\d+)', prompt):
+        out.append((m.group(1), int(m.group(2))))
+    for m in re.finditer(r"([A-Za-z0-9_./\\-]+\.(?:py|js|ts|tsx|jsx|rb|go|rs|java|kt|dart|php)):(\d+)", prompt):
+        out.append((m.group(1), int(m.group(2))))
+    seen, refs = set(), []
+    for p, n in out:
+        if (p, n) not in seen:
+            seen.add((p, n))
+            refs.append((p, n))
+    return refs[:limit]
+
+
+def _source_excerpt(path, line, context=5, max_chars=4000):
+    try:
+        with open(os.path.expanduser(path), encoding="utf-8", errors="replace") as f:
+            lines = f.readlines()
+    except OSError:
+        return None
+    if not 1 <= line <= len(lines):
+        return None
+    lo, hi = max(0, line - 1 - context), min(len(lines), line + context)
+    return "".join(f"{i+1}: {lines[i]}" for i in range(lo, hi))[:max_chars]
+
+
+def _read_capped(path, cap=8192):
+    try:
+        if os.path.getsize(path) > cap * 4:
+            return None
+        with open(path, encoding="utf-8", errors="replace") as f:
+            return f.read(cap)
+    except OSError:
+        return None
+
+
+def _context_files(root, names, key):
+    # ponytail: B14/B18/B20 — attach named working-context files, capped; missing = skip.
+    out = {}
+    for name in names:
+        p = os.path.join(root, name)
+        text = _read_capped(p)
+        if text:
+            out[f"{key}:{name}"] = text
+    return out
+
+
+def repo_context_files(root=None):
+    root = root or os.getcwd()
+    found = _context_files(root, ("package.json", "schema.json"), "repo")
+    try:
+        for name in sorted(os.listdir(root)):
+            if name.endswith(".schema.json") and f"repo:{name}" not in found:
+                text = _read_capped(os.path.join(root, name))
+                if text:
+                    found[f"repo:{name}"] = text
+    except OSError:
+        pass
+    return found
+
+
+def meeting_context_files(root=None):
+    # ponytail: B20 — MEETING*/AGENDA*/notes* docs for meeting-prep prompts.
+    root = root or os.getcwd()
+    out = {}
+    try:
+        for name in sorted(os.listdir(root)):
+            low = name.lower()
+            if low.endswith(".md") and (low.startswith(("meeting", "agenda")) or low.startswith("notes")):
+                text = _read_capped(os.path.join(root, name))
+                if text:
+                    out[f"meeting:{name}"] = text
+    except OSError:
+        pass
+    return out
+
+
+def schema_context_files(root=None):
+    # ponytail: B18 — schema.sql / prisma schema for slow-query prompts; EXPLAIN stays live-DB-gated.
+    root = root or os.getcwd()
+    return _context_files(root, ("schema.sql", "schema.prisma",
+                                 os.path.join("prisma", "schema.prisma"),
+                                 os.path.join("db", "schema.sql")), "db:schema")
+
+
+def _has_toks(prompt, words):
+    pt = set(toks(prompt))
+    return any(w in pt for w in words)
+
+
+def capture_screenshot(url, out_dir="/tmp"):
+    # ponytail: B13 — headless chromium to a local file; never uploaded. None when no browser.
+    import shutil as _shutil
+    exe = (_shutil.which("chromium") or _shutil.which("chromium-browser")
+           or _shutil.which("google-chrome"))
+    if exe is None:
+        return None
+    path = os.path.join(out_dir, f"steroids-shot-{int(time.time() * 1000)}.png")
+    try:
+        r = subprocess.run([exe, "--headless", "--disable-gpu", "--no-sandbox",
+                            f"--screenshot={path}", "--window-size=1280,800",
+                            "--virtual-time-budget=8000", url],
+                           capture_output=True, timeout=30)
+    except Exception:
+        return None
+    if r.returncode == 0:
+        try:
+            if os.path.getsize(path) > 1024:
+                return path
+        except OSError:
+            pass
+    return None
+
+
+STRIPE_OPENAPI_URL = ("https://raw.githubusercontent.com/stripe/openapi/"
+                      "master/openapi/spec3.json")
+
+
+def openapi_spec_info(url=STRIPE_OPENAPI_URL, timeout=20, cache_path=None, ttl=86400):
+    # ponytail: B16 — live spec version + path count; day-cached (stripe ~8MB, no per-route abuse).
+    if cache_path is None:
+        cache_path = os.path.join(BASE_DIR, "openapi-stripe.json")
+    raw = None
+    try:
+        if time.time() - os.path.getmtime(cache_path) < ttl:
+            with open(cache_path, "rb") as f:
+                raw = f.read()
+    except OSError:
+        pass
+    if raw is None:
+        raw = _fetch_bytes(url, timeout=timeout, max_bytes=16000000)
+        if raw is None:
+            return None
+        try:
+            os.makedirs(os.path.dirname(cache_path), exist_ok=True)
+            with open(cache_path, "wb") as f:
+                f.write(raw)
+        except OSError:
+            pass
+    try:
+        doc = json.loads(raw.decode("utf-8"))
+        if not isinstance(doc, dict) or not isinstance(doc.get("paths"), dict):
+            return None
+        info = doc.get("info") or {}
+        return {"version": str(info.get("version", "?")), "paths": len(doc["paths"])}
+    except Exception:
+        return None
+
+
+def figma_node(node_url, token=None, base="https://api.figma.com", timeout=10):
+    # ponytail: B17 — node JSON + image URL; token-gated, honest without.
+    token = token or os.environ.get("FIGMA_TOKEN")
+    if not token:
+        return {"ok": False, "error": "FIGMA_TOKEN not set"}
+    m = re.search(r"figma\.com/(?:file|design)/([A-Za-z0-9]+).*?[?&]node-id=([^&#]+)",
+                  node_url)
+    if not m:
+        return {"ok": False, "error": "not a figma node url"}
+    key, node = m.group(1), m.group(2)
+    try:
+        from urllib.parse import unquote
+        node = unquote(node)
+    except Exception:
+        pass
+    try:
+        import urllib.request
+        req = urllib.request.Request(
+            f"{base}/v1/files/{key}/nodes?ids={node}",
+            headers={"X-Figma-Token": token, "User-Agent": "Steroids-figma/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as res:
+            doc = json.loads(res.read(500000).decode("utf-8"))
+        req2 = urllib.request.Request(
+            f"{base}/v1/images/{key}?ids={node}&format=png",
+            headers={"X-Figma-Token": token, "User-Agent": "Steroids-figma/1.0"})
+        with urllib.request.urlopen(req2, timeout=timeout) as res2:
+            imgs = json.loads(res2.read(100000).decode("utf-8"))
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:120]}
+    images = (imgs.get("images") or {})
+    return {"ok": True, "key": key, "node": node,
+            "document": doc.get("nodes", {}).get(node, {}),
+            "image": images.get(node, "")}
+
+
 def gather(prompt, rules, idx, needs=None, proof=None, accepts=None, seen_evidence=None):
     # ponytail: route -> needs -> MCP-first, fetch-second, browser-third, ask-last.
     top = route_query(prompt, rules, idx, accepts)
@@ -1178,6 +1363,45 @@ def gather(prompt, rules, idx, needs=None, proof=None, accepts=None, seen_eviden
             unfetched.append(u)
         if seen >= 3:
             break
+    # ponytail: B12 — links past the fetch cap are reported, never silently dropped.
+    for u in urls:
+        if u not in evidence and u not in unfetched:
+            unfetched.append(u)
+    # ponytail: B19 — stack-trace refs pull source lines into evidence (missing files skip).
+    for path, line in _trace_refs(prompt):
+        excerpt = _source_excerpt(path, line)
+        if excerpt:
+            evidence[f"source:{path}:{line}"] = excerpt
+    # ponytail: B14/B18/B20 — working-context files (attach only what exists in cwd).
+    if top:
+        for k, v in repo_context_files().items():
+            evidence.setdefault(k, v)
+    if _has_toks(prompt, ("slow", "explain", "postgres", "postgresql", "sqlite", "optim")):
+        for k, v in schema_context_files().items():
+            evidence.setdefault(k, v)
+    if _has_toks(prompt, ("meeting", "agenda", "standup", "retro", "prep")):
+        for k, v in meeting_context_files().items():
+            evidence.setdefault(k, v)
+    # ponytail: B13 — visual task + URL: headless capture to a local file (no upload).
+    if urls and any(s == "browser-qa" for _, s, _ in top):
+        shot = capture_screenshot(urls[0])
+        if shot:
+            evidence[f"screenshot:{urls[0]}"] = shot
+    # ponytail: B16 — stripe routed: pull live OpenAPI version + path count.
+    if any(s == "stripe-integration" for _, s, _ in top):
+        spec = openapi_spec_info()
+        if spec is not None:
+            evidence["openapi:stripe"] = (
+                f"version {spec['version']}, {spec['paths']} paths (live)")
+    # ponytail: B17 — figma node URL + token: node JSON + image; else stays ask/missing.
+    if os.environ.get("FIGMA_TOKEN"):
+        for u in urls:
+            if "figma.com" in u:
+                res = figma_node(u)
+                if res.get("ok"):
+                    evidence[f"figma:{res['key']}:{res['node']}"] = (
+                        json.dumps(res["document"])[:8000]
+                        + ("\nimage: " + res["image"] if res["image"] else ""))
     browser = (rules.get("browser_fallback") or {}).get("server", "playwright")
     out_needs = {}
     out_proof = {}
@@ -1226,6 +1450,9 @@ def gather(prompt, rules, idx, needs=None, proof=None, accepts=None, seen_eviden
         "unfetched": unfetched,
         "missing": missing[:5],
         "unbacked": unbacked[:5],
+        # ponytail: B15 — missing context surfaces as exactly one question (first missing wins).
+        "question": (f"Which {missing[0]} should I use? Reply with it to proceed."
+                     if missing else ""),
     }
 
 def chain(plan, rules, idx, needs=None, proof=None, accepts=None):
