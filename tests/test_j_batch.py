@@ -34,5 +34,26 @@ class TestJ92Dream(unittest.TestCase):
         self.assertIsNone(router.dream_route("unseen query", cache))
 
 
+class TestJ94Counterfactual(unittest.TestCase):
+    IDX = {"sa": ["alpha", "common"], "sb": ["beta", "common"], "z": ["common"]}
+    RULES = {"glue": [], "max_recommendations": 3}
+
+    def test_winner_removed_flips(self):
+        r = router.counterfactual("alpha", "sa", self.RULES, self.IDX)
+        self.assertEqual(r["top"], "sa")
+        self.assertNotEqual(r["top_without"], "sa")
+        self.assertEqual(r["miss"], "sa")
+
+    def test_nonwinner_removed_no_miss(self):
+        r = router.counterfactual("alpha", "sb", self.RULES, self.IDX)
+        self.assertEqual(r["top"], "sa")
+        self.assertIsNone(r["miss"])
+
+    def test_winner_removed_nothing_left(self):
+        r = router.counterfactual("alpha", "sa", self.RULES, {"sa": ["alpha"]})
+        self.assertEqual(r["miss"], "sa")
+        self.assertIsNone(r["top_without"])
+
+
 if __name__ == "__main__":
     unittest.main()

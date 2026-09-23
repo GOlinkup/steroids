@@ -939,6 +939,21 @@ def dream_route(query, cache):
     return list(hit) if hit is not None else None
 
 
+def counterfactual(prompt, without, rules, idx, accepts=None):
+    # ponytail: J94 — what changes if a skill vanished: route full vs route
+    # with it removed; miss names the skill you would have lost.
+    full = route_query(prompt, rules, idx, accepts)
+    if not full:
+        return {"top": None, "without": without, "top_without": None, "miss": None}
+    top_skill = full[0][1]
+    view = {s: k for s, k in idx.items() if s != without}
+    alt = route_query(prompt, rules, view, accepts)
+    alt_top = alt[0][1] if alt else None
+    miss = top_skill if (without == top_skill and alt_top != top_skill) else None
+    return {"top": top_skill, "without": without,
+            "top_without": alt_top, "miss": miss}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
