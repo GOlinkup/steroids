@@ -88,5 +88,20 @@ class TestH75Cost(unittest.TestCase):
         self.assertEqual(per_team, {"blue": 100})
 
 
+class TestH76Policy(unittest.TestCase):
+    IDX = {"security-review": ["audit"], "other": ["widget"]}
+
+    def test_auth_diff_auto_includes(self):
+        rules = {"glue": [], "max_recommendations": 3}
+        top = router.policy_route("fix login password reset flow", rules, self.IDX)
+        self.assertEqual(top[0][1], "security-review")
+
+    def test_non_auth_untouched(self):
+        rules = {"glue": [], "max_recommendations": 3}
+        top = router.policy_route("fix widget layout", rules, self.IDX)
+        normal = router.route_query("fix widget layout", rules, self.IDX)
+        self.assertEqual([s for _, s, _ in top], [s for _, s, _ in normal])
+
+
 if __name__ == "__main__":
     unittest.main()

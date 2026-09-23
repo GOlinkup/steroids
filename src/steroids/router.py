@@ -736,6 +736,19 @@ def pii_blocked(prompt, skill, rules):
     return any(rx.search(prompt) for rx in PII_RES)
 
 
+AUTH_RES = re.compile(r"auth|login|password|passwd|token|session|oauth|credential", re.I)
+
+
+def policy_route(prompt, rules, idx, accepts=None):
+    # ponytail: H76 — auth-touching text auto-includes security-review first
+    # (0.0 policy carrier); non-auth prompts route untouched.
+    top = route_query(prompt, rules, idx, accepts)
+    if "security-review" in idx and AUTH_RES.search(prompt):
+        if not any(s == "security-review" for _, s, _ in top):
+            top = [(0.0, "security-review", ["policy"])] + top[:2]
+    return top
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
