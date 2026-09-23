@@ -663,6 +663,26 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_c22_outcome_scales_accepts(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            mem = os.path.join(tmp, "memory.json")
+            router.record_outcome("alpha", True, mem_path=mem)
+            router.record_outcome("alpha", True, mem_path=mem)
+            router.record_outcome("alpha", True, mem_path=mem)
+            router.record_outcome("alpha", False, mem_path=mem)
+            router.record_outcome("beta", False, mem_path=mem)
+            outcomes = router.load_outcomes(mem_path=mem)
+            self.assertEqual(outcomes["alpha"], [3, 1])
+            scaled = router.apply_outcomes({"alpha": 4, "beta": 2, "gamma": 5}, outcomes)
+            self.assertEqual(scaled["alpha"], 3.0)  # 4 * 3/4
+            self.assertEqual(scaled["beta"], 0.0)  # all bad
+            self.assertEqual(scaled["gamma"], 5)  # no outcomes = full weight
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

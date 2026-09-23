@@ -419,6 +419,55 @@ def learn(transcript_path):
             pass
     return accepts
 
+def load_outcomes(mem_path=MEM_PATH):
+    # ponytail: C22 — {skill: [ok, bad]}; missing file = no outcomes.
+    try:
+        with open(mem_path, encoding="utf-8") as f:
+            out = json.load(f).get("outcomes", {})
+        return out if isinstance(out, dict) else {}
+    except Exception:
+        return {}
+
+def record_outcome(skill, ok, mem_path=MEM_PATH):
+    # ponytail: C22 — metric = ok/(ok+bad) per skill; consumer = apply_outcomes.
+    try:
+        with open(mem_path, encoding="utf-8") as f:
+            mem = json.load(f)
+    except Exception:
+        mem = {}
+    if not isinstance(mem, dict):
+        mem = {}
+    outcomes = mem.get("outcomes", {})
+    if not isinstance(outcomes, dict):
+        outcomes = {}
+    ok_n, bad_n = outcomes.get(skill, [0, 0])
+    if ok:
+        ok_n += 1
+    else:
+        bad_n += 1
+    outcomes[skill] = [ok_n, bad_n]
+    mem["outcomes"] = outcomes
+    try:
+        os.makedirs(os.path.dirname(mem_path) or ".", exist_ok=True)
+        with open(mem_path, "w", encoding="utf-8") as f:
+            json.dump(mem, f)
+    except OSError:
+        return None
+    return outcomes[skill]
+
+def apply_outcomes(accepts, outcomes):
+    # ponytail: C22 — scale accepts by success rate; no outcomes = full weight.
+    out = dict(accepts or {})
+    for s, pair in (outcomes or {}).items():
+        try:
+            ok, bad = pair
+            tot = ok + bad
+        except Exception:
+            continue
+        if tot and s in out:
+            out[s] = round(out[s] * (ok / tot), 3)
+    return out
+
 def _ed1_variants(tok):
     # ponytail: edit-distance-1 set for typo fix; len>=4 only, stdlib.
     v = set()
@@ -1642,6 +1691,15 @@ def main():
         print(json.dumps(build_loop(" ".join(args.prompt[1:]), rules, idx), default=str))
         return
 
+    if args.prompt and args.prompt[0] == "outcome":
+        # ponytail: C22 — `steroids outcome <skill> <ok|bad>` records task success.
+        if len(args.prompt) != 3 or args.prompt[2] not in ("ok", "bad"):
+            print(json.dumps({"ok": False, "error": "usage: steroids outcome <skill> <ok|bad>"}))
+            return
+        res = record_outcome(args.prompt[1], args.prompt[2] == "ok")
+        print(json.dumps({"ok": res is not None, "skill": args.prompt[1], "record": res}))
+        return
+
     if args.count:
         print(f"Indexed skills: {len(idx)}")
         return
@@ -1718,7 +1776,7 @@ def main():
             parser.print_help()
         return
 
-    accepts = learn(tp)
+    accepts = apply_outcomes(learn(tp), load_outcomes())
     if args.chain:
         print(json.dumps(chain(args.chain, rules, idx, accepts=accepts)))
         return
