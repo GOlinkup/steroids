@@ -1348,6 +1348,32 @@ def load_votes(path=None):
     return {s: v for s, v in counts.items() if v > 0}
 
 
+def canary_bucket(key, pct):
+    # ponytail: D40 — deterministic 5%-style sampler (sha of key, no RNG).
+    return (int(hashlib.sha256(key.encode("utf-8")).hexdigest()[:8], 16) % 100) < pct
+
+
+CANARY_STATS = {"canary": 0, "primary": 0, "rolled_back": 0}
+
+
+def canary_route(prompt, rules, idx, ranker=None, pct=5, accepts=None):
+    # ponytail: D40 — pct% of traffic tries ranker (default: primary);
+    # any exception auto-rolls back to route_query + counts it. Design in
+    # docs/canary.md; a real v2 ranker plugs into ranker= later.
+    bucket = (int(hashlib.sha256(prompt.encode("utf-8")).hexdigest()[:8], 16) % 100) < pct
+    if bucket and ranker is not None:
+        try:
+            out = ranker(prompt, rules, idx, accepts)
+            CANARY_STATS["canary"] += 1
+            return {"route": out, "lane": "canary", "rolled_back": False}
+        except Exception:
+            CANARY_STATS["rolled_back"] += 1
+    else:
+        CANARY_STATS["primary"] += 1
+    return {"route": route_query(prompt, rules, idx, accepts),
+            "lane": "primary", "rolled_back": bucket and ranker is not None}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

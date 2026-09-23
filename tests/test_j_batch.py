@@ -167,5 +167,21 @@ class TestD39Latency(unittest.TestCase):
         self.assertGreaterEqual(m["max"], m["p99"])
 
 
+class TestD40Canary(unittest.TestCase):
+    def test_bucket_rate(self):
+        n = sum(router.canary_bucket(f"q{i}", 5) for i in range(1000))
+        self.assertTrue(20 <= n <= 90, n)
+
+    def test_rollback(self):
+        idx = {"sa": ["alpha"]}
+        rules = {"glue": [], "max_recommendations": 3}
+        def boom(prompt, rules, idx, accepts=None):
+            raise RuntimeError("v2 down")
+        r = router.canary_route("alpha", rules, idx, ranker=boom, pct=100)
+        self.assertTrue(r["rolled_back"])
+        self.assertEqual(r["lane"], "primary")
+        self.assertTrue(r["route"])
+
+
 if __name__ == "__main__":
     unittest.main()

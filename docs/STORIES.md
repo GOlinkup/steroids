@@ -74,7 +74,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] D37 Thumb votes — 👍/👎 on hints wired to accepts; close: end-to-end vote flow. (Kevin 2026-09-23, r342)
 - [x] D38 Token cost per skill — context cost ledger; close: top-10 hogs listed. (Kevin 2026-09-23, r342)
 - [x] D39 Latency SLO — route p99 <100ms @5000 skills; close: bench script + number. (Kevin 2026-09-23, r342)
-- [ ] D40 Canary routing — 5% traffic, auto-rollback; close: design + flag.
+- [x] D40 Canary routing — 5% traffic, auto-rollback; close: design + flag. (Kevin 2026-09-23, r342)
 
 ## E. Multi-agent & orchestration
 - [x] E41 Dispatcher mode — subtasks to subagents with skills; close: 1 demo task. (Kevin 2026-09-23, r343)
