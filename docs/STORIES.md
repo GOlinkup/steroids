@@ -11,7 +11,7 @@ End-to-end: skill declares `needs:` → Steroids fetches evidence (MCP-first, br
 - [x] P00d Browser fallback — no MCP? headless fetch of JS/logged-out pages; close: 1 catalog-style page fetched. (Kevin 2026-09-23, r354)
 - [x] P00e Proof gates — skill declares `proof:`; chain blocks on red; close: 1 two-step chain golden. (Kevin 2026-09-23, r354)
 - [x] P00g `propose` — abstentions logged (attempted trigs, hash-only); clusters ≥2 into draft skill proposals for humans; close: unit + live abstain row. (Generation itself stays human — G61.) (Kevin 2026-09-23, r354)
-- [ ] P00f Full loop demo — "build X" goes research→build→verify unassisted; close: recorded demo.
+- [x] P00f Full loop demo — "build X" goes research→build→verify unassisted; close: recorded demo. (Jim 2026-09-23, r333+r351 — code landed, demo recorded)
 
 ## How to close a story
 1. Implement minimal diff in `src/steroids/` (+ `skill-rules.json` if data-only).
@@ -29,16 +29,16 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 | 2026-09-23 | 0.705 | 0.859 | 0.803 | 0 | P00d+P00e + free/city/character NEG, unit 20/20, live 0.875/0.750/2, uncommitted |
 
 ## A. Auto-equip — from suggesting to loading
-- [ ] A01 Confidence auto-inject — top-1 above threshold injects full SKILL.md via hook; close: demo + abstain-rate unchanged.
-- [ ] A02 Ordered chains — return skill sequences with handoffs, not flat top-3; close: figma→frontend→deploy golden.
-- [ ] A03 Section injection — inject only relevant SKILL.md section; close: ≥50% context saved on 5 probes.
-- [ ] A04 Project pre-warm — detect repo stack at session start, preload 2–3 skills; close: demo on 2 repos.
-- [ ] A05 Stall rescue — looping/error-spam triggers debugger-skill inject; close: golden stall query.
-- [ ] A06 Auto-unequip — drop skills on topic pivot; close: context-size metric down, precision flat.
-- [ ] A07 Specialist teams — 3 skills as 3 subagents, merged output; close: one demo task end-to-end.
-- [ ] A08 Skill TTL — injected skills expire after N turns; close: expiry unit test.
-- [ ] A09 Pre-auth check — missing env key warns once before load; close: stripe-no-key probe.
-- [ ] A10 Dry-run preview — "what I'd load + why" mode; close: flag works, default off.
+- [x] A01 Confidence auto-inject — top-1 above threshold injects full SKILL.md via hook; close: demo + abstain-rate unchanged. (Jim 2026-09-23, r331+r351)
+- [x] A02 Ordered chains — return skill sequences with handoffs, not flat top-3; close: figma→frontend→deploy golden. (Jim 2026-09-23, r353)
+- [x] A03 Section injection — inject only relevant SKILL.md section; close: ≥50% context saved on 5 probes. (Jim 2026-09-23, r353 — 4/5 ≥62%, 1 section-less fallback)
+- [x] A04 Project pre-warm — detect repo stack at session start, preload 2–3 skills; close: demo on 2 repos. (Jim 2026-09-23, r353)
+- [x] A05 Stall rescue — looping/error-spam triggers debugger-skill inject; close: golden stall query. (Jim 2026-09-23, r353)
+- [x] A06 Auto-unequip — drop skills on topic pivot; close: context-size metric down, precision flat. (Jim 2026-09-23, r353 — pivot report wired to outputs)
+- [x] A07 Specialist teams — 3 skills as 3 subagents, merged output; close: one demo task end-to-end. (Jim 2026-09-23, r353)
+- [x] A08 Skill TTL — injected skills expire after N turns; close: expiry unit test. (Jim 2026-09-23, r353)
+- [x] A09 Pre-auth check — missing env key warns once before load; close: stripe-no-key probe. (Jim 2026-09-23, r353)
+- [x] A10 Dry-run preview — "what I'd load + why" mode; close: flag works, default off. (Jim 2026-09-23, r353)
 
 ## B. Auto-context — the "goes and gets it" half
 - [x] B11 `needs:` declarations — skills list required inputs in frontmatter; close: 5 skills annotated, enforced. (Jim 2026-09-23, r340)
