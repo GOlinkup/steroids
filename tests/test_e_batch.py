@@ -117,5 +117,19 @@ class TestE47Sandbox(unittest.TestCase):
         self.assertIn("exec", p["tools"])
 
 
+class TestE48Budget(unittest.TestCase):
+    def test_cap_triggers(self):
+        b = router.TokenBudget({"hog": 100})
+        self.assertTrue(b.spend("hog", 60))
+        self.assertFalse(b.spend("hog", 50))
+        self.assertEqual(b.spent["hog"], 60)
+        self.assertEqual(b.remaining("hog"), 40)
+
+    def test_uncapped_always(self):
+        b = router.TokenBudget()
+        self.assertTrue(b.spend("any", 10 ** 9))
+        self.assertIsNone(b.remaining("any"))
+
+
 if __name__ == "__main__":
     unittest.main()

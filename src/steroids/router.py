@@ -553,6 +553,26 @@ def sandbox_policy(skill, rules):
     return {"sandboxed": False, "tools": ["read", "write", "exec", "net"]}
 
 
+class TokenBudget:
+    # ponytail: E48 — per-skill session token caps; spend() refuses past cap.
+    def __init__(self, caps=None):
+        self.caps = dict(caps or {})
+        self.spent = {}
+
+    def spend(self, skill, tokens):
+        cap = self.caps.get(skill)
+        if cap is not None and self.spent.get(skill, 0) + tokens > cap:
+            return False
+        self.spent[skill] = self.spent.get(skill, 0) + tokens
+        return True
+
+    def remaining(self, skill):
+        cap = self.caps.get(skill)
+        if cap is None:
+            return None
+        return cap - self.spent.get(skill, 0)
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

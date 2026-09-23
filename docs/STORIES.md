@@ -84,7 +84,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] E45 Skill wallets — 2-skill cap per subagent; close: enforcement test. (Kevin 2026-09-23, r343)
 - [x] E46 One index, every harness — shared rank + learning; close: 2 harnesses same result. (Kevin 2026-09-23, r336)
 - [x] E47 Sandboxed skills — restricted tools for untrusted; close: policy + 1 demo. (Kevin 2026-09-23, r343)
-- [ ] E48 Token budgets — per-skill session cap; close: cap triggers in test.
+- [x] E48 Token budgets — per-skill session cap; close: cap triggers in test. (Kevin 2026-09-23, r343)
 - [ ] E49 Priority lanes — P0 skills bypass abstention; close: golden + abuse test.
 - [ ] E50 Fallback chains — A fails → B with error attached; close: golden.
 
