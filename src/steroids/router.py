@@ -659,6 +659,31 @@ def stall_rescue(top, idx, prompt):
     base = top[0][0] if top else 0.0
     return [(round(base + 1.0, 3), "debugger", ["stall-rescue"])] + [t for t in (top or []) if t[1] != "debugger"]
 
+SESSION_PATH = os.path.join(BASE_DIR, "session.json")
+
+def detect_pivot(prev_skills, top):
+    # ponytail: A06 — topic pivot = new top shares zero skills with last turn.
+    if not prev_skills or not top:
+        return False
+    return not (set(prev_skills) & {n for _, n, _ in top})
+
+def track_session(top, session_path=SESSION_PATH):
+    # ponytail: A06 — report dropped skills on pivot; persist current top. Read/write best-effort.
+    names = [n for _, n, _ in top or []]
+    try:
+        with open(session_path, encoding="utf-8") as f:
+            prev = json.load(f).get("last_skills", [])
+    except Exception:
+        prev = []
+    pivoted = detect_pivot(prev, top)
+    try:
+        os.makedirs(os.path.dirname(session_path) or ".", exist_ok=True)
+        with open(session_path, "w", encoding="utf-8") as f:
+            json.dump({"last_skills": names}, f)
+    except OSError:
+        pass
+    return {"pivoted": pivoted, "dropped": prev if pivoted else []}
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -2067,6 +2092,7 @@ def main():
     top = apply_project_profile(top, load_project_profile())
     top = apply_taste(top, load_taste_profile())
     top = stall_rescue(top, idx, prompt)
+    session = track_session(top)
 
     if args.ranker in ("v2", "ab"):
         # ponytail: C27 — explicit challenger or 10% auto-assign experiment run.
@@ -2111,7 +2137,8 @@ def main():
             print(json.dumps({
                 "triggers": trigs.split(","),
                 "skills": [s for _, s, _ in top],
-                "hint": hint
+                "hint": hint,
+                "unequipped": session["dropped"]
             }))
         else:
             print(hint)

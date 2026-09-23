@@ -870,6 +870,25 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(already[0], (5.0, "debugger", ["debug"]))
         self.assertEqual(router.stall_rescue([], {}, "error again loop"), [])
 
+    def test_a06_pivot_unequips(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            sess = os.path.join(tmp, "session.json")
+            first = router.track_session([(3.0, "alpha", ["a"])], session_path=sess)
+            self.assertFalse(first["pivoted"])
+            same = router.track_session([(2.0, "alpha", ["a"])], session_path=sess)
+            self.assertFalse(same["pivoted"])
+            self.assertEqual(same["dropped"], [])
+            pivot = router.track_session([(2.0, "beta", ["b"])], session_path=sess)
+            self.assertTrue(pivot["pivoted"])
+            self.assertEqual(pivot["dropped"], ["alpha"])
+            self.assertTrue(router.detect_pivot(["a"], [(1.0, "b", [])]))
+            self.assertFalse(router.detect_pivot([], [(1.0, "b", [])]))
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()
