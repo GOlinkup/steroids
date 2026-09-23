@@ -840,6 +840,16 @@ def triage_build(log_text, rules, idx, accepts=None):
             "skills": [s for _, s, _ in top]}
 
 
+def summarize_upgrade(dep, old_ver, new_ver, rules, idx, accepts=None):
+    # ponytail: I86 — upgrade span routes the guide skill; summary carries
+    # the version span (stripe-v16 style). Changelog fetch harness-side.
+    top = route_query(f"upgrade {dep} {old_ver} to {new_ver} breaking changes",
+                      rules, idx, accepts)
+    return {"dep": dep, "from": old_ver, "to": new_ver,
+            "skill": top[0][1] if top else None,
+            "skills": [s for _, s, _ in top]}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

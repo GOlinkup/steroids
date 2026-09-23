@@ -130,7 +130,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] I83 Paste-to-route — stack-trace offered fix skill; close: golden. (Kevin 2026-09-23, r347)
 - [x] I84 Pre-commit hook — auth diffs get review comment; close: demo repo. (Kevin 2026-09-23, r347)
 - [x] I85 CI triage — red build → fix skill + logs; close: 1 real red build. (Kevin 2026-09-23, r347)
-- [ ] I86 Dep upgrade — breaking-change summary skill; close: golden stripe-v16 style.
+- [x] I86 Dep upgrade — breaking-change summary skill; close: golden stripe-v16 style. (Kevin 2026-09-23, r347)
 - [ ] I87 Clone-and-equip — new repo equipped pre-README; close: timed demo.
 - [ ] I88 Idle reindex — background refresh; close: never-blocks proof.
 - [ ] I89 Weekly digest — new/better skills for your stack; close: first digest generated.

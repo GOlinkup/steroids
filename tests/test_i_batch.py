@@ -86,5 +86,15 @@ class TestI85Triage(unittest.TestCase):
         self.assertTrue(r["excerpt"])
 
 
+class TestI86Upgrade(unittest.TestCase):
+    def test_golden_stripe_style(self):
+        idx = {"pay-x": ["stripe", "upgrade", "payment", "billing"],
+               "other": ["widget"]}
+        rules = {"glue": [], "max_recommendations": 3}
+        r = router.summarize_upgrade("stripe", "v15", "v16", rules, idx)
+        self.assertEqual(r["skill"], "pay-x")
+        self.assertEqual((r["dep"], r["from"], r["to"]), ("stripe", "v15", "v16"))
+
+
 if __name__ == "__main__":
     unittest.main()
