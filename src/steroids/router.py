@@ -489,6 +489,16 @@ def dispatch_task(task, rules, idx, accepts=None):
     return plan
 
 
+def pinned_route(prompt, pinned, rules, idx, accepts=None):
+    # ponytail: E42 — pinned skill never drops out of top-3 (real row when
+    # hit, 0.0 carrier otherwise; rank-3 yields the slot). Tuple shape kept.
+    top = route_query(prompt, rules, idx, accepts)
+    if any(s == pinned for _, s, _ in top):
+        return top
+    keep = rules.get("max_recommendations", 3) - 1
+    return (top[:keep] + [(0.0, pinned, [])])[:rules.get("max_recommendations", 3)]
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

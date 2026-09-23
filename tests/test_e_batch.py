@@ -36,5 +36,19 @@ class TestE41Dispatch(unittest.TestCase):
         self.assertEqual(len(plan), 1)
 
 
+
+class TestE42Pinned(unittest.TestCase):
+    def test_pinned_survives_no_hit(self):
+        top = router.pinned_route("fix merge conflict markers", "canvas", RULES, IDX)
+        self.assertIn("canvas", [s for _, s, _ in top])
+        self.assertLessEqual(len(top), 3)
+
+    def test_pinned_hit_keeps_real_score(self):
+        top = router.pinned_route("lay my notes out on a visual canvas", "canvas", RULES, IDX)
+        row = next(r for r in top if r[1] == "canvas")
+        self.assertTrue(row[2])
+        self.assertGreater(row[0], 0.0)
+
+
 if __name__ == "__main__":
     unittest.main()
