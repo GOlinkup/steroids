@@ -117,7 +117,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] H72 Clearance gating — restricted skills hidden; close: policy test. (Kevin 2026-09-23, r346)
 - [x] H73 Audit trail — who loaded what/when; close: log format + 1 query. (Kevin 2026-09-23, r346)
 - [x] H74 PII guard — customer-data prompts block analytics skills; close: golden red-team pair. (Kevin 2026-09-23, r346)
-- [ ] H75 Cost allocation — tokens per team/skill; close: first report from D38 data.
+- [x] H75 Cost allocation — tokens per team/skill; close: first report from D38 data. (Kevin 2026-09-23, r346)
 - [ ] H76 Policy skills — security-review auto on auth diffs; close: golden.
 - [ ] H77 Incident packs — outage bundle; close: 1 pack defined + drill.
 - [ ] H78 Leaver continuity — custom skills retained; close: policy doc.

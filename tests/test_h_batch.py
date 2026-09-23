@@ -2,6 +2,7 @@
 import importlib.util
 import json
 import os
+import sys
 import unittest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -67,6 +68,24 @@ class TestH74PII(unittest.TestCase):
     def test_control_no_pii_passes(self):
         self.assertFalse(router.pii_blocked(
             "analyze quarterly churn trends", "analytics-x", self.RULES))
+
+
+class TestH75Cost(unittest.TestCase):
+    def test_allocate_teams(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import cost_report, tempfile
+        d = tempfile.mkdtemp()
+        dd = os.path.join(d, "sa")
+        os.makedirs(dd)
+        md = os.path.join(dd, "SKILL.md")
+        open(md, "w").write("x" * 400)
+        lp = os.path.join(d, "s.jsonl")
+        open(lp, "w").write('{"t":1,"q":"a","trigs":"x","skills":"sa"}\n')
+        rp = os.path.join(d, "rules.json")
+        open(rp, "w").write('{"teams": {"blue": ["sa"]}}')
+        per_skill, per_team = cost_report.allocate(lp, rp, topdir=d)
+        self.assertEqual(per_skill["sa"], 100)
+        self.assertEqual(per_team, {"blue": 100})
 
 
 if __name__ == "__main__":
