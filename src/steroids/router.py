@@ -781,6 +781,21 @@ def offline_guard():
     return _guard()
 
 
+def watch_suggest(changed_files, rules, idx, accepts=None):
+    # ponytail: I81 — file events surface skills. Each path becomes a query
+    # from its filename tokens ("Dockerfile changed"); fs watching itself
+    # stays harness-side.
+    out = []
+    for path in changed_files:
+        base = path.rsplit("/", 1)[-1]
+        words = [w for w in re.findall(r"[a-z][a-z0-9+#]{1,}", base.lower())]
+        query = " ".join(words) + " changed"
+        top = route_query(query, rules, idx, accepts)
+        out.append({"file": path, "query": query,
+                    "skills": [s for _, s, _ in top]})
+    return out
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

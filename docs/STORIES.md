@@ -125,7 +125,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] H80 Air-gap mode — full offline box; close: offline install test. (Kevin 2026-09-23, r346)
 
 ## I. Proactive & ambient — skills before you ask
-- [ ] I81 Watch mode — file events surface skills; close: Dockerfile demo.
+- [x] I81 Watch mode — file events surface skills; close: Dockerfile demo. (Kevin 2026-09-23, r347)
 - [ ] I82 Calendar-aware — meeting preload; close: demo.
 - [ ] I83 Paste-to-route — stack-trace offered fix skill; close: golden.
 - [ ] I84 Pre-commit hook — auth diffs get review comment; close: demo repo.
