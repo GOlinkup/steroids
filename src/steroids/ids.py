@@ -5,12 +5,12 @@ import random
 import re
 import time
 
-_FMT = re.compile(r"^\d{8}-\d{6}-[0-9a-f]{6}$")
+_FMT = re.compile(r"^\d{8}-\d{6}-[0-9a-f]{16}$")
 
 def new_id(prefix=""):
     # ponytail: time + pid + rand; sortable by time, unique over 1000 fast calls.
     t = time.strftime("%Y%m%d-%H%M%S", time.gmtime())
-    rand = "%06x" % random.getrandbits(24)
+    rand = "%016x" % random.getrandbits(64)
     return f"{prefix}{t}-{rand}" if prefix else f"{t}-{rand}"
 
 def valid(sid):
