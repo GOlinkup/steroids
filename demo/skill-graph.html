@@ -25,6 +25,9 @@ header .sub{color:#8b949e;font-size:12px;overflow:hidden;text-overflow:ellipsis;
 #details .kw{display:inline-block;background:#1a2230;border:1px solid #2a3342;border-radius:5px;padding:2px 8px;margin:2px;font-size:12px;line-height:1.5}
 #details .kw:hover{border-color:#3b4763}
 #details .dim{color:#8b949e;line-height:1.5}
+#details .load{display:block;width:100%;margin:10px 0;padding:8px;border-radius:6px;border:1px solid #1f6feb;background:#12203a;color:#e6e9f0;font:inherit;cursor:pointer}
+#details .load:hover{background:#1a2c4f}
+#details .nb{color:#8b949e;font-size:12px}
 #mascot{width:100%;height:104px;display:block;border-bottom:1px solid #1e2430;cursor:grab;touch-action:none;image-rendering:pixelated}
 footer{padding:6px 16px;border-top:1px solid #1e2430;color:#8b949e;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:700px){
@@ -125,8 +128,19 @@ function draw(){
 function headline(){document.getElementById("headline").textContent=
   "generated from your live index — "+data.nodes.length+" skills";}
 function show(n){
+  // ponytail: F52 click-to-inject — details against the live index: neighbors
+  // + one-click load command (copies `load skill: <id>` for the harness).
   var d=document.getElementById("details"),kws=n.kw.map(function(k){return '<span class="kw">'+k+"</span>";}).join("");
-  d.innerHTML="<h2>"+n.id+"</h2><p>degree: <b>"+deg(n.id)+"</b></p><p>"+kws+"</p>";
+  var nbs=[];data.links.forEach(function(l){if(l.source===n.id)nbs.push(l.target);else if(l.target===n.id)nbs.push(l.source);});
+  var nb=nbs.slice(0,8).map(function(id){return '<span class="kw">'+id+"</span>";}).join("")||'<span class="dim">none</span>';
+  d.innerHTML="<h2>"+n.id+"</h2><p>degree: <b>"+deg(n.id)+"</b></p><p>"+kws+"</p>"+
+    '<button class="load" id="loadbtn">Load skill: '+n.id+"</button>"+
+    '<p class="nb">neighbors:<br>'+nb+"</p>";
+  document.getElementById("loadbtn").addEventListener("click",function(){
+    var cmd="load skill: "+n.id;
+    function done(ok){document.getElementById("loadbtn").textContent=ok?"Copied!":"Copy: "+cmd;}
+    if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(cmd).then(function(){done(true);},function(){done(false);});}
+    else{var t=document.createElement("textarea");t.value=cmd;document.body.appendChild(t);t.select();try{document.execCommand("copy");done(true);}catch(e){done(false);}document.body.removeChild(t);}});
 }
 function hit(mx,my){for(var i=nodes.length-1;i>=0;i--){var p=w2s([nodes[i].x,nodes[i].y]);
   if((p[0]-mx)*(p[0]-mx)+(p[1]-my)*(p[1]-my)<144) return nodes[i];}return null;}

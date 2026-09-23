@@ -90,7 +90,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 
 ## F. Canvas & UX — make it visible
 - [ ] F51 Live fire display — blobs ignite on route; close: demo gif.
-- [ ] F52 Click-to-inject — click blob loads skill; close: works against live index.
+- [x] F52 Click-to-inject — click blob loads skill; close: works against live index. (Kevin 2026-09-23, r344)
 - [ ] F53 Drag-a-prompt — drop text, watch ripple; close: demo.
 - [ ] F54 Graph explorer — 1265 nodes zoom/pan/search; close: loads <2s.
 - [ ] F55 Fire heatmap — hot glow, dead dim; close: served-driven colors.
