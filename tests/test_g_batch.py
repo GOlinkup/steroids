@@ -75,5 +75,15 @@ class TestG68Author(unittest.TestCase):
         self.assertEqual((fires["sa"], accepts["sa"]), (2, 1))
 
 
+class TestG69Changelog(unittest.TestCase):
+    def test_diff(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import index_changelog
+        old = {"a": ["x"], "b": ["y"]}
+        new = {"a": ["x", "z"], "c": ["w"]}
+        added, removed, changed = index_changelog.diff(old, new)
+        self.assertEqual((added, removed, changed), (["c"], ["b"], ["a"]))
+
+
 if __name__ == "__main__":
     unittest.main()
