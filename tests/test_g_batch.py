@@ -2,6 +2,7 @@
 import importlib.util
 import os
 import sys
+import tempfile
 import unittest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -59,6 +60,19 @@ class TestG67Ratings(unittest.TestCase):
 
     def test_poor_record(self):
         self.assertLessEqual(router.star_rating(100, 10, 1, 9), 2)
+
+
+class TestG68Author(unittest.TestCase):
+    def test_fires_accepts_join(self):
+        import author_report
+        d = tempfile.mkdtemp()
+        lp = os.path.join(d, "s.jsonl")
+        open(lp, "w").write('{"t":1,"q":"a","trigs":"x","skills":"sa/sb"}\n'
+                            '{"t":2,"q":"b","trigs":"y","skills":"sa"}\n')
+        mp = os.path.join(d, "m.json")
+        open(mp, "w").write('{"accepts": {"sa": 1}}')
+        fires, accepts = author_report.author_stats(lp, mp)
+        self.assertEqual((fires["sa"], accepts["sa"]), (2, 1))
 
 
 if __name__ == "__main__":
