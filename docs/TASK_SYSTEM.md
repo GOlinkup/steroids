@@ -132,3 +132,25 @@ Size: S
 
 *Status: task system v1.0 (this doc). Format is frozen; fields change only via
 change control with reason. First executable story: S-01 above — say go.*
+
+## 11. Grader policy (P0-6)
+
+1. **Outputs, not paths.** Grade the observable outcome, never the route
+   taken. A reference solution is one valid route, not the required one.
+2. **Every bank task carries a reference solution or a deterministic grader**
+   (bank rule, CP-0 enforced). A grader is a command with exit 0 = pass.
+3. **Allowlisted execution only.** The harness runs grader fragments starting
+   with a safe prefix (`python3 -m unittest`, `python3 src/steroids/`,
+   `python3 -c`, `git diff --quiet`, `git show`, `git checkout --`);
+   anything else is skipped and logged, never executed
+   (skeleton-guard precedent: arbitrary bank text must not run).
+4. **Partial credit.** A grader with ` + `-separated sub-checks scores
+   passed/runnable (new `grader_score` column; `grader_pass` stays
+   all-or-nothing for backward compatibility). Skipped fragments are
+   excluded from the denominator and noted.
+5. **Calibration.** Two-grader disagreement re-opens the task; the task,
+   not the grader, is suspect first.
+6. **Privacy.** Logs carry task_id + sha256 of task text, never full prompts.
+7. The condensed policy ships in `scripts/phase0_harness.py --help`
+   (epilog); this section is canonical. Worked example:
+   [grader-transcript-B02.md](grader-transcript-B02.md).

@@ -28,7 +28,7 @@ _BANK = os.path.join(_ROOT, "specs", "phase-0", "task-bank.md")
 _FROZEN = os.path.join(_ROOT, "benchmarks", "golden-1265")
 _CSV_COLS = ["task_id", "arm", "trial", "tokens_in", "tokens_out",
              "cost_usd", "wall_s", "interventions", "rework",
-             "grader_pass", "notes"]
+             "grader_pass", "grader_score", "notes"]
 _ARMS = ["model-only", "model+steroids"]
 # ponytail: allowlist keeps skeleton from executing arbitrary bank text.
 _SAFE_PREFIXES = ("python3 -m unittest ", "python3 src/steroids/",
@@ -70,17 +70,43 @@ def frozen_clean():
     return r.returncode == 0
 
 
+def split_checks(grader):
+    """Split a grader into ` + `-separated sub-checks (P0-6 partial credit).
+
+    Bank text is never edited for this: splitting happens at run time.
+    A fragment that is not allowlisted is skipped, never executed.
+    Returns (runnable, skipped) fragment lists.
+    """
+    parts = [p.strip() for p in (grader or "").split(" + ") if p.strip()]
+    runnable = [p for p in parts if p.startswith(_SAFE_PREFIXES)]
+    skipped = [p for p in parts if not p.startswith(_SAFE_PREFIXES)]
+    return runnable, skipped
+
+
 def run_grader(grader, timeout=120):
-    if not grader or not grader.startswith(_SAFE_PREFIXES):
-        return None, 0.0, "grader-skipped-not-allowlisted"
+    runnable, skipped = split_checks(grader)
+    if not runnable:
+        return None, None, 0.0, "grader-skipped-not-allowlisted"
     t0 = time.time()
+    passed = 0
     try:
         with tempfile.TemporaryDirectory(prefix="p04-") as tmp:
-            r = subprocess.run(grader, shell=True, cwd=_ROOT, capture_output=True,
-                               text=True, timeout=timeout, env={**os.environ, "TMPDIR": tmp})
-        return (r.returncode == 0), round(time.time() - t0, 2), ""
+            for check in runnable:
+                r = subprocess.run(check, shell=True, cwd=_ROOT, capture_output=True,
+                                   text=True, timeout=timeout, env={**os.environ, "TMPDIR": tmp})
+                passed += (r.returncode == 0)
     except subprocess.TimeoutExpired:
-        return False, round(time.time() - t0, 2), "grader-timeout"
+        wall = round(time.time() - t0, 2)
+        score = round(passed / len(runnable), 3)
+        return False, score, wall, "grader-timeout (%d/%d sub-checks)" % (passed, len(runnable))
+    wall = round(time.time() - t0, 2)
+    score = round(passed / len(runnable), 3)
+    note = ""
+    if len(runnable) > 1:
+        note = "sub-checks %d/%d" % (passed, len(runnable))
+    if skipped:
+        note = (note + "; " if note else "") + "skipped %d non-allowlisted" % len(skipped)
+    return (passed == len(runnable)), score, wall, note
 
 
 def main():
@@ -110,10 +136,11 @@ def main():
         for arm in _ARMS:
             for trial in range(1, max(1, a.trials) + 1):
                 if a.dry_run:
-                    ok, wall, note = run_grader(t["grader"])
-                    note = note or "dry-run: no model calls; grader-only"
+                    ok, score, wall, note = run_grader(t["grader"])
+                    note = (note + "; " if note else "") + "dry-run: no model calls; grader-only"
                     rows.append([tid, arm, trial, "", "", "", wall, 0, 0,
-                                 "" if ok is None else int(ok), note])
+                                 "" if ok is None else int(ok),
+                                 "" if score is None else score, note])
                 else:
                     print("live model arms need keys + spend cap — refusing (free-tier rule)",
                           file=sys.stderr)
