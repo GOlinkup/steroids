@@ -45,6 +45,9 @@ every claim re-verifiable with the command next to it.
   proves the harness shape on B-02/B-03 (4 rows, frozen clean).
 - Full AgentDojo waits on spend cap; proxy pair is the standing metric.
 - Live reinstall waits on a maintenance window (throwaway-HOME run).
+- Paid evals SKIPPED for V1 (owner decision 2026-09-23): full 97-task
+  AgentDojo + P0-4 live model arms move to V-next. V1 ships (if it ships)
+  on proxy metrics + bank evidence, never on paid runs.
 
 ## V-next hold (user decision 2026-09-23: free-branch done, rest deferred)
 
