@@ -733,6 +733,26 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_c26_retirement_dry_run(self):
+        import tempfile, os, time as _time
+        tmp = tempfile.mkdtemp()
+        try:
+            for name in ("oldie", "fresh", "used"):
+                d = os.path.join(tmp, name)
+                os.makedirs(d)
+                with open(os.path.join(d, "SKILL.md"), "w") as f:
+                    f.write(f"# {name}\n")
+            old_t = _time.time() - 100 * 86400
+            os.utime(os.path.join(tmp, "oldie", "SKILL.md"), (old_t, old_t))
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            idx = {"oldie": ["o"], "fresh": ["f"], "used": ["u"]}
+            out = router.retirement_candidates(rules, idx, accepts={"used": 2})
+            self.assertEqual([r["skill"] for r in out], ["oldie"])
+            self.assertGreaterEqual(out[0]["age_days"], 90)
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

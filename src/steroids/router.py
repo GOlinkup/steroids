@@ -524,6 +524,25 @@ def apply_downvotes(accepts, served, threshold=3):
             out[s] = -1
     return out
 
+def retirement_candidates(rules, idx, accepts=None, outcomes=None, seen=None, now=None, days=90):
+    # ponytail: C26 — 90-day zero-outcome quarantine list; dry-run report only, never enforced here.
+    accepts, outcomes, seen = accepts or {}, outcomes or {}, seen or {}
+    now = time.time() if now is None else now
+    paths = {}
+    for name, md in skill_files(rules.get("index_dirs", [])):
+        paths.setdefault(name, md)
+    out = []
+    for name in idx:
+        if accepts.get(name) or outcomes.get(name) or seen.get(name):
+            continue
+        try:
+            age = (now - os.path.getmtime(paths[name])) / 86400.0
+        except (KeyError, OSError):
+            continue
+        if age >= days:
+            out.append({"skill": name, "age_days": round(age, 1)})
+    return sorted(out, key=lambda r: -r["age_days"])
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -1780,6 +1799,19 @@ def main():
             return
         res = record_outcome(args.prompt[1], args.prompt[2] == "ok")
         print(json.dumps({"ok": res is not None, "skill": args.prompt[1], "record": res}))
+        return
+
+    if args.prompt and args.prompt[0] == "retire":
+        # ponytail: C26 — dry-run quarantine report only.
+        mem = {}
+        try:
+            with open(MEM_PATH, encoding="utf-8") as f:
+                mem = json.load(f)
+        except Exception:
+            pass
+        print(json.dumps({"dry_run": True, "candidates": retirement_candidates(
+            rules, idx, accepts=mem.get("accepts", {}),
+            outcomes=mem.get("outcomes", {}), seen=mem.get("seen", {}))}))
         return
 
     if args.count:
