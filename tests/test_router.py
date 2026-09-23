@@ -706,6 +706,14 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_c24_decay_fades_with_fake_clock(self):
+        t0 = 1700000000.0
+        out = router.apply_decay({"a": 8, "b": 4}, {"a": t0}, now=t0 + 60 * 86400)
+        self.assertEqual(out["a"], 2.0)  # two halflives (30d) -> 8 * 0.25
+        self.assertEqual(out["b"], 4)  # no timestamp = grandfathered
+        fresh = router.apply_decay({"a": 8}, {"a": t0}, now=t0)
+        self.assertEqual(fresh["a"], 8.0)
+
 
 if __name__ == "__main__":
     unittest.main()

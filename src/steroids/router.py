@@ -386,13 +386,16 @@ def rule_neg(rules):
     return neg
 
 
-def learn(transcript_path):
+def learn(transcript_path, now=None):
     try:
         with open(MEM_PATH, encoding="utf-8") as f:
             mem = json.load(f)
     except Exception:
         mem = {}
     accepts, offsets = mem.get("accepts", {}), mem.get("offsets", {})
+    seen = mem.get("seen", {})
+    if not isinstance(seen, dict):
+        seen = {}
     if transcript_path and os.path.isfile(transcript_path):
         try:
             size = os.path.getsize(transcript_path)
@@ -410,11 +413,13 @@ def learn(transcript_path):
             # ponytail: fallback for tool-loop shapes without the Skill wrapper.
             if not found:
                 found = re.findall(r'"skill":\s*"([a-z0-9][a-z0-9_-]{2,60})"', chunk)
+            ts = now if now is not None else time.time()
             for s in found:
                 accepts[s] = accepts.get(s, 0) + 1
+                seen[s] = ts
             offsets[transcript_path] = size
             with open(MEM_PATH, "w", encoding="utf-8") as f:
-                json.dump({"accepts": accepts, "offsets": offsets}, f)
+                json.dump({"accepts": accepts, "offsets": offsets, "seen": seen}, f)
         except OSError:
             pass
     return accepts
@@ -466,6 +471,28 @@ def apply_outcomes(accepts, outcomes):
             continue
         if tot and s in out:
             out[s] = round(out[s] * (ok / tot), 3)
+    return out
+
+def load_seen(mem_path=MEM_PATH):
+    # ponytail: C24 — {skill: last-accept epoch}; missing = {} (grandfathered, no decay).
+    try:
+        with open(mem_path, encoding="utf-8") as f:
+            seen = json.load(f).get("seen", {})
+        return seen if isinstance(seen, dict) else {}
+    except Exception:
+        return {}
+
+def apply_decay(accepts, seen, now=None, halflife_days=30):
+    # ponytail: C24 — accepts fade by halves per halflife since last accept; no ts = full weight.
+    now = time.time() if now is None else now
+    out = dict(accepts or {})
+    for s, n in list(out.items()):
+        try:
+            ts = float((seen or {}).get(s, now))
+        except Exception:
+            continue
+        age_days = max(0.0, (now - ts) / 86400.0)
+        out[s] = round(n * (0.5 ** (age_days / halflife_days)), 3)
     return out
 
 def load_project_profile(root=None):
@@ -1802,7 +1829,7 @@ def main():
             parser.print_help()
         return
 
-    accepts = apply_outcomes(learn(tp), load_outcomes())
+    accepts = apply_decay(apply_outcomes(learn(tp), load_outcomes()), load_seen())
     if args.chain:
         print(json.dumps(chain(args.chain, rules, idx, accepts=accepts)))
         return
