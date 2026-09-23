@@ -559,6 +559,36 @@ def ab_route(prompt, rules, idx, accepts=None, key=None):
     top = route_v2(prompt, rules, idx, accepts) if variant == "v2" else route_query(prompt, rules, idx, accepts)
     return {"variant": variant, "skills": [s for _, s, _ in top]}
 
+def load_taste_profile(root=None):
+    # ponytail: C28 — user picks <cwd>/.steroids-taste.json {like:[tok], dislike:[tok]}.
+    root = root or os.getcwd()
+    try:
+        with open(os.path.join(root, ".steroids-taste.json"), encoding="utf-8") as f:
+            doc = json.load(f)
+        if not isinstance(doc, dict):
+            return {}
+        like = doc.get("like", [])
+        dislike = doc.get("dislike", [])
+        return {"like": [str(t).lower() for t in like] if isinstance(like, list) else [],
+                "dislike": [str(t).lower() for t in dislike] if isinstance(dislike, list) else []}
+    except Exception:
+        return {}
+
+def apply_taste(top, taste, bonus=0.5):
+    # ponytail: C28 — liked tokens lift, disliked sink; neutral untouched. Pure.
+    if not top or not taste:
+        return top
+    like = set(taste.get("like", []))
+    dislike = set(taste.get("dislike", []))
+    out = []
+    for s, n, h in top:
+        toks_n = set(toks(n)) | set(h)
+        d = bonus if toks_n & like else 0.0
+        d -= bonus if toks_n & dislike else 0.0
+        out.append((round(s + d, 3), n, h))
+    out.sort(key=lambda t: (-t[0], t[1]))
+    return out
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -1915,6 +1945,7 @@ def main():
         return
     top = route_query(prompt, rules, idx, accepts)
     top = apply_project_profile(top, load_project_profile())
+    top = apply_taste(top, load_taste_profile())
 
     if args.ranker in ("v2", "ab"):
         # ponytail: C27 — explicit challenger or 10% auto-assign experiment run.

@@ -766,6 +766,26 @@ class TestRouter(unittest.TestCase):
         self.assertIn(run["variant"], ("v1", "v2"))
         self.assertTrue(run["skills"])
 
+    def test_c28_taste_profile_golden_pair(self):
+        import tempfile, os, json as _json
+        tmp = tempfile.mkdtemp()
+        try:
+            top = [(2.0, "mui", ["mui", "component"]), (1.9, "tailwind-patterns", ["tailwind", "css"])]
+            plain = router.apply_taste(top, {})
+            self.assertEqual([n for _, n, _ in plain], ["mui", "tailwind-patterns"])
+            taste = {"like": ["tailwind"], "dislike": ["mui"]}
+            ranked = router.apply_taste(top, taste)
+            self.assertEqual([n for _, n, _ in ranked], ["tailwind-patterns", "mui"])
+            prof = os.path.join(tmp, ".steroids-taste.json")
+            with open(prof, "w") as f:
+                f.write(_json.dumps(taste))
+            loaded = router.load_taste_profile(tmp)
+            self.assertEqual(loaded["like"], ["tailwind"])
+            self.assertEqual(router.load_taste_profile(os.path.join(tmp, "nope")), {})
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()
