@@ -823,6 +823,17 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_a03_section_injection_saves_context(self):
+        md = ("# S\n\n## Usage\n\nUse the widget for things.\n\n"
+              "## API reference\n\nEndpoints, parameters, auth tokens.\n\n"
+              "## Examples\n\nMany lines here.\n")
+        best, hit = router.extract_section(md, "auth tokens parameters")
+        self.assertTrue(hit)
+        self.assertIn("API reference", best)
+        self.assertNotIn("Examples", best)
+        _, miss = router.extract_section("# flat doc, no sections", "anything")
+        self.assertFalse(miss)
+
 
 if __name__ == "__main__":
     unittest.main()

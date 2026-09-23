@@ -1761,10 +1761,11 @@ def open_canvas():
     else:
         print(f"[Steroids] Canvas script not found at {PY2D_PATH}", file=sys.stderr)
 
-def autoinject(top, rules, idx):
+def autoinject(top, rules, idx, query=""):
     # ponytail: A01 — confident top-1 injects its full SKILL.md. Threshold 2.0
     # measured on live index: 85/100 goldens fire; noise battery max 2.15 (one
     # fires — precision cost logged, abstains never fire since top is empty).
+    # ponytail: A03 — section_inject flag swaps full body for the best ## section.
     if not top:
         return None
     score, name, _hits = top[0]
@@ -1774,10 +1775,34 @@ def autoinject(top, rules, idx):
         if sname == name:
             try:
                 with open(md, encoding="utf-8", errors="replace") as f:
-                    return {"skill": name, "score": score, "path": md, "content": f.read()}
+                    content = f.read()
+                section = None
+                if rules.get("section_inject") and query:
+                    section, hit = extract_section(content, query)
+                    if hit:
+                        content = section
+                return {"skill": name, "score": score, "path": md, "content": content,
+                        "section": bool(section)}
             except OSError:
                 return None
     return None
+
+def extract_section(md_text, query):
+    # ponytail: A03 — best ## section by query-token overlap; ("", False) when no win.
+    qt = set(toks(query))
+    if not qt:
+        return "", False
+    parts = re.split(r"(?m)^(#{2,})\s+(.+)$", md_text)
+    if len(parts) < 4:
+        return "", False
+    best, best_n = "", 0
+    for i in range(1, len(parts), 3):
+        title = parts[i + 1]
+        body = parts[i + 2] if i + 2 < len(parts) else ""
+        n = len(qt & set(toks(title + " " + body[:2000])))
+        if n > best_n:
+            best, best_n = (parts[i] + " " + title + "\n" + body), n
+    return (best, True) if best else ("", False)
 
 def build_loop(spec, rules, idx, demo_dir=None):
     # ponytail: P00f — one call runs research>build>verify via chain(); the
@@ -2012,7 +2037,7 @@ def main():
         hint = f"Possibly relevant skills (load what applies, skip rest): {trigs} -> {names}"
         injected = None
         if not args.json and (is_antigravity or isinstance(parsed_json, dict) or args.claude_hook):
-            injected = autoinject(top, rules, idx)
+            injected = autoinject(top, rules, idx, prompt)
         if injected is not None:
             body = (f"[Steroids] Auto-loaded skill: {injected['skill']} "
                     f"(score {injected['score']})\n{injected['content']}")
