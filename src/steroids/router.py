@@ -643,6 +643,22 @@ def prewarm(root, rules, idx, accepts=None):
         out[stack] = [s for _, s, _ in top[:3]]
     return out
 
+def detect_stall(prompt):
+    # ponytail: A05 — error + loop language means the user is going in circles.
+    pl = prompt.lower()
+    err = "error" in pl or "traceback" in pl or "exception" in pl or "failing" in pl
+    loop = any(w in pl for w in ("again", "still", "loop", "repeat", "tried", "keeps", "stuck", "circles"))
+    return err and loop
+
+def stall_rescue(top, idx, prompt):
+    # ponytail: A05 — stall detected: debugger skill takes the lead (explicit +1.0 rescue boost).
+    if not detect_stall(prompt) or "debugger" not in (idx or {}):
+        return top
+    if top and top[0][1] == "debugger":
+        return top
+    base = top[0][0] if top else 0.0
+    return [(round(base + 1.0, 3), "debugger", ["stall-rescue"])] + [t for t in (top or []) if t[1] != "debugger"]
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -2050,6 +2066,7 @@ def main():
     top = route_query(prompt, rules, idx, accepts)
     top = apply_project_profile(top, load_project_profile())
     top = apply_taste(top, load_taste_profile())
+    top = stall_rescue(top, idx, prompt)
 
     if args.ranker in ("v2", "ab"):
         # ponytail: C27 — explicit challenger or 10% auto-assign experiment run.

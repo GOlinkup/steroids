@@ -857,6 +857,19 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_a05_stall_rescue_golden(self):
+        idx = {"debugger": ["debug"], "other": ["thing"]}
+        stall = router.stall_rescue([(2.0, "other", ["thing"])], idx,
+                                    "this error keeps failing again and again, tried 3 times, still stuck")
+        self.assertEqual(stall[0][1], "debugger")
+        self.assertIn("stall-rescue", stall[0][2])
+        calm = router.stall_rescue([(2.0, "other", ["thing"])], idx, "how do I write a widget")
+        self.assertEqual(calm[0][1], "other")
+        already = router.stall_rescue([(5.0, "debugger", ["debug"])], idx,
+                                      "error again, still stuck in a loop")
+        self.assertEqual(already[0], (5.0, "debugger", ["debug"]))
+        self.assertEqual(router.stall_rescue([], {}, "error again loop"), [])
+
 
 if __name__ == "__main__":
     unittest.main()
