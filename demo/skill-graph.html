@@ -47,7 +47,7 @@ footer{font-size:11px;padding:5px 12px}
 </style>
 </head>
 <body>
-<header><h1>Steroids Skill Graph</h1><span class="sub" id="headline"></span><input id="search" placeholder="search skills…"><input id="scrub" type="range" min="0" max="1000" value="1000" title="Scrub routing history" style="width:110px"><span class="sub" id="scrublabel"></span></header>
+<header><h1>Steroids Skill Graph</h1><span class="sub" id="headline"></span><input id="search" placeholder="search skills…"><input id="scrub" type="range" min="0" max="1000" value="1000" title="Scrub routing history" style="width:110px"><button id="mic" title="Voice in: speak to equip" style="background:#11161f;border:1px solid #2a3342;color:#e6e9f0;border-radius:6px;padding:6px 10px;cursor:pointer">🎙</button><span class="sub" id="scrublabel"></span></header>
 <canvas id="mascot"></canvas>
 <div id="wrap"><canvas id="canvas"></canvas><aside id="details"><p class="dim">Click a node for details.</p></aside></div>
 <div id="zoom"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button></div>
@@ -176,6 +176,20 @@ cv.addEventListener("wheel",function(e){e.preventDefault();
 cv.addEventListener("dblclick",function(){view.x=0;view.y=0;replayOn=false;
   document.getElementById("scrub").value=1000;document.getElementById("scrublabel").textContent="";fitView();draw();});
 document.getElementById("scrub").addEventListener("input",function(e){applyScrub(e.target.value/1000);});
+// ponytail: F57 voice in — speech transcript equips (searches + selects top
+// match); no-API/no-mic degrades to a typed-instead note. Mic demo needs hardware.
+document.getElementById("mic").addEventListener("click",function(){
+  var label=document.getElementById("scrublabel");
+  var SR=window.SpeechRecognition||window.webkitSpeechRecognition;
+  if(!SR){label.textContent="voice not supported here — type instead";return;}
+  function equip(t){document.getElementById("search").value=t;q=t.toLowerCase();
+    sel=null;for(var i=0;i<nodes.length;i++){if(match(nodes[i])){sel=nodes[i];break;}}
+    if(sel)show(sel);draw();}
+  try{var rec=new SR();rec.lang="en-US";rec.interimResults=false;
+    label.textContent="listening…";
+    rec.onresult=function(e){var t=e.results[0][0].transcript;label.textContent="heard: "+t;equip(t);};
+    rec.onerror=function(){label.textContent="mic unavailable — type instead";};
+    rec.start();}catch(err){label.textContent="mic unavailable — type instead";}});
 // ponytail: F53 drag-a-prompt — drop text, top-5 keyword matches ripple.
 function dropScore(text){var seen={},toks=(text||"").toLowerCase().match(/[a-z0-9+#]{3,}/g)||[];
   toks.forEach(function(t){seen[t]=1;});

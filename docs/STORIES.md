@@ -95,7 +95,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] F54 Graph explorer — 1265 nodes zoom/pan/search; close: loads <2s. (Kevin 2026-09-23, r344)
 - [x] F55 Fire heatmap — hot glow, dead dim; close: served-driven colors. (Kevin 2026-09-23, r344)
 - [x] F56 Session replay — scrub routing history; close: 1 session replayed. (Kevin 2026-09-23, r344)
-- [ ] F57 Voice in — speak → equipped; close: demo.
+- [x] F57 Voice in — speak → equipped; close: demo. (Kevin 2026-09-23, r344)
 - [ ] F58 Phone approver — approve injects remotely; close: design only.
 - [ ] F59 Menubar widget — fire-rate + top skills; close: running widget.
 - [ ] F60 Stack tour — new-user top-skills brief; close: 2 stacks demoed.
