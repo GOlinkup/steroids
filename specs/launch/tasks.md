@@ -42,8 +42,8 @@ Description: remove plaintext PAT from origin remote URL; move to git
 Do-not-touch: repo access for collaborators (coordinate rotation)
 Acceptance:
 - [x] `git remote get-url origin` shows no credentials
-- [ ] push/pull work via helper on a fresh shell
-- [ ] old token revoked/rotated; new token minimal scopes, recorded where
+- [x] push/pull work via helper on a fresh shell
+- [x] old token revoked/rotated; new token minimal scopes, recorded where
 Verification: print remote URL; git ls-remote origin; show helper config
 Dependencies: None (do first — live exposure)
 Files likely touched: local git config only (no repo files)

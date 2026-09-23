@@ -52,10 +52,9 @@ every claim re-verifiable with the command next to it.
   router-logging code change — held for next version, not V1.
 - CP-1 schema+bus review record (P1-3 box 3): needs human review line.
 - P1-4 live-run overhead: unmeasured, held (fixture + 80-col verified).
-- PAT in origin remote URL (LCH-3): IN PROGRESS 2026-09-23 — remote URL
-  cleaned, helper=store, ~/.github_pat shredded, history scrubbed, all
-  GitHub tokens revoked by owner. Remaining: owner creates one repo-scoped
-  token, uses it once at the Username/Password prompt; then boxes 2-3.
+- PAT hygiene (LCH-3): DONE 2026-09-23 — all old tokens revoked, remote
+  clean, helper=store, ~/.github_pat shredded, history scrubbed, new
+  repo-scoped token verified via passwordless `git ls-remote`.
 - install.sh has no Python-deps step (R-1 finding 2026-09-23): onnxruntime
   lives in HOME-dependent user site, so a fresh machine hits silent
   lexical fallback until `pip install onnxruntime numpy`. Fresh-HOME runs
