@@ -34,23 +34,46 @@ def load_router():
 def score_set(router, goldens, rules, idx):
     p1 = p3 = leaks = 0
     rrs = []
+    hits1, hits3 = [], []
+    ranked_all = []
     for row in goldens:
         query, exp = row[0], row[1]
         acc = row[2] if len(row) > 2 else []
         exc = row[3] if len(row) > 3 else []
         ranked = [s for _, s, _ in router.route_query(query, rules, idx)]
-        p1 += ranked[:1] == [exp]
+        h1 = ranked[:1] == [exp]
         rel = [i for i, s in enumerate(ranked[:3]) if s == exp or s in acc]
         leak = bool(set(ranked[:3]) & set(exc))
-        p3 += bool(rel) and not leak
+        h3 = bool(rel) and not leak
+        p1 += h1
+        p3 += h3
         leaks += leak
+        hits1.append(1 if h1 else 0)
+        hits3.append(1 if h3 else 0)
         rrs.append(1.0 / (rel[0] + 1) if rel else 0.0)
+        ranked_all.append(ranked[:3])
     n = len(goldens)
     return {"n": n, "p1": round(p1 / n, 3), "p3": round(p3 / n, 3),
-            "mrr": round(sum(rrs) / n, 3), "leaks": leaks}
+            "mrr": round(sum(rrs) / n, 3), "leaks": leaks,
+            "hits1": hits1, "hits3": hits3, "ranked": ranked_all}
 
 
-def cmd_golden():
+def bootstrap_ci(hits, n_resamples=10000, seed=42):
+    # ponytail: stdlib percentile bootstrap over prompt hits (task-sampling
+    # uncertainty). Deterministic given seed. Empty input is a caller bug.
+    import random
+    if not hits:
+        raise ValueError("bootstrap_ci needs at least one hit")
+    rng = random.Random(seed)
+    n = len(hits)
+    means = sorted(sum(hits[rng.randrange(n)] for _ in range(n)) / n
+                   for _ in range(n_resamples))
+    lo = means[int(0.025 * n_resamples)]
+    hi = means[min(int(0.975 * n_resamples), n_resamples - 1)]
+    return (round(lo, 3), round(hi, 3))
+
+
+def cmd_golden(trials=1):
     router = load_router()
     idx = json.load(open(os.path.join(_GOLDEN_DIR, "index.json")))
     rules = json.load(open(os.path.join(_GOLDEN_DIR, "rules.json")))
@@ -62,16 +85,31 @@ def cmd_golden():
     descs = json.load(open(os.path.join(_GOLDEN_DIR, "descs.json")))
     router._DESC_MEM = {"key": id(idx), "map": {s: descs.get(s, "") for s in idx}}
     meta = json.load(open(_META))
-    got = score_set(router, goldens, rules, idx)
+    # Honesty note: route_query is deterministic, so repeated trials measure
+    # run-variance (expected: zero) while the bootstrap CI over prompt hits
+    # measures task-sampling uncertainty (the real error bar). Both reported.
+    passes = [score_set(router, goldens, rules, idx) for _ in range(max(1, trials))]
+    got = passes[0]
+    deterministic = all(p["ranked"] == got["ranked"] for p in passes[1:])
+    ci1 = bootstrap_ci(got["hits1"])
+    ci3 = bootstrap_ci(got["hits3"])
+    with open(os.path.join(_GOLDEN_DIR, "trial-stats.json"), "w") as f:
+        json.dump({"trials": max(1, trials), "seed": 42, "n_resamples": 10000,
+                   "deterministic": deterministic,
+                   "p1": got["p1"], "p1_ci95": list(ci1),
+                   "p3": got["p3"], "p3_ci95": list(ci3),
+                   "mrr": got["mrr"], "leaks": got["leaks"]}, f, indent=1)
     exp = meta["results"]["blind149"]
     print("STEROIDS GOLDEN BENCHMARK")
     print("index:     %d skills (frozen %s)" % (meta["index_size"], meta["snapshot_id"]))
     print("prompts:   %d" % got["n"])
-    print("P@1        %.3f (recorded %.3f)" % (got["p1"], exp["p1"]))
-    print("P@3        %.3f (recorded %.3f)" % (got["p3"], exp["p3"]))
+    print("P@1        %.3f (recorded %.3f) 95%% CI [%.3f, %.3f]" % (got["p1"], exp["p1"], ci1[0], ci1[1]))
+    print("P@3        %.3f (recorded %.3f) 95%% CI [%.3f, %.3f]" % (got["p3"], exp["p3"], ci3[0], ci3[1]))
     print("leaks:     %d (recorded %d)" % (got["leaks"], exp["leaks"]))
+    print("trials:    %d, deterministic: %s" % (max(1, trials), deterministic))
     ok = (got["p1"] >= exp["p1"] and got["p3"] >= exp["p3"]
-          and got["leaks"] <= exp["leaks"] and got["n"] == exp["n"])
+          and got["leaks"] <= exp["leaks"] and got["n"] == exp["n"]
+          and deterministic)
     print("PASS" if ok else "FAIL — regression vs %s" % _META)
     return 0 if ok else 1
 
@@ -123,8 +161,12 @@ def cmd_check():
 
 if __name__ == "__main__":
     mode = sys.argv[1] if len(sys.argv) > 1 else "--golden"
+    trials = 1
+    for a in sys.argv[2:]:
+        if a.startswith("--trials"):
+            trials = int(a.split("=", 1)[1] if "=" in a else sys.argv[sys.argv.index(a) + 1])
     if mode == "--golden":
-        sys.exit(cmd_golden())
+        sys.exit(cmd_golden(trials))
     if mode == "--live":
         sys.exit(cmd_live())
     if mode == "--check":
