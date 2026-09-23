@@ -1,0 +1,253 @@
+{
+  "$id": "https://steroids.local/schemas/task/v0.1",
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "definitions": {
+    "assumption": {
+      "properties": {
+        "confidence": {
+          "enum": [
+            "low",
+            "medium",
+            "high"
+          ],
+          "type": "string"
+        },
+        "statement": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "status": {
+          "enum": [
+            "unverified",
+            "verified",
+            "invalidated"
+          ],
+          "type": "string"
+        }
+      },
+      "required": [
+        "statement"
+      ],
+      "type": "object"
+    },
+    "evidence": {
+      "properties": {
+        "claim": {
+          "minLength": 1,
+          "type": "string"
+        },
+        "kind": {
+          "enum": [
+            "fact",
+            "assumption",
+            "inference",
+            "unknown",
+            "verified-fact"
+          ],
+          "type": "string"
+        },
+        "source": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "claim",
+        "source"
+      ],
+      "type": "object"
+    },
+    "question": {
+      "properties": {
+        "answer": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "question": {
+          "minLength": 1,
+          "type": "string"
+        }
+      },
+      "required": [
+        "question"
+      ],
+      "type": "object"
+    },
+    "status": {
+      "description": "11 engine statuses; entry/exit in x-status-lifecycle",
+      "enum": [
+        "pending",
+        "discovering",
+        "planned",
+        "ready",
+        "running",
+        "verifying",
+        "blocked",
+        "failed",
+        "recovering",
+        "completed",
+        "cancelled"
+      ],
+      "type": "string"
+    }
+  },
+  "description": "Steroids Phase 2 task object (vision \u00a75 + P2-1). IDs accept dotted hierarchy (AUTH-2.4.3) or timestamp form (ids.py); envelope id pattern from P1-1 intentionally NOT enforced here. P2-1.",
+  "properties": {
+    "actions": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "assumptions": {
+      "items": {
+        "$ref": "#/definitions/assumption"
+      },
+      "type": "array"
+    },
+    "decisions": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "dependencies": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "evidence": {
+      "items": {
+        "$ref": "#/definitions/evidence"
+      },
+      "type": "array"
+    },
+    "failures": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "goal": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "id": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "inputs": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "known_facts": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "memory_updates": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "parent": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "questions": {
+      "items": {
+        "$ref": "#/definitions/question"
+      },
+      "type": "array"
+    },
+    "required_context": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "status": {
+      "$ref": "#/definitions/status"
+    },
+    "title": {
+      "minLength": 1,
+      "type": "string"
+    },
+    "unknowns": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    },
+    "verification": {
+      "items": {
+        "type": "string"
+      },
+      "type": "array"
+    }
+  },
+  "required": [
+    "goal",
+    "id",
+    "status",
+    "title"
+  ],
+  "title": "steroids-task",
+  "type": "object",
+  "version": "v0.1",
+  "x-status-lifecycle": {
+    "blocked": {
+      "enter": "a dependency or input is missing; record WHAT is missing, never wait silently",
+      "exit": "missing input arrives -> ready; goal abandoned -> cancelled"
+    },
+    "cancelled": {
+      "enter": "goal abandoned or superseded; terminal",
+      "exit": "none (terminal)"
+    },
+    "completed": {
+      "enter": "completion contract checks pass with evidence pointers (P2-4)",
+      "exit": "none (terminal)"
+    },
+    "discovering": {
+      "enter": "task created, unknowns being listed before commitment",
+      "exit": "unknowns bounded -> planned; unworkable -> cancelled"
+    },
+    "failed": {
+      "enter": "verification failed or error classified; failure recorded with class",
+      "exit": "diagnosed -> recovering; unrecoverable -> cancelled"
+    },
+    "pending": {
+      "enter": "task created, not yet examined",
+      "exit": "examination starts -> discovering"
+    },
+    "planned": {
+      "enter": "objective, inputs and verification criteria written",
+      "exit": "deps met -> ready; waiting on deps -> blocked"
+    },
+    "ready": {
+      "enter": "deps met, verification commands exist (DoR met)",
+      "exit": "work starts -> running"
+    },
+    "recovering": {
+      "enter": "from failed with diagnosis + replan; retry budgeted",
+      "exit": "retry passes -> verifying; budget spent -> failed | escalate"
+    },
+    "running": {
+      "enter": "from ready, one session owns it",
+      "exit": "work done -> verifying; error -> failed; input missing -> blocked"
+    },
+    "verifying": {
+      "enter": "from running/recovering with evidence attached",
+      "exit": "contract passes -> completed; fails -> failed"
+    }
+  }
+}

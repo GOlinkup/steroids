@@ -1,0 +1,1 @@
+{"acceptance": ["task tree for one real feature driven end-to-end", "completion contracts enforced in code", "retro with keep/kill decisions"], "children": ["P2-1", "P2-2", "P2-3", "P2-4", "P2-5", "P2-6"], "id": "S-20", "outcome": "a real feature driven through goal -> tasks -> evidence -> verified completion", "rq": "RQ-2", "status": "active", "title": "Phase 2 task engine"}
