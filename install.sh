@@ -7,6 +7,9 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIVE_DATA="$HOME/.config/opencode/plugins/steroids"
 BIN="$HOME/.local/bin/steroids"
 
+# D32 gate: eval regression refuses deploy (nothing copied yet at this point).
+bash "$REPO/scripts/eval_gate.sh" || { echo "EVAL GATE FAILED — deploy refused, live files untouched"; exit 1; }
+
 mkdir -p "$LIVE_DATA" "$HOME/.local/bin"
 cp "$REPO/src/steroids/router.py" "$BIN"
 chmod +x "$BIN"

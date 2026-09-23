@@ -1,39 +1,28 @@
 {
-  "commit": "416b07503f789b150813412ab1689bcdadbb75ef",
+  "commit": "d285f8c48084d8f38cc816f027458cf10c5d8598",
   "dirty": [
-    "M README.md",
-    "M demo/skill-graph.json",
-    "M docs/STORIES.md",
-    "M docs/architecture.mmd",
-    "M docs/router.architecture.json",
-    "M docs/visual-check.md",
-    "M skill-rules.json",
-    "M src/steroids/router.py",
-    "M tests/test_router.py",
-    "?? drafts/",
-    "?? scripts/bench.py",
-    "?? scripts/bench_baseline.json"
+    "?? scripts/eval_gate.sh"
   ],
   "sets": {
     "blind149": {
       "n": 149,
-      "p1": 0.799,
-      "p3": 0.96,
-      "mrr": 0.881,
+      "p1": 0.705,
+      "p3": 0.859,
+      "mrr": 0.777,
       "leaks": 0
     },
     "second315": {
       "n": 315,
-      "p1": 0.886,
-      "p3": 0.959,
-      "mrr": 0.926,
+      "p1": 0.803,
+      "p3": 0.914,
+      "mrr": 0.861,
       "leaks": 0
     },
     "live16": {
       "n": 16,
       "p1": 0.875,
-      "p3": 0.812,
-      "mrr": 0.906,
+      "p3": 0.75,
+      "mrr": 0.875,
       "leaks": 2
     }
   }
