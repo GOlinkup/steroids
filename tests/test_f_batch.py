@@ -44,5 +44,21 @@ class TestF59Menubar(unittest.TestCase):
         self.assertEqual(s["top"][0], ("sa", 2))
 
 
+class TestF60Tour(unittest.TestCase):
+    def test_brief_ranked(self):
+        import stack_tour
+        d = tempfile.mkdtemp()
+        files = []
+        for name, body in (("sa", "flutter widgets"), ("sb", "django orm")):
+            dd = os.path.join(d, name)
+            os.makedirs(dd, exist_ok=True)
+            md = os.path.join(dd, "SKILL.md")
+            open(md, "w").write("---\nname: %s\ndescription: %s stuff\n---\n# T\n" % (name, body))
+            files.append((name, md))
+        b = stack_tour.brief_for_stack("flutter mobile", files)
+        self.assertEqual(b[0]["skill"], "sa")
+        self.assertIn("flutter", b[0]["why"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -98,7 +98,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] F57 Voice in — speak → equipped; close: demo. (Kevin 2026-09-23, r344)
 - [x] F58 Phone approver — approve injects remotely; close: design only. (Kevin 2026-09-23, r344)
 - [x] F59 Menubar widget — fire-rate + top skills; close: running widget. (Kevin 2026-09-23, r344)
-- [ ] F60 Stack tour — new-user top-skills brief; close: 2 stacks demoed.
+- [x] F60 Stack tour — new-user top-skills brief; close: 2 stacks demoed. (Kevin 2026-09-23, r344)
 
 ## G. Authoring & ecosystem
 - [x] G61 Skill generator — task description → SKILL.md + goldens; close: 1 generated skill passes D31. (`draft` writes template + nearby refs to drafts/ (never indexed); goldens per generated skill still open.)
