@@ -6,6 +6,7 @@ import unittest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROUTER_PATH = os.path.normpath(os.path.join(_HERE, "..", "src", "steroids", "router.py"))
+_RULES_PATH = os.path.normpath(os.path.join(_HERE, "..", "skill-rules.json"))
 
 _spec = importlib.util.spec_from_file_location("steroids_router_jbatch", _ROUTER_PATH)
 router = importlib.util.module_from_spec(_spec)
@@ -63,6 +64,21 @@ class TestJ95Replay(unittest.TestCase):
         new = {"q1": ["a", "b"], "q2": ["d", "c"]}
         self.assertEqual(bench.find_drifts(old, new), [("q2", "c", "d")])
         self.assertEqual(bench.find_drifts(old, dict(old)), [])
+
+
+class TestJ96MetaLoop(unittest.TestCase):
+    def test_improve_routing_routes_inward(self):
+        import json as _json
+        with open(_RULES_PATH, encoding="utf-8") as _f:
+            _rules = _json.load(_f)
+        _files = router.skill_files(_rules.get("index_dirs", []))
+        _idx, _ = router.build_index(_files)
+        for _skill, _extra in _rules.get("skills", {}).items():
+            if _skill in _idx:
+                _es = [router.stem(w) for w in _extra]
+                _idx[_skill] = _es + [k for k in _idx[_skill] if k not in _es]
+        top = router.route_query("improve routing", _rules, _idx)
+        self.assertEqual(top[0][1], "steroids")
 
 
 if __name__ == "__main__":
