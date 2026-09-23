@@ -14,8 +14,11 @@ def new_id(prefix=""):
     return f"{prefix}{t}-{rand}" if prefix else f"{t}-{rand}"
 
 def valid(sid):
-    s = sid.split("/")[-1] if "/" in sid else sid
-    s = s.split("-run-", 1)[-1] if "-run-" in sid else s
+    s = sid.split("/")[-1]
+    for p in ("run-", "task-"):
+        if s.startswith(p):
+            s = s[len(p):]
+            break
     return bool(_FMT.match(s))
 
 def run_id():

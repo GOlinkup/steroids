@@ -38,7 +38,9 @@ class TestBus(unittest.TestCase):
         os.remove(p)
 
     def test_cloudevent_validates(self):
-        schema = json.load(open(os.path.join(_HERE, "..", "specs", "phase-1", "events.schema.json")))
+        schema_path = os.path.join(_HERE, "..", "specs", "phase-1", "events.schema.json")
+        with open(schema_path, encoding="utf-8") as f:
+            schema = json.load(f)
         ev = bus.to_cloudevent(bus.make_event("skill.routed", "r/t", {"model": "m"}))
         for k in schema["required"]:
             self.assertIn(k, ev)

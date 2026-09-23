@@ -14,6 +14,9 @@ def fmt(ev):
 
 def main():
     path = sys.argv[1] if len(sys.argv) > 1 else "-"
+    if path in ("-h", "--help"):
+        print("usage: status.py [bus.jsonl|-]")
+        return
     fh = sys.stdin if path == "-" else open(path, encoding="utf-8")
     with fh:
         for line in fh:
