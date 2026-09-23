@@ -81,23 +81,31 @@ def score(rows, has_acc):
             "misses": [{"q": q, "exp": e, "got": g} for q, e, g in misses]}, None
 
 
-def main():
-    record = "--record" in sys.argv
+def run_all(verbose=True):
+    """Run all sets, return the result dict. shared by main() + nightly_report."""
     commit, dirty = git_state()
-    print(f"commit: {commit[:12]}  dirty_paths: {len(dirty)}")
+    if verbose:
+        print(f"commit: {commit[:12]}  dirty_paths: {len(dirty)}")
     result = {"commit": commit, "dirty": dirty, "sets": {}}
-    failed = False
     for name, rows, has_acc in SETS:
         metrics, missing = score(rows, has_acc)
         if missing:
-            print(f"{name}: MISSING FROM INDEX: {missing}")
-            failed = True
+            if verbose:
+                print(f"{name}: MISSING FROM INDEX: {missing}")
+            result["sets"][name] = {"error": "missing", "missing": missing}
             continue
         result["sets"][name] = {k: v for k, v in metrics.items() if k != "misses"}
         m = result["sets"][name]
-        print(f"{name:<10} n={m['n']:<4} P@1={m['p1']:.3f}  P@3={m['p3']:.3f}  "
-              f"MRR={m['mrr']:.3f}  leaks={m['leaks']}")
-    if failed:
+        if verbose:
+            print(f"{name:<10} n={m['n']:<4} P@1={m['p1']:.3f}  P@3={m['p3']:.3f}  "
+                  f"MRR={m['mrr']:.3f}  leaks={m['leaks']}")
+    return result
+
+
+def main():
+    record = "--record" in sys.argv
+    result = run_all()
+    if any("error" in m for m in result["sets"].values()):
         return 1
     if record:
         with open(_BASELINE, "w", encoding="utf-8") as f:
