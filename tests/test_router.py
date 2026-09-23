@@ -636,6 +636,33 @@ class TestRouter(unittest.TestCase):
         finally:
             srv.shutdown()
 
+    def test_c21_learn_parses_three_harness_shapes(self):
+        import tempfile, os, json as _json
+        tmp = tempfile.mkdtemp()
+        try:
+            ag = os.path.join(tmp, "ag.jsonl")
+            with open(ag, "w") as f:
+                f.write(_json.dumps({"name": "Skill", "x": 1, "skill": "alpha-skill"}) + "\n")
+            cc = os.path.join(tmp, "cc.jsonl")
+            with open(cc, "w") as f:
+                f.write(_json.dumps({"type": "assistant", "message": {"content": [
+                    {"type": "tool_use", "id": "1", "name": "Skill",
+                     "input": {"skill": "beta-skill"}}]}}) + "\n")
+            gen = os.path.join(tmp, "gen.jsonl")
+            with open(gen, "w") as f:
+                f.write('did {"skill": "gamma-skill"} run\n')
+            real = router.MEM_PATH
+            router.MEM_PATH = os.path.join(tmp, "memory.json")
+            try:
+                self.assertEqual(router.learn(ag).get("alpha-skill"), 1)
+                self.assertEqual(router.learn(cc).get("beta-skill"), 1)
+                self.assertEqual(router.learn(gen).get("gamma-skill"), 1)
+            finally:
+                router.MEM_PATH = real
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

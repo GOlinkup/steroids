@@ -404,6 +404,9 @@ def learn(transcript_path):
                 f.seek(start)
                 chunk = f.read().decode("utf-8", "replace")
             found = re.findall(r'"name":\s*"Skill"[\s\S]{0,300}?"skill":\s*"([^"]+)"', chunk)
+            # ponytail: C21 — claude-code tool_use shape (name Skill + input.skill).
+            if not found:
+                found = re.findall(r'"type":\s*"tool_use"[\s\S]{0,200}?"name":\s*"Skill"[\s\S]{0,400}?"skill":\s*"([^"]+)"', chunk)
             # ponytail: fallback for tool-loop shapes without the Skill wrapper.
             if not found:
                 found = re.findall(r'"skill":\s*"([a-z0-9][a-z0-9_-]{2,60})"', chunk)
