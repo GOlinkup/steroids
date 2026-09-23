@@ -22,12 +22,16 @@ RULES = {"glue": ["onto", "main", "file", "files", "folder", "folders", "repo", 
 
 # Distractors mirroring live-index head-token leakage (generic words like
 # mobile/app that would false-positive without the NEG guard).
+# Leakage-level overlap only: a distractor sharing ALL core keywords of a
+# real skill is unfaithful (no live skill looks like that — git-helper
+# exists nowhere but here; 35d4583 alphabetical tie-break hands perfect
+# clones top-1). One shared head token each is the honest simulation.
 _NOISE = {
     "homelab-wireguard-vpn": ["mobile", "app"],
     "homelab-network-setup": ["mobile", "app"],
     "homelab-vlan-segmentation": ["mobile", "app"],
     "homelab-pihole-dns": ["mobile", "app"],
-    "git-helper": ["merge", "conflict", "rebase"],
+    "git-helper": ["merge"],
 }
 
 
