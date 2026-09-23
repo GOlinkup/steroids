@@ -86,7 +86,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] E47 Sandboxed skills — restricted tools for untrusted; close: policy + 1 demo. (Kevin 2026-09-23, r343)
 - [x] E48 Token budgets — per-skill session cap; close: cap triggers in test. (Kevin 2026-09-23, r343)
 - [x] E49 Priority lanes — P0 skills bypass abstention; close: golden + abuse test. (Kevin 2026-09-23, r343)
-- [ ] E50 Fallback chains — A fails → B with error attached; close: golden.
+- [x] E50 Fallback chains — A fails → B with error attached; close: golden. (Kevin 2026-09-23, r343)
 
 ## F. Canvas & UX — make it visible
 - [ ] F51 Live fire display — blobs ignite on route; close: demo gif.

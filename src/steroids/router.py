@@ -593,6 +593,19 @@ def priority_route(prompt, rules, idx, accepts=None):
     return route_query(prompt, rules, idx, accepts)
 
 
+def route_with_fallback(prompt, rules, idx, accepts=None):
+    # ponytail: E50 — strict lexical first; on abstain, full route with the
+    # miss attached (A fails -> B + error). Shape: {"route", "fallback"}.
+    strict = dict(rules)
+    strict["semantic_weight"] = 0.0
+    strict["embed_weight"] = 0.0
+    top = route_query(prompt, strict, idx, accepts)
+    if top:
+        return {"route": top, "fallback": None}
+    return {"route": route_query(prompt, rules, idx, accepts),
+            "fallback": "strict lexical abstained; full route attached"}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

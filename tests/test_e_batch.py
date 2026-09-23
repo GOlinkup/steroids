@@ -151,5 +151,21 @@ class TestE49Priority(unittest.TestCase):
         self.assertEqual([s for _, s, _ in top], [s for _, s, _ in normal])
 
 
+class TestE50Fallback(unittest.TestCase):
+    def test_strict_hit_no_fallback(self):
+        idx = {"sa": ["alpha"], "sb": ["beta"]}
+        rules = {"glue": [], "max_recommendations": 3}
+        r = router.route_with_fallback("alpha", rules, idx)
+        self.assertIsNone(r["fallback"])
+        self.assertEqual(r["route"][0][1], "sa")
+
+    def test_abstain_falls_back_with_error(self):
+        idx = {"sa": ["alpha"], "sb": ["beta"]}
+        rules = {"glue": [], "max_recommendations": 3, "semantic_weight": 1.0}
+        r = router.route_with_fallback("zzzqqq", rules, idx)
+        self.assertIsNotNone(r["fallback"])
+        self.assertEqual(r["route"], router.route_query("zzzqqq", rules, idx))
+
+
 if __name__ == "__main__":
     unittest.main()
