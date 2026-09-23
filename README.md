@@ -10,7 +10,7 @@ Universal skill router plugin for AI coding harnesses. **Steroids is not a model
 
 ```bash
 git clone <repo> steroids && cd steroids
-python3 src/steroids/router.py --count        # Indexed skills: 366 (~0.3s)
+python3 src/steroids/router.py --count        # live count: 1265 (~0.3s); run it, don't trust docs
 python3 src/steroids/router.py "build a flutter mobile app"
 # -> build,flutter -> dart-flutter-patterns/...
 bash install.sh                               # deploy binary + hooks (optional)
@@ -19,7 +19,7 @@ bash scripts/demo-serve.sh                # demo on :8903, auto-closes with the 
 
 `steroids "query"` prints a short hint like `build,flutter -> dart-flutter-patterns/...`. Load what applies, skip the rest.
 
-## Results (verified 2026-09-20, 366 skills)
+## Results (verified 2026-09-20; live index 1265 skills — re-run `steroids --count`)
 
 | Eval | n | precision@1 | precision@3 | exclusion-leaks | MRR | MAP |
 |---|---|---|---|---|---|---|
@@ -54,7 +54,7 @@ Re-run any time: `python3 tests/blind_eval_100.py`, `python3 tests/live_probe.py
 
 ## Demo
 
-![Live demo: 366-skill graph with mascot](docs/img/demo-graph.png)
+![Live demo: skill graph with mascot](docs/img/demo-graph.png)
 
 Open `demo/skill-graph.html` in a browser — zero dependencies, works offline.
 Regenerate its data from your live index with `steroids graph --export demo/graph.json`.

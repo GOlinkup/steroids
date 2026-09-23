@@ -24,13 +24,17 @@ class TestRouter(unittest.TestCase):
         self.assertIn("dart-flutter-patterns", names)
 
     def test_name_bonus_ranks_resolve_conflicts_first(self):
+        # ponytail: no name bonus (measured +12/+9 blind noise) — identical
+        # keys tie, alphabetical tie-break wins.
         idx = {
             "resolving-merge-conflicts": ["merge", "conflict", "rebase"],
             "git-helper": ["merge", "conflict", "rebase"],
         }
         top = router.route_query("merge conflict rebase", RULES, idx)
         self.assertTrue(top)
-        self.assertEqual(top[0][1], "resolving-merge-conflicts")
+        self.assertEqual({s for _, s, _ in top}, {"resolving-merge-conflicts", "git-helper"})
+        self.assertEqual(top[0][0], top[1][0])
+        self.assertEqual(top[0][1], "git-helper")
 
     def test_glue_removal_empty_prompt_returns_empty(self):
         idx = {"resolving-merge-conflicts": ["merge", "conflict", "rebase"]}
@@ -246,6 +250,23 @@ class TestRouter(unittest.TestCase):
                                 needs={"pdf": ["source-file-or-url"]},
                                 proof={"pdf": ["output-opens"]})
         self.assertTrue(blocked["gate"]["pdf"].startswith("blocked:"))
+
+    def test_proof_file_receipt_blocks_and_passes(self):
+        import tempfile, os
+        with tempfile.NamedTemporaryFile(delete=False) as f:
+            path = f.name
+        try:
+            idx = {"pdf": ["pdf", "file"]}
+            base = {"glue": [], "max_recommendations": 3}
+            ok = router.gather("read this pdf", base, idx,
+                               needs={}, proof={"pdf": [f"file:{path}"]})
+            self.assertEqual(ok["gate"]["pdf"], "ready")
+            bad = router.gather("read this pdf", base, idx,
+                                needs={}, proof={"pdf": ["file:/nope/missing-xyz"]})
+            self.assertTrue(bad["gate"]["pdf"].startswith("blocked:"))
+            self.assertIn("proof:file:/nope/missing-xyz", bad["gate"]["pdf"])
+        finally:
+            os.unlink(path)
 
     def test_chain_verdict(self):
         idx = {"pdf": ["pdf", "file"], "other": ["zzz"]}

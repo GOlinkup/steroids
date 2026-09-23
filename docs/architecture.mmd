@@ -21,14 +21,14 @@ flowchart TB
 
     subgraph GRAPH["graph lane"]
         EXP["--export → graph_export.py\ntop_k 8, min_shared 2, max_degree 6"]
-        JSON["demo/skill-graph.json\n366 nodes / 582 links"]
+        JSON["demo/skill-graph.json\nlive count via `steroids --count` (1265 nodes / 2866 links at last export)"]
         DEMO["demo/skill-graph.html\nzero-dep canvas, SAMPLE fallback\nfetch json when served"]
     end
 
     subgraph EVAL["eval lane"]
         TE["test_eval.py — 12-row golden"]
         BL["blind_eval_100.py — 100+ paraphrase rows\nP@1 / P@3 / leaks"]
-        LP["live_probe.py — 16 blind queries\nvs live 366 index"]
+        LP["live_probe.py — 16 blind queries\nvs live index (`steroids --count`)"]
         ER["eval_report.py — one-page table"]
     end
 

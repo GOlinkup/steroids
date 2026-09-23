@@ -7,13 +7,13 @@ All values verified live 2026-09-20; re-run any line to confirm.
 
 ```bash
 python3 -c "import json;d=json.load(open('demo/skill-graph.json'));print(len(d['nodes']),len(d['links']),sorted(d.keys()))"
-# expect: 366 582 ['links', 'meta', 'nodes']
+# expect: live count, e.g. 1265 2866 ['links', 'meta', 'nodes'] — compare against `steroids --count`
 ```
 
 ## 2. Fresh export matches shipped data (deterministic)
 
 ```bash
-python3 src/steroids/graph_export.py /tmp/vc-graph.json   # expect: 366 nodes, 582 links
+python3 src/steroids/graph_export.py /tmp/vc-graph.json   # expect: live nodes/links matching `steroids --count`
 python3 -c "import json;a=json.load(open('demo/skill-graph.json'));b=json.load(open('/tmp/vc-graph.json'));print(sorted(n['id'] for n in a['nodes'])==sorted(n['id'] for n in b['nodes']))"
 # expect: True
 ```
@@ -42,6 +42,6 @@ python3 tests/test_eval.py     # expect: Ran 3 tests, OK (12-row golden)
 ## 6. Eval baselines (other lanes — cited, not owned)
 
 - `tests/blind_eval_100.py`: 100+ paraphrase/synonym/typo rows, P@1/P@3/leaks.
-- `tests/live_probe.py`: 16 blind queries vs live 366 index.
+- `tests/live_probe.py`: 16 blind queries vs live index (see `steroids --count`).
 - Pre-rules baseline (eval-live lane): P@1 0.875 / P@3 0.625 / leaks 6.
   Post-rules-apply numbers belong to that card when it lands.

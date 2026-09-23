@@ -172,11 +172,21 @@ def load_rules():
             "~/.claude/.agents/skills",
             "~/.config/opencode/skills",
             "~/.gemini/antigravity-cli/builtin/skills",
+            "~/.gemini/skills",
             "~/.codex/skills",
+            "~/.cursor/skills",
+            "~/.codeium",
+            "~/.windsurf/skills",
+            "~/.cline/skills",
+            "~/.kiro/skills",
             "~/claude-obsidian/skills",
             "~/flutter/.agents/skills",
             "./.agents/skills",
             "./.claude/skills",
+            "./.cursor/skills",
+            "./.windsurf/skills",
+            "./.kiro/skills",
+            "./.gemini/skills",
             "./skills"
         ],
         "glue": ["onto", "main", "file", "files", "folder", "folders", "repo", "code", "thing", "stuff"],
@@ -1443,8 +1453,8 @@ def route_query(prompt, rules, idx, accepts=None):
                 bad, good = neg[skill]
                 if not (set(hits) & good) and (set(hits) & bad):
                     continue
-            namehits = len(set(toks(skill.replace("-", " ").replace("_", " "))) & ptoks)
-            s = round(sum(1.0 / df[h] for h in hits) + min(1.5, 1.0 * namehits)
+            # ponytail: no name bonus (measured +12/+9 blind: flat +1.0 let generic name words steal).
+            s = round(sum(1.0 / df[h] for h in hits)
                       + min(1.0, 0.2 * accepts.get(skill, 0)), 3)
             if s > top_hit:
                 top_hit = s
@@ -1458,8 +1468,8 @@ def route_query(prompt, rules, idx, accepts=None):
                 bad, good = neg[skill]
                 if not (set(hits) & good) and (set(hits) & bad):
                     continue
-            namehits = len(set(toks(skill.replace("-", " ").replace("_", " "))) & ptoks)
-            bonus = min(1.5, 1.0 * namehits) + min(1.0, 0.2 * accepts.get(skill, 0))
+            # ponytail: no name bonus (measured noise; generic name words stole generic queries).
+            bonus = min(1.0, 0.2 * accepts.get(skill, 0))
             score = round(sum(1.0 / df[h] for h in hits) + bonus, 3)
         elif sem_w or emb_on:
             score = 0.0
@@ -1480,6 +1490,9 @@ def route_query(prompt, rules, idx, accepts=None):
             scored.append((score, skill, hits))
 
     scored.sort(key=lambda t: (-t[0], -len(t[2]), t[1]))
+    # ponytail: hits exist = no-hit semantic noise gets no slot; all-no-hit still abstains below.
+    if any(h for _, _, h in scored):
+        scored = [t for t in scored if t[2]]
     # ponytail: abstain on pure-trigram noise; no lexical hit = no recommendation.
     if scored and not any(h for _, _, h in scored):
         return []
@@ -1580,6 +1593,15 @@ def resolve_mcp(need, rules):
     if isinstance(entry, dict) and entry.get("server"):
         return {"kind": "mcp", "server": entry["server"], "tool": entry.get("tool", "")}
     return None
+
+def verify_proof(item):
+    # ponytail: only url:/file: receipts are machine-checkable; other slugs stay advisory.
+    if item.startswith("url:"):
+        return fetch_text(item[4:].strip(), timeout=5) is not None
+    if item.startswith("file:"):
+        return os.path.exists(os.path.expanduser(item[5:].strip()))
+    return True
+
 
 def _trace_refs(prompt, limit=5):
     # ponytail: B19 — File "x", line N + path:line for code extensions only.
@@ -1833,9 +1855,9 @@ def gather(prompt, rules, idx, needs=None, proof=None, accepts=None, seen_eviden
         if checks:
             out_proof[skill] = checks
         reqs = needs.get(skill, [])
+        red = []
         if reqs:
             out_needs[skill] = reqs
-            red = []
             for r in reqs:
                 if r in routes:
                     if routes[r]["kind"] == "ask" and r not in red:
@@ -1853,9 +1875,10 @@ def gather(prompt, rules, idx, needs=None, proof=None, accepts=None, seen_eviden
                     red.append(r)
                     if r not in missing:
                         missing.append(r)
-            gate[skill] = ("blocked:" + ",".join(red)) if red else "ready"
-        else:
-            gate[skill] = "ready"
+        for c in checks:
+            if not verify_proof(c):
+                red.append("proof:" + c)
+        gate[skill] = ("blocked:" + ",".join(red)) if red else "ready"
     # ponytail: fetch/browser routes with zero evidence are actionable but ungrounded.
     grounded = evidence or seen_evidence
     unbacked = sorted(r for r, h in routes.items()
@@ -1943,6 +1966,47 @@ def draft_skill(name, trigs, rules, idx, accepts=None):
         return {"ok": False, "error": str(e)}
     return {"ok": True, "path": dest, "nearby": near}
 
+def get_version():
+    # ponytail: stdlib regex on nearest pyproject.toml; never crash.
+    cands = [os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "..", "pyproject.toml"),
+             "~/steroids/pyproject.toml"]
+    for c in cands:
+        try:
+            with open(os.path.expanduser(c), encoding="utf-8") as f:
+                m = re.search(r'^version\s*=\s*"([^"]+)"', f.read(), re.M)
+            if m:
+                return m.group(1)
+        except OSError:
+            pass
+    return "0.1.0"
+
+def self_update():
+    # ponytail: git pull --ff-only + recopy live files (install.sh mirror) + reindex.
+    import shutil
+    cands = [os.environ.get("STEROIDS_REPO", ""), "~/steroids", os.getcwd()]
+    repo = next((os.path.expanduser(c) for c in cands if c
+                 and os.path.isfile(os.path.join(os.path.expanduser(c), "src/steroids/router.py"))), None)
+    if not repo:
+        print("self-update: repo not found (set STEROIDS_REPO=path)", file=sys.stderr)
+        return 1
+    r = subprocess.run(["git", "-C", repo, "pull", "--ff-only"], capture_output=True, text=True)
+    print(((r.stdout or "") + (r.stderr or "")).strip())
+    if r.returncode:
+        return r.returncode
+    home = os.path.expanduser("~")
+    pairs = [("src/steroids/router.py", home + "/.local/bin/steroids"),
+             ("src/steroids/embed.py", home + "/.local/bin/embed.py"),
+             ("src/steroids/hook.sh", home + "/.config/opencode/plugins/steroids/hook.sh"),
+             ("skill-rules.json", home + "/.config/opencode/plugins/steroids/skill-rules.json"),
+             ("plugins/opencode/steroids-plugin.ts", home + "/.config/opencode/plugins/steroids-plugin.ts")]
+    for src, dst in pairs:
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        shutil.copy(os.path.join(repo, src), dst)
+    os.chmod(home + "/.local/bin/steroids", 0o755)
+    n = len(get_index(load_rules(), force_rebuild=True))
+    print(f"self-update ok: steroids {get_version()} ({n} skills)")
+    return 0
+
 def open_canvas():
     if os.path.isfile(PY2D_PATH):
         try:
@@ -1952,6 +2016,66 @@ def open_canvas():
             print(f"[Steroids] Failed to launch 2D canvas: {e}", file=sys.stderr)
     else:
         print(f"[Steroids] Canvas script not found at {PY2D_PATH}", file=sys.stderr)
+
+def _mcp_serve(rules, idx):
+    # ponytail: stdio JSON-RPC, stdlib json+sys only; one tool: recommend_skills.
+    for line in sys.stdin:
+        line = line.strip()
+        if not line:
+            continue
+        try:
+            req = json.loads(line)
+        except Exception:
+            continue
+        mid, m, p = req.get("id"), req.get("method"), req.get("params") or {}
+        if m == "initialize":
+            res = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}},
+                   "serverInfo": {"name": "steroids", "version": "0.1.0"}}
+        elif m == "tools/list":
+            res = {"tools": [{"name": "recommend_skills",
+                "description": "Recommend installed skills for a prompt (offline, zero telemetry).",
+                "inputSchema": {"type": "object", "properties": {"prompt": {"type": "string"}},
+                                "required": ["prompt"]}}]}
+        elif m == "tools/call":
+            a = p.get("arguments") if isinstance(p.get("arguments"), dict) else p
+            q = (a.get("prompt") or p.get("prompt") or "")
+            r2 = dict(rules, max_recommendations=3)
+            top = route_query(q, r2, idx)
+            trigs = sorted({h for _, _, hs in top for h in hs})
+            names = [s for _, s, _ in top]
+            hint = f"Possibly relevant skills (load what applies, skip rest): {','.join(trigs)} -> {'/'.join(names)}" if top else ""
+            res = {"content": [{"type": "text", "text": json.dumps(
+                {"skills": names, "triggers": trigs, "hint": hint})}]}
+        elif m == "ping":
+            res = {}
+        else:
+            if mid is None:
+                continue
+            sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": mid,
+                "error": {"code": -32601, "message": "unknown method"}}) + "\n")
+            sys.stdout.flush()
+            continue
+        if mid is None:
+            continue
+        sys.stdout.write(json.dumps({"jsonrpc": "2.0", "id": mid, "result": res}) + "\n")
+        sys.stdout.flush()
+
+
+def _share_summary(rules, idx, out="/tmp/steroids-graph.json"):
+    # ponytail: reuse build_graph(); top skills = highest degree.
+    import importlib.util
+    _gx = os.path.join(os.path.dirname(os.path.abspath(__file__)), "graph_export.py")
+    _spec = importlib.util.spec_from_file_location("steroids_graph_export", _gx)
+    _mod = importlib.util.module_from_spec(_spec)
+    _spec.loader.exec_module(_mod)
+    g = _mod.build_graph(idx)
+    with open(out, "w", encoding="utf-8") as f:
+        json.dump(g, f)
+    tops = sorted(g["nodes"], key=lambda n: (-n.get("degree", 0), n["id"]))[:5]
+    print(f"{out}: {len(g['nodes'])} nodes, {len(g['links'])} links")
+    print("Top skills: " + ", ".join(f"{n['id']} ({n.get('degree', 0)})" for n in tops))
+    print(f"Share: open demo/skill-graph.html + copy {out} next to it as skill-graph.json, or paste the counts above.")
+
 
 def autoinject(top, rules, idx, query=""):
     # ponytail: A01 — confident top-1 injects its full SKILL.md. Threshold 2.0
@@ -2046,6 +2170,9 @@ def main():
     parser.add_argument("--share", action="store_true", help="Export graph to /tmp + print share-ready summary")
     parser.add_argument("--self-update", action="store_true", help="Fetch latest skill-rules.json from GitHub (offline TF-IDF default untouched)")
     parser.add_argument("--check", action="store_true", help="Check whether local skill-rules.json is behind GitHub (read-only)")
+    parser.add_argument("--ranker", default="v1", choices=["v1", "v2", "ab"], help="Ranker variant: v1 default, v2 lexical challenger, ab 10%% auto-assign")
+    parser.add_argument("--team", default="", help="Opt-in shared org accept pool JSON path (C29 team learning)")
+    parser.add_argument("--dry-run", action="store_true", help="Preview what I'd load + why; no side effects (A10, default off)")
     parser.add_argument("--explain", action="store_true", help="Self-explaining hints: why each pick + tokens saved (J93)")
 
     args, unknown = parser.parse_known_args()
@@ -2076,6 +2203,16 @@ def main():
 
     if args.propose:
         print(json.dumps(propose()))
+        return
+
+    if args.promote is not None:
+        # ponytail: gate on propose(); count>=2 enforced there; drafts never index.
+        want = set(toks(" ".join(args.promote or [])))
+        match = next((p for p in propose() if want and want <= set(p["trigs"])), None)
+        if match is None:
+            print(json.dumps({"ok": False, "error": "no repeated abstention (count>=2) for those triggers"}))
+            return
+        print(json.dumps(draft_skill(match["suggested_name"], match["trigs"], rules, idx)))
         return
 
     if args.prompt and args.prompt[0] == "draft":
@@ -2242,6 +2379,9 @@ def main():
         log_impression(prompt, trigs, names)
 
         hint = f"Possibly relevant skills (load what applies, skip rest): {trigs} -> {names}"
+        if session["dropped"]:
+            # ponytail: A06 — tell the harness what left context on pivot.
+            hint += f" (dropped: {','.join(session['dropped'])})"
         injected = None
         if not args.json and (is_antigravity or isinstance(parsed_json, dict) or args.claude_hook):
             injected = autoinject(top, rules, idx, prompt)

@@ -2,12 +2,22 @@
   "verified_only": true,
   "min_stars": 1000,
   "max_recommendations": 3,
-  "semantic_weight": 1.0,
+  "semantic_weight": 2.0,
   "mcp_needs": {    "query-or-url": {"server": "exa-web-search", "tool": "web_search"},
     "topic-or-url": {"server": "exa-web-search", "tool": "web_search"},
     "source-file-or-url": {"server": "firecrawl", "tool": "scrape"}
   },
   "browser_fallback": {"server": "playwright"},
+  "needs_overlay": {
+    "pdf-official": ["source-file-or-url"],
+    "game-art": ["reference-url-or-brief"],
+    "blender-motion-state-inspection": ["motion-catalog-url"]
+  },
+  "proof_overlay": {
+    "pdf-official": ["output-opens", "text-extractable"],
+    "game-art": ["asset-sourced"],
+    "blender-motion-state-inspection": ["motions-listed"]
+  },
   "index_dirs": [
     "~/.agents/skills",
     "~/.claude/skills",
@@ -284,9 +294,66 @@
     ],
     "messages-ops": [
       "flood"
+    ],
+    "javascript-testing-patterns": [
+      "vitest",
+      "jest"
     ]
   },
   "neg": {
+    "free-tool-strategy": [
+      [
+        "free"
+      ],
+      [
+        "marketing",
+        "lead",
+        "leads",
+        "seo",
+        "traffic",
+        "brand",
+        "startup",
+        "growth",
+        "landing",
+        "monetize",
+        "calculator",
+        "generator",
+        "grader",
+        "saas",
+        "nurture",
+        "marketer"
+      ]
+    ],
+    "openclaw-persona-forge": [
+      [
+        "character"
+      ],
+      [
+        "persona",
+        "lobster",
+        "soul",
+        "openclaw",
+        "gacha",
+        "avatar",
+        "forge"
+      ]
+    ],
+    "programmatic-seo": [      [
+        "city"
+      ],
+      [
+        "seo",
+        "landing",
+        "directory",
+        "location",
+        "keyword",
+        "template",
+        "scale",
+        "programmatic",
+        "audit",
+        "traffic"
+      ]
+    ],
     "json-canvas": [
       [
         "obsidian",

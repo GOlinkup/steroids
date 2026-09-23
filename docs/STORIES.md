@@ -1,6 +1,6 @@
 # Steroids Stories — 100-item backlog
 
-Source: router deep search + eval numbers (149-set P@1 0.705 / P@3 0.859, 315-set P@1 0.803 / P@3 0.917, leaks 0, unit 20/20 @ `f758d09`).
+Source: router deep search + eval numbers (149-set P@1 0.705 / P@3 0.859, 315-set P@1 0.803 / P@3 0.917, leaks 0, unit 25/25).
 Shipped already: abstention gate, short tokens, 12 synonyms, ed1 typo fix, de-hijacked overrides, learn fallback, served cap, embed deploy.
 
 ## P00. Grounded execution loop (build FIRST — unlocks the 100)
@@ -27,6 +27,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 |------|---------|---------|---------|-------|------|
 | 2026-09-22 | 0.705 | 0.859 | 0.803 | 0 | baseline @ 6511ad2 |
 | 2026-09-23 | 0.705 | 0.859 | 0.803 | 0 | P00d+P00e + free/city/character NEG, unit 20/20, live 0.875/0.750/2, uncommitted |
+| 2026-09-23 | 0.705 | 0.859 | 0.803 | 0 | grounding harden: needs/proof overlay, min-evidence 200, unbacked, chain carry, url:/file: proof, unit 25/25, uncommitted |
 
 ## A. Auto-equip — from suggesting to loading
 - [x] A01 Confidence auto-inject — top-1 above threshold injects full SKILL.md via hook; close: demo + abstain-rate unchanged. (Jim 2026-09-23, r331+r351)
