@@ -55,5 +55,15 @@ class TestJ94Counterfactual(unittest.TestCase):
         self.assertIsNone(r["top_without"])
 
 
+class TestJ95Replay(unittest.TestCase):
+    def test_find_drifts(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import bench
+        old = {"q1": ["a", "b"], "q2": ["c"]}
+        new = {"q1": ["a", "b"], "q2": ["d", "c"]}
+        self.assertEqual(bench.find_drifts(old, new), [("q2", "c", "d")])
+        self.assertEqual(bench.find_drifts(old, dict(old)), [])
+
+
 if __name__ == "__main__":
     unittest.main()

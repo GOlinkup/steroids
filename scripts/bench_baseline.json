@@ -1,29 +1,2435 @@
 {
-  "commit": "d285f8c48084d8f38cc816f027458cf10c5d8598",
+  "commit": "943b96a78f67cdb022d2ff83620af8115b921e17",
   "dirty": [
-    "?? scripts/eval_gate.sh"
+    "M scripts/bench.py"
   ],
   "sets": {
     "blind149": {
       "n": 149,
       "p1": 0.705,
-      "p3": 0.859,
-      "mrr": 0.777,
-      "leaks": 0
+      "p3": 0.866,
+      "mrr": 0.78,
+      "leaks": 0,
+      "queries": {
+        "how do I make my checkout usable with a screen reader and keyboard only": [
+          "accessibility",
+          "accessibility-auditor",
+          "zapier-make-patterns"
+        ],
+        "my grandmother can't tap these tiny buttons, what sizes should I use": [
+          "accessibility",
+          "multimodal-whisper",
+          "ui-ux-pro-max"
+        ],
+        "compare claude code aider and codex on my own repo tasks with real numbers": [
+          "agent-eval",
+          "codex",
+          "everything-claude-code"
+        ],
+        "my agent loop keeps stalling halfway through, help me debug the failure": [
+          "continuous-agent-loop",
+          "loop-me",
+          "agent-introspection-debugging"
+        ],
+        "let my bot pay for its own API calls with a per-task budget": [
+          "telegram-bot-builder--enterprise-communication",
+          "telegram-bot-builder",
+          "token-budget-advisor"
+        ],
+        "pay my drivers out in stablecoin each night within a spending cap": [
+          "evm-token-decimals",
+          "weekly-ops-report",
+          "agent-payment-x402"
+        ],
+        "rate my last task output on accuracy and clarity with concrete evidence": [
+          "agent-self-evaluation",
+          "pudu-task-telemetry",
+          "forecast-accuracy-review"
+        ],
+        "my toolbox is bloated, decide daily drivers versus library buckets": [
+          "agent-sort",
+          "weekly-ops-report",
+          "daily-meeting-update"
+        ],
+        "set review gates and ownership rules for an agent-written codebase": [
+          "ai-first-engineering",
+          "code-review-checklist",
+          "agent-development"
+        ],
+        "the same model wrote and reviewed this code, catch what it missed": [
+          "ai-regression-testing",
+          "codex-review",
+          "requesting-code-review"
+        ],
+        "split my android app into clean modules with use cases and repos": [
+          "android-clean-architecture",
+          "updating-android-sdk",
+          "android-cicd"
+        ],
+        "help me build an angular form with signals and validation": [
+          "angular",
+          "angular-developer",
+          "zod-validation-expert"
+        ],
+        "wire up another REST API the same way our codebase already does it": [
+          "api-connector-builder",
+          "api-design-principles",
+          "api-integration-specialist"
+        ],
+        "how should I name endpoints and handle paging and errors": [
+          "error-resolver",
+          "fastapi-endpoint",
+          "api-design"
+        ],
+        "draw the architecture of this repo as a diagram I can explore": [
+          "mermaid-diagrams",
+          "c4-architecture",
+          "mermaid-diagram-specialist"
+        ],
+        "record why we picked postgres so future devs stop asking": [
+          "architecture-decision-records",
+          "postgres-schema-design",
+          "postgres-patterns"
+        ],
+        "write my launch post so it sounds like me, not a template": [
+          "templates",
+          "templates--railway",
+          "launch-strategy"
+        ],
+        "I'm lost in the skill list, which one fits my task": [
+          "skill-creation-guide",
+          "skill-creator",
+          "skill-scout"
+        ],
+        "list every automation I have and flag the overlaps": [
+          "automation-audit-ops",
+          "linear-automation",
+          "github-workflow-automation--workflow-automation"
+        ],
+        "keep an agent running overnight with memory and scheduled jobs": [
+          "agent-memory-mcp",
+          "agent-memory-systems",
+          "autonomous-agent-harness"
+        ],
+        "research this topic and file a cited dossier I can trust": [
+          "research",
+          "deep-research",
+          "market-research"
+        ],
+        "is bun actually faster than node here, measure both": [
+          "bun-runtime",
+          "bun-development",
+          "n8n-node-configuration"
+        ],
+        "this endpoint is slow, try variants and pick the winner by measurement": [
+          "raffle-winner-picker",
+          "fastapi-endpoint",
+          "benchmark-optimization-loop"
+        ],
+        "inspect my blender rig pose and check the feet touch the ground": [
+          "blender-motion-state-inspection",
+          "loop-design-check",
+          "flutter-pr-checks-finder"
+        ],
+        "turn this rambling idea into a build plan with ordered steps": [
+          "plan-writing",
+          "orch-build-mvp",
+          "plan-orchestrate"
+        ],
+        "interview me until my brand positioning is sharp": [
+          "brand-discovery",
+          "grill-me",
+          "interview-prep-generator"
+        ],
+        "learn how I write so my newsletter stays in my voice": [
+          "brand-voice",
+          "voice-ai-development",
+          "voice-agents"
+        ],
+        "click through my deployed app and verify the key flows work": [
+          "vercel-deploy",
+          "telegram-mini-app",
+          "kotlin-coroutines-flows"
+        ],
+        "should the team switch its runtime to bun": [
+          "bun-runtime",
+          "bun-development",
+          "team-agent-orchestration"
+        ],
+        "we just deployed, is production still healthy right now": [
+          "production-audit",
+          "render-deploy",
+          "pb-deploy"
+        ],
+        "lay my notes out on a visual canvas I can rearrange spatially": [
+          "canvas-design",
+          "plan-canvas",
+          "canvas"
+        ],
+        "get my freight rates down and rank my carriers properly": [
+          "carrier-relationship-management",
+          "logistics-exception-management",
+          "customs-trade-compliance"
+        ],
+        "sanity-check my cisco switch config before tonight's change window": [
+          "cisco-ios-patterns",
+          "network-config-validation",
+          "orch-change-feature"
+        ],
+        "keep project memory alive between sessions without re-explaining": [
+          "conversation-memory",
+          "session-handoff",
+          "agent-memory-systems"
+        ],
+        "run four coding agents at once in isolated worktrees and track them": [
+          "claude-devfleet",
+          "using-git-worktrees",
+          "agents-autogpt"
+        ],
+        "each button works alone but together they break the page, find the clash": [
+          "click-path-audit",
+          "page-cro",
+          "commit-work"
+        ],
+        "my clickhouse aggregation over billions of rows crawls, tune it": [
+          "clickhouse-io",
+          "cc-skill-clickhouse-io",
+          "vaex"
+        ],
+        "review my branch against what the issue actually asked for": [
+          "code-review",
+          "receiving-code-review",
+          "code-review-excellence"
+        ],
+        "give me a guided tour of how auth works in this repo": [
+          "google-cloud-auth",
+          "clerk-auth",
+          "nextjs-supabase-auth"
+        ],
+        "this module has no clear boundary, where should the seam go": [
+          "codebase-design",
+          "golang-pro",
+          "golang-patterns"
+        ],
+        "I just joined, map this codebase for me": [
+          "codebase-onboarding",
+          "security-ownership-map",
+          "improve-codebase-architecture"
+        ],
+        "did my last AI edit make this file's structure better or worse": [
+          "codehealth-mcp",
+          "avoid-ai-writing",
+          "safety-alignment-constitutional-ai"
+        ],
+        "be blunt about my naming and readability habits": [
+          "naming-analyzer",
+          "avoid-ai-writing",
+          "coding-standards"
+        ],
+        "who really competes with us and where are the gaps": [
+          "competitive-platform-analysis",
+          "premium-web-design",
+          "hipaa-compliance"
+        ],
+        "score each competitor one to five on nine dimensions": [
+          "benchmark-methodology",
+          "competitor-alternatives",
+          "competitive-report-structure"
+        ],
+        "turn these competitor scores into a report my team can act on": [
+          "competitive-report-structure",
+          "competitor-alternatives",
+          "weekly-ops-report"
+        ],
+        "state and navigation in my compose multiplatform app feel messy": [
+          "compose-multiplatform-patterns",
+          "react-state-management",
+          "make-interfaces-feel-better"
+        ],
+        "my config folder is bloated with stuff I never use, audit it": [
+          "config-gc",
+          "production-code-audit",
+          "agent-architecture-audit"
+        ],
+        "where did all my API money go this month, break it down": [
+          "api-integration-specialist",
+          "x-api",
+          "api-fuzzing-bug-bounty"
+        ],
+        "argue both sides of this architecture call before I commit": [
+          "commit-smart",
+          "context-architecture",
+          "commit"
+        ],
+        "review my C++ for modern safe idioms": [
+          "code-review-checklist",
+          "cpp-coding-standards",
+          "cpp-pro"
+        ],
+        "my googletest suite flakes in CI, stabilize it": [
+          "cpp-testing",
+          "gh-fix-ci",
+          "burp-suite-testing"
+        ],
+        "post this announcement to X and linkedin without duplicate text": [
+          "linkedin-profile-optimizer",
+          "crosspost",
+          "curviate-engage"
+        ],
+        "help with xunit mocks and integration tests in dotnet": [
+          "csharp-testing",
+          "dotnet-backend",
+          "rust-testing"
+        ],
+        "a customer got charged twice, find the duplicate from the code": [
+          "customer-billing-ops",
+          "find-bugs",
+          "finance-billing-ops"
+        ],
+        "sort out customs paperwork and stop overpaying duty": [
+          "customs-trade-compliance",
+          "carrier-relationship-management",
+          "returns-reverse-logistics"
+        ],
+        "my flutter list janks and rebuilds everything on scroll": [
+          "scroll-experience",
+          "dart-flutter-patterns",
+          "flutter-dart-code-review"
+        ],
+        "build a dashboard that tells me what broke, not vanity graphs": [
+          "dashboard-builder",
+          "grafana-dashboards",
+          "social-graph-ranker"
+        ],
+        "watch these prices nightly and save them to a sheet, free only": [
+          "data-scraper-agent",
+          "free-tool-strategy",
+          "save"
+        ],
+        "this backfill takes all weekend, make it fast without corrupting rows": [
+          "data-throughput-accelerator",
+          "email-sequence",
+          "zapier-make-patterns"
+        ],
+        "migrate my schema with zero downtime and a safe rollback": [
+          "database-migrations",
+          "database-migration",
+          "migrate-workflows"
+        ],
+        "deep-dive this topic with real sources and citations": [
+          "deep-research",
+          "deep-research-notebooklm",
+          "citation-management"
+        ],
+        "audit my swap contract for reentrancy and oracle games": [
+          "defi-amm-security",
+          "prediction-market-oracle-research",
+          "develop-web-game"
+        ],
+        "strip the clutter from this article and give me clean markdown": [
+          "defuddle",
+          "web-to-markdown",
+          "article-writing"
+        ],
+        "stop the release pipeline until the quality gates pass": [
+          "delivery-gate",
+          "opensource-pipeline",
+          "ralphinho-rfc-pipeline"
+        ],
+        "set up deploys with health checks and one-command rollback": [
+          "pb-deploy",
+          "deployment-patterns",
+          "loop-design-check"
+        ],
+        "my screens look inconsistent, audit the tokens and spacing": [
+          "seo-audit",
+          "production-code-audit",
+          "web-quality-audit"
+        ],
+        "I want PM architect dev and QA arguing in one room about this feature": [
+          "dev-team",
+          "feature-design-assistant",
+          "monorepo-architect"
+        ],
+        "this crash only happens on tuesdays, help me hunt it": [
+          "diagnosing-bugs",
+          "grill-me",
+          "deployment"
+        ],
+        "schedule background jobs with beat, retries and monitoring in django": [
+          "django-celery",
+          "django-pro",
+          "writing-beats"
+        ],
+        "my django ORM does a hundred queries per page, fix it": [
+          "django-patterns",
+          "django-pro",
+          "django-verification"
+        ],
+        "lock down my django auth, forms and cookies properly": [
+          "django-security",
+          "django-verification",
+          "django-patterns"
+        ],
+        "drive my django API test-first with pytest": [
+          "python-testing-patterns",
+          "django-tdd",
+          "python-testing"
+        ],
+        "drive two different AI CLIs side by side in terminal panes": [
+          "dmux-workflows",
+          "ai-agents-architect",
+          "ai-wrapper-product"
+        ],
+        "write a dockerfile without the usual security holes": [
+          "docker-patterns",
+          "docker-expert",
+          "security-ownership-map"
+        ],
+        "look up the current docs instead of quoting the API from memory": [
+          "docs-search",
+          "api-documentation-generator",
+          "openai-docs"
+        ],
+        "we call the same thing three names, settle our vocabulary": [
+          "domain-modeling",
+          "domain-name-brainstormer",
+          "humanizer"
+        ],
+        "review my C# dependency injection and async usage": [
+          "dotnet-patterns",
+          "dependabot-review",
+          "async-python-patterns"
+        ],
+        "my agent games its own verifier, redesign the loop so it can't cheat": [
+          "loop-design-check",
+          "continuous-agent-loop",
+          "autonomous-loops"
+        ],
+        "my transfer shows the wrong amount by a factor of a million on base": [
+          "obsidian-bases",
+          "evm-token-decimals",
+          "reducing-entropy"
+        ],
+        "search the live web and real code for how others solved this": [
+          "exa-search",
+          "develop-web-game",
+          "search-first"
+        ],
+        "generate a cover image and a voiceover for the launch video": [
+          "generate-image",
+          "fal-ai-media",
+          "launch-strategy"
+        ],
+        "pydantic schemas and dependency injection for my fastapi service": [
+          "fastapi-patterns",
+          "fastapi-endpoint",
+          "fastapi-pro"
+        ],
+        "prove from the code whether anyone is being billed twice": [
+          "finance-billing-ops",
+          "customer-billing-ops",
+          "stripe-integration"
+        ],
+        "one command dev environment so onboarding stops hurting": [
+          "flox-environments",
+          "environment",
+          "dev-team"
+        ],
+        "tell me straight what to delete from this overbuilt module": [
+          "code-review",
+          "loop-me",
+          "avoid-ai-writing"
+        ],
+        "full-repo scan for simplification wins, ranked cut list": [
+          "improve-codebase-architecture",
+          "repo-scan",
+          "i-have-adhd"
+        ],
+        "my row-level security policies made every query slow": [
+          "web-security-testing",
+          "perl-security",
+          "defi-amm-security"
+        ],
+        "write the PR body so reviewers actually understand it": [
+          "pr",
+          "create-pr",
+          "code-reviewer"
+        ],
+        "can prediction markets forecast demand for my product": [
+          "prediction-market-oracle-research",
+          "forecast-accuracy-review",
+          "marketing-demand-acquisition"
+        ],
+        "prisma migrate wiped my database, explain and prevent it": [
+          "database-migrations",
+          "prisma-expert",
+          "database-migration"
+        ],
+        "pressure-test whether this feature deserves to exist at all": [
+          "test-driven-development",
+          "cpp-testing",
+          "perl-testing"
+        ],
+        "what will break when we launch, audit us before users do": [
+          "production-audit",
+          "web-quality-audit",
+          "automation-audit-ops"
+        ],
+        "triage my github backlog and mirror it into linear": [
+          "design-mirror",
+          "github-ops",
+          "github-workflow-automation"
+        ],
+        "rewrite this prompt so a fresh agent can run it cold": [
+          "agent-development",
+          "prompt-optimizer",
+          "prompt-library"
+        ],
+        "throwaway prototype to feel whether this state shape works": [
+          "prototype",
+          "writing-shape",
+          "make-interfaces-feel-better"
+        ],
+        "find the pubmed literature on this interaction": [
+          "scientific-db-pubmed-database",
+          "literature-review",
+          "pubmed-database"
+        ],
+        "is this python idiomatic or am I writing java in disguise": [
+          "python-patterns",
+          "n8n-code-python",
+          "python-pro"
+        ],
+        "teach me pytest fixtures parametrization and mocks properly": [
+          "python-testing",
+          "python-testing-patterns",
+          "django-tdd"
+        ],
+        "my pytorch run gives different numbers every time, stabilize it": [
+          "pytorch-patterns",
+          "distributed-training-pytorch-lightning",
+          "pytorch-lightning"
+        ],
+        "root-cause this line defect and draft the corrective action": [
+          "root-cause-pareto",
+          "github-actions-templates",
+          "github-actions-creator"
+        ],
+        "review my quarkus camel event service": [
+          "quarkus-patterns",
+          "quarkus-tdd",
+          "quarkus-verification"
+        ],
+        "skinny controllers service objects and hotwire for rails 8": [
+          "rails-patterns",
+          "git-context-controller",
+          "service"
+        ],
+        "my react routes waterfall and the bundle is huge": [
+          "react-best-practices--web-development",
+          "react-performance",
+          "react-component-performance"
+        ],
+        "test my react hook with server mocks and a11y checks": [
+          "react-testing",
+          "testing-patterns",
+          "test-detect"
+        ],
+        "design my feed as source hydrator filter scorer selector": [
+          "recsys-pipeline-architect",
+          "data-feeds",
+          "design-mirror"
+        ],
+        "add caching locks and rate limits with redis, done right": [
+          "redis-patterns",
+          "prompt-caching",
+          "orch-add-feature"
+        ],
+        "regex or LLM for parsing these logs, decide with reasons": [
+          "regex-vs-llm-structured-text",
+          "growth-log",
+          "llm-evaluation"
+        ],
+        "animate this modal with springs and respect reduced motion": [
+          "motion-patterns",
+          "motion-foundations",
+          "motion-advanced"
+        ],
+        "captions charts and transitions for my react video project": [
+          "remotion-video-creation",
+          "react-best-practices--web-development",
+          "react-best-practices"
+        ],
+        "trim my vlog and structure it like a story, not a dump": [
+          "video-editing",
+          "plugin-structure",
+          "agile-product-owner"
+        ],
+        "animate the proof of this theorem with clean math visuals": [
+          "manim-video",
+          "clean-code",
+          "slack-gif-creator"
+        ],
+        "my mysql replica lags behind, tune the indexes": [
+          "mysql-patterns",
+          "safety-stock-review",
+          "distributed-training-ray-train"
+        ],
+        "publish this episode to every platform from one place": [
+          "social-publisher",
+          "gemini-api-agent-platform",
+          "crosspost"
+        ],
+        "review my spring boot service layers and caching": [
+          "springboot-patterns",
+          "prompt-caching",
+          "service"
+        ],
+        "offload work without breaking swift 6.2 isolation rules": [
+          "swift-concurrency-6-2",
+          "swift-concurrency-expert",
+          "swift-actor-persistence"
+        ],
+        "observable state and navigation perf in my swiftui app": [
+          "swiftui-patterns",
+          "llm-app-patterns",
+          "app-store-optimization"
+        ],
+        "heisenbug that vanishes under the debugger, hunt it methodically": [
+          "systematic-debugging",
+          "debugger",
+          "diagnosing-bugs"
+        ],
+        "red green refactor my next feature, no code before tests": [
+          "testing-patterns",
+          "test-driven-development",
+          "tdd"
+        ],
+        "page objects and CI setup for my checkout e2e suite": [
+          "e2e-testing",
+          "playwright-e2e-builder",
+          "e2e-testing-patterns"
+        ],
+        "my laravel queues keep dying silently, harden them": [
+          "laravel-patterns",
+          "laravel-expert",
+          "laravel-verification"
+        ],
+        "my kotlin flows leak on rotation, fix the scope": [
+          "kotlin-coroutines-flows",
+          "kotlin-coroutines-expert",
+          "kotlin-exposed-patterns"
+        ],
+        "review my ktor routing plugins and auth": [
+          "kotlin-ktor-patterns",
+          "nextjs-supabase-auth",
+          "laravel-plugin-discovery"
+        ],
+        "my k8s probes fail and RBAC denies everything, untangle it": [
+          "kubernetes-patterns",
+          "kubernetes-architect",
+          "everything-claude-code"
+        ],
+        "bgp session down and prefixes missing, diagnose read-only": [
+          "network-bgp-diagnostics",
+          "session-handoff",
+          "claude-code-sessions"
+        ],
+        "vite dev is sluggish and HMR takes forever": [
+          "vite-patterns",
+          "trigger-dev",
+          "dev-team"
+        ],
+        "composition API and pinia patterns for my vue app": [
+          "vue-patterns",
+          "nextjs-app-router-patterns",
+          "api-patterns"
+        ],
+        "my nuxt page flashes wrong content then fixes itself": [
+          "optimization-flash-attention",
+          "social-content",
+          "content-creator"
+        ],
+        "review my nestjs modules guards and DTOs": [
+          "nestjs-patterns",
+          "nestjs-expert",
+          "safety-guard"
+        ],
+        "make my health app HIPAA-clean with proper PHI handling": [
+          "hipaa-compliance",
+          "healthcare-phi-compliance",
+          "healthcare-eval-harness"
+        ],
+        "tune my drug interaction alerts so doctors stop ignoring them": [
+          "healthcare-cdss-patterns",
+          "medchem",
+          "healthcare-emr-patterns"
+        ],
+        "draft our vendor agreement from the template with the right clauses": [
+          "master-agreement-generator",
+          "template-skill",
+          "templates--railway"
+        ],
+        "build an MCP server exposing tools and resources over stdio": [
+          "mcp-server-patterns",
+          "mcp-builder",
+          "mcp-integration"
+        ],
+        "dig my verification code out of this message flood": [
+          "messages-ops",
+          "verification-loop",
+          "verification-before-completion"
+        ],
+        "tame my inbox and show proof of what actually sent": [
+          "curviate-inbox",
+          "messages-ops",
+          "email-ops"
+        ],
+        "pull the jira ticket, read the requirements, move it along": [
+          "jira-integration",
+          "jira",
+          "jira-automation"
+        ],
+        "my hibernate queries N+1 on every page load": [
+          "jpa-patterns",
+          "tanstack-query-expert",
+          "k6-load-testing"
+        ],
+        "the borrow checker hates my tree, restructure it idiomatically": [
+          "orch-refine-code",
+          "file-organizer",
+          "rust-patterns"
+        ],
+        "table-driven tests with subtests for my go service": [
+          "golang-testing",
+          "perl-testing",
+          "test-driven-development"
+        ],
+        "is my go error handling and concurrency idiomatic": [
+          "golang-patterns",
+          "golang-pro",
+          "swift-concurrency-expert"
+        ],
+        "harden my perl CGI against taint and injection": [
+          "perl-security",
+          "perl-patterns",
+          "sql-injection-testing"
+        ],
+        "property-based tests for my F# domain model": [
+          "fsharp-testing",
+          "csharp-testing",
+          "kotlin-testing"
+        ],
+        "resovle the merg confilct in my branch, nothing is clean": [
+          "resolving-merge-conflicts",
+          "finishing-a-development-branch",
+          "emerging-techniques-model-merging"
+        ],
+        "fluter listview keeps rebuilding, memoize the rows dammit": [
+          "dart-flutter-patterns",
+          "flutter-dart-code-review",
+          "mobile-design"
+        ],
+        "hepl me with docker compose netwroking between services": [
+          "docker-patterns",
+          "docker-expert",
+          "service"
+        ],
+        "this signup screen feels cheap and I can't say why": [
+          "signup-flow-cro",
+          "make-interfaces-feel-better",
+          "page-cro"
+        ],
+        "turn my standup notes into tickets with blocked-by links": [
+          "to-tickets",
+          "notion-knowledge-capture",
+          "obsidian-markdown"
+        ],
+        "merge two PDFs and OCR the scanned pages": [
+          "pdf-processing",
+          "pdf",
+          "pdf-official"
+        ],
+        "convert this slide deck into a stakeholder update": [
+          "scientific-slides",
+          "frontend-slides",
+          "marp-slide"
+        ]
+      }
     },
     "second315": {
       "n": 315,
       "p1": 0.803,
       "p3": 0.914,
       "mrr": 0.861,
-      "leaks": 0
+      "leaks": 0,
+      "queries": {
+        "make my app usable for blind users pls": [
+          "progressive-web-app",
+          "app-store-optimization",
+          "telegram-mini-app"
+        ],
+        "fix slow clickhouse query, billions rows": [
+          "clickhouse-io",
+          "cc-skill-clickhouse-io",
+          "vaex"
+        ],
+        "optmize endpoint, try variants, measure winner": [
+          "raffle-winner-picker",
+          "fastapi-endpoint",
+          "benchmark-optimization-loop"
+        ],
+        "is bun faster than node? measure both pls": [
+          "bun-runtime",
+          "bun-development",
+          "n8n-node-configuration"
+        ],
+        "setup precommit hooks husky lint-staged now": [
+          "setup-pre-commit",
+          "lint-and-validate",
+          "hook-development"
+        ],
+        "teach me pagination, I am new here": [
+          "teach",
+          "grill-me",
+          "academy-guide"
+        ],
+        "grill my plan hard, find holes": [
+          "grill-me",
+          "grilling",
+          "grill-with-docs"
+        ],
+        "make flutter list stop jank on scroll": [
+          "scroll-experience",
+          "dart-flutter-patterns",
+          "flutter-dart-code-review"
+        ],
+        "build flutter app with payments, help": [
+          "dart-flutter-patterns",
+          "flutter-expert",
+          "flutter-dart-code-review"
+        ],
+        "fix merge conflict markers rebase branch": [
+          "resolving-merge-conflicts",
+          "finishing-a-development-branch",
+          "orch-fix-defect"
+        ],
+        "review my PR, check standards": [
+          "create-pr",
+          "code-review",
+          "dependabot-review"
+        ],
+        "tour me through auth code in repo": [
+          "code-tour",
+          "nextjs-supabase-auth",
+          "google-cloud-auth"
+        ],
+        "I just joined team, map codebase for me": [
+          "codebase-onboarding",
+          "security-ownership-map",
+          "team-agent-orchestration"
+        ],
+        "where should seam go in this module": [
+          "codebase-design",
+          "golang-pro",
+          "golang-patterns"
+        ],
+        "my AI edit made file worse? check": [
+          "avoid-ai-writing",
+          "codehealth-mcp",
+          "safety-alignment-constitutional-ai"
+        ],
+        "be blunt about my naming habits": [
+          "naming-analyzer",
+          "delivery-gate",
+          "avoid-ai-writing"
+        ],
+        "deploy check: is prod healthy right now": [
+          "production-audit",
+          "pb-deploy",
+          "render-deploy"
+        ],
+        "click my app flows, verify they work": [
+          "kotlin-coroutines-flows",
+          "shopify-apps",
+          "telegram-mini-app"
+        ],
+        "record demo video of my web app": [
+          "ui-demo",
+          "video-editing",
+          "video-downloader"
+        ],
+        "my e2e flakes in CI, fix it": [
+          "gh-fix-ci",
+          "e2e-testing",
+          "e2e-testing-patterns"
+        ],
+        "write pytest tests with mocks fixtures": [
+          "python-testing-patterns",
+          "python-testing",
+          "test-detect"
+        ],
+        "my gtest suite flakes, stabilize pls": [
+          "cpp-testing",
+          "burp-suite-testing",
+          "flox-environments"
+        ],
+        "review my C++ for safe idioms": [
+          "code-review-checklist",
+          "cpp-pro",
+          "cpp-coding-standards"
+        ],
+        "write xunit mocks integration tests dotnet": [
+          "csharp-testing",
+          "dotnet-backend",
+          "rust-testing"
+        ],
+        "write rust tests, unit and integration": [
+          "rust-testing",
+          "rust-cli-builder",
+          "rust-patterns"
+        ],
+        "review my rust ownership lifetimes": [
+          "rust-patterns",
+          "rust-pro",
+          "rust-testing"
+        ],
+        "review my go code, idioms please": [
+          "golang-patterns",
+          "golang-pro",
+          "code-review-checklist"
+        ],
+        "write go table-driven tests": [
+          "golang-testing",
+          "test-driven-development",
+          "golang-patterns"
+        ],
+        "review my kotlin coroutines flow code": [
+          "kotlin-coroutines-expert",
+          "kotlin-coroutines-flows",
+          "kotlin-patterns"
+        ],
+        "write kotest mockk tests": [
+          "kotlin-testing",
+          "test-detect",
+          "rust-testing"
+        ],
+        "fix slow postgres query, add index": [
+          "postgres-patterns",
+          "postgres-schema-design",
+          "postgres-best-practices"
+        ],
+        "design mysql schema and indexes": [
+          "postgres-schema-design",
+          "database-design",
+          "database-schema-designer"
+        ],
+        "tune redis cache lock rate limit": [
+          "redis-patterns",
+          "content-hash-cache-pattern",
+          "bullmq-specialist"
+        ],
+        "migrate schema zero downtime, how": [
+          "database-migrations",
+          "migrate-workflows",
+          "database-migration"
+        ],
+        "write prisma schema query help": [
+          "prisma-expert",
+          "prisma-patterns",
+          "schema-markup"
+        ],
+        "design JPA entities, fix N+1": [
+          "jpa-patterns",
+          "database-design",
+          "domain-driven-design"
+        ],
+        "review django ORM queries caching": [
+          "django-patterns",
+          "django-pro",
+          "prompt-caching"
+        ],
+        "add celery background jobs django": [
+          "django-celery",
+          "django-pro",
+          "django-tdd"
+        ],
+        "test my django DRF api pytest": [
+          "django-tdd",
+          "python-testing-patterns",
+          "python-testing"
+        ],
+        "check django auth security settings": [
+          "django-security",
+          "laravel-security",
+          "django-verification"
+        ],
+        "build laravel controller eloquent queue": [
+          "laravel-patterns",
+          "laravel-expert",
+          "laravel-security"
+        ],
+        "test laravel with pest factories": [
+          "laravel-tdd",
+          "test-detect",
+          "meme-factory"
+        ],
+        "check laravel auth csrf xss": [
+          "laravel-security",
+          "laravel-verification",
+          "laravel-expert"
+        ],
+        "build rails controller service job": [
+          "rails-patterns",
+          "service",
+          "git-context-controller"
+        ],
+        "review spring boot service cache async": [
+          "content-hash-cache-pattern",
+          "springboot-patterns",
+          "async-python-patterns"
+        ],
+        "test spring boot mockmvc testcontainers": [
+          "springboot-tdd",
+          "springboot-verification",
+          "testing-patterns"
+        ],
+        "review spring security jwt csrf": [
+          "quarkus-security",
+          "security-review",
+          "cc-skill-security-review"
+        ],
+        "build quarkus camel messaging service": [
+          "quarkus-patterns",
+          "quarkus-tdd",
+          "quarkus-verification"
+        ],
+        "test quarkus junit rest assured": [
+          "quarkus-tdd",
+          "quarkus-verification",
+          "quarkus-security"
+        ],
+        "build nestjs module guard interceptor": [
+          "nestjs-patterns",
+          "nestjs-expert",
+          "supply-chain-guard"
+        ],
+        "build fastapi pydantic async auth test": [
+          "fastapi-endpoint",
+          "fastapi-patterns",
+          "fastapi-pro"
+        ],
+        "build ktor routing auth DI": [
+          "kotlin-ktor-patterns",
+          "nextjs-supabase-auth",
+          "clerk-auth"
+        ],
+        "query exposed ORM transactions flyway": [
+          "kotlin-exposed-patterns",
+          "drizzle-orm-expert",
+          "tanstack-query-expert"
+        ],
+        "write DRF serializer viewset guide": [
+          "django-patterns",
+          "skill-creation-guide",
+          "antigravity_guide"
+        ],
+        "make react component hooks form": [
+          "react-dev",
+          "react-component-performance",
+          "react-patterns"
+        ],
+        "test react component RTL msW": [
+          "react-testing",
+          "react-component-performance",
+          "react-best-practices--web-development"
+        ],
+        "make react faster, fix rerenders": [
+          "react-performance",
+          "react-best-practices",
+          "react-component-performance"
+        ],
+        "animate button modal toast stagger": [
+          "motion-patterns",
+          "modal",
+          "motion-advanced"
+        ],
+        "setup motion tokens springs reduced-motion": [
+          "motion-foundations",
+          "motion-advanced",
+          "motion-patterns"
+        ],
+        "drag drop gesture SVG animation": [
+          "motion-advanced",
+          "diagrammer",
+          "claude-d3js-skill"
+        ],
+        "build vue composition pinia router": [
+          "vue-patterns",
+          "ui-to-vue",
+          "nextjs-app-router-patterns"
+        ],
+        "build nuxt app no hydration mismatch": [
+          "nuxt4-patterns",
+          "app-builder",
+          "telegram-mini-app"
+        ],
+        "setup vite config HMR proxy": [
+          "vite-patterns",
+          "environment-setup-guide",
+          "network-config-validation"
+        ],
+        "make nextjs turbopack build faster": [
+          "nextjs-turbopack",
+          "nextjs-best-practices",
+          "nextjs-app-router-patterns"
+        ],
+        "label my forms for screen reader": [
+          "form-cro",
+          "frontend-a11y",
+          "pdf-fill-studio"
+        ],
+        "audit design system visual consistency": [
+          "design-system",
+          "ui-design-system",
+          "design-system-starter"
+        ],
+        "make interface spacing typography better": [
+          "make-interfaces-feel-better",
+          "network-interface-health",
+          "design-system"
+        ],
+        "build expo router screen tanstack list": [
+          "expo-deployment",
+          "react-native-patterns",
+          "tanstack-query-expert"
+        ],
+        "make swiftui observable navigation view": [
+          "swiftui-patterns",
+          "zapier-make-patterns",
+          "ui-ux-pro-max"
+        ],
+        "generate ios icons asset catalog": [
+          "ios-icon-gen",
+          "generate-image",
+          "cisco-ios-patterns"
+        ],
+        "add liquid glass blur ios 26": [
+          "liquid-glass-design",
+          "ios-icon-gen",
+          "cisco-ios-patterns"
+        ],
+        "persist data swift actor no races": [
+          "swift-actor-persistence",
+          "swift-concurrency-expert",
+          "swift-concurrency-6-2"
+        ],
+        "mock network swift testing protocol": [
+          "swift-protocol-di-testing",
+          "rust-testing",
+          "swift-concurrency-expert"
+        ],
+        "fix compose state navigation theme": [
+          "compose-multiplatform-patterns",
+          "theme-factory",
+          "react-state-management"
+        ],
+        "structure android KMP modules usecase": [
+          "android-clean-architecture",
+          "updating-android-sdk",
+          "plugin-structure"
+        ],
+        "make angular signals form validation": [
+          "angular-developer",
+          "angular",
+          "zod-validation-expert"
+        ],
+        "draw system diagram explorable html": [
+          "draw-io",
+          "mermaid-diagrams",
+          "mermaid-diagram-specialist"
+        ],
+        "record ADR why postgres picked": [
+          "architecture-decision-records",
+          "postgres-schema-design",
+          "postgres-patterns"
+        ],
+        "turn idea into step plan build": [
+          "plan-writing",
+          "writing-plans",
+          "orch-build-mvp"
+        ],
+        "make prototype to test state model": [
+          "prototype",
+          "testing-patterns",
+          "test-detect"
+        ],
+        "break plan into tracer tickets": [
+          "to-tickets",
+          "plan-writing",
+          "plan-orchestrate"
+        ],
+        "turn chat into spec publish tracker": [
+          "to-spec",
+          "notion-spec-to-implementation",
+          "implement-spec"
+        ],
+        "make questionnaire for undecided choice": [
+          "to-questionnaire",
+          "think-tank",
+          "token-budget-advisor"
+        ],
+        "write PR body for me": [
+          "pr",
+          "create-pr",
+          "iterate-pr"
+        ],
+        "triage issues verify write briefs": [
+          "triage",
+          "verification-loop",
+          "email-ops"
+        ],
+        "resolve merge rebase conflict now": [
+          "resolving-merge-conflicts",
+          "star-history-chart",
+          "git-workflow"
+        ],
+        "pick branching strategy team": [
+          "team-builder",
+          "flutter-cherry-pick",
+          "dev-team"
+        ],
+        "block dangerous git push reset hooks": [
+          "git-guardrails-claude-code",
+          "git-pushing",
+          "hook-development"
+        ],
+        "manage github issues PRs releases gh cli": [
+          "github-ops",
+          "gh-address-comments",
+          "gh-fix-ci"
+        ],
+        "setup CI docker health rollback": [
+          "deployment-patterns",
+          "docker-expert",
+          "docker-patterns"
+        ],
+        "write dockerfile compose network volume": [
+          "docker-patterns",
+          "docker-expert",
+          "compose-multiplatform-patterns"
+        ],
+        "debug k8s probe RBAC autoscale": [
+          "kubernetes-patterns",
+          "kubernetes-architect",
+          "gitops-workflow"
+        ],
+        "make flox env reproducible packages": [
+          "flox-environments",
+          "zapier-make-patterns",
+          "opensource-pipeline"
+        ],
+        "check homelab VLAN IoT guest setup": [
+          "homelab-vlan-segmentation",
+          "homelab-network-setup",
+          "homelab-wireguard-vpn"
+        ],
+        "setup wireguard remote home network": [
+          "homelab-wireguard-vpn",
+          "homelab-network-readiness",
+          "homelab-network-setup"
+        ],
+        "install pihole blocklists DoH DHCP": [
+          "homelab-pihole-dns",
+          "homelab-network-setup",
+          "perl-security"
+        ],
+        "plan home network gateway AP DHCP DNS": [
+          "homelab-network-setup",
+          "homelab-pihole-dns",
+          "homelab-network-readiness"
+        ],
+        "check network readiness VLAN DNS VPN": [
+          "homelab-network-readiness",
+          "homelab-network-setup",
+          "homelab-pihole-dns"
+        ],
+        "diagnose interface CRC flapping duplex": [
+          "network-interface-health",
+          "make-interfaces-feel-better",
+          "network-bgp-diagnostics"
+        ],
+        "BGP neighbor down, routes missing": [
+          "network-bgp-diagnostics",
+          "network-config-validation",
+          "nuxt4-patterns"
+        ],
+        "review router config before deploy": [
+          "network-config-validation",
+          "requesting-code-review",
+          "vercel-deploy"
+        ],
+        "automate SSH netmiko read-only collect": [
+          "netmiko-ssh-automation",
+          "ssh-penetration-testing",
+          "network-config-validation"
+        ],
+        "review cisco IOS ACL wildcard": [
+          "cisco-ios-patterns",
+          "ios-icon-gen",
+          "requesting-code-review"
+        ],
+        "send email via mailtrap sandbox test": [
+          "mailtrap-email-integration",
+          "ai-regression-testing",
+          "email-ops"
+        ],
+        "post tweet thread X api rate limits": [
+          "x-api",
+          "api-integration-specialist",
+          "api-security-testing"
+        ],
+        "publish everywhere X linkedin tiktok": [
+          "social-publisher",
+          "linkedin-profile-optimizer",
+          "content-engine"
+        ],
+        "repurpose post cross-platform no dupes": [
+          "crosspost",
+          "social-content",
+          "multiplayer"
+        ],
+        "grow X linkedin network warm outreach": [
+          "curviate-network",
+          "investor-outreach",
+          "social-graph-ranker"
+        ],
+        "find qualify reach high-value contacts": [
+          "lead-intelligence",
+          "find-release",
+          "curviate-search"
+        ],
+        "rank warm intros bridge scoring": [
+          "social-graph-ranker",
+          "lead-intelligence",
+          "investor-outreach"
+        ],
+        "score my session 1-5 honest": [
+          "session-handoff",
+          "claude-code-sessions",
+          "broken-authentication"
+        ],
+        "debug my agent run failure reproduce": [
+          "agent-introspection-debugging",
+          "agent-architecture-audit",
+          "agent-evaluation"
+        ],
+        "audit my agent stack 12 layers": [
+          "agent-architecture-audit",
+          "workspace-surface-audit",
+          "agent-development"
+        ],
+        "compare claude aider codex pass rate cost": [
+          "agent-eval",
+          "cost-tracking",
+          "claude-code-guide"
+        ],
+        "run agents parallel isolated worktrees": [
+          "parallel-execution-optimizer",
+          "dispatching-parallel-agents--development",
+          "parallel-agents"
+        ],
+        "coordinate agent squad kanban gates": [
+          "team-agent-orchestration",
+          "agent-management",
+          "continuous-agent-loop"
+        ],
+        "pick parallel team agents dispatch": [
+          "dispatching-parallel-agents--development",
+          "dispatching-parallel-agents",
+          "team-builder"
+        ],
+        "keep memory across sessions no re-explain": [
+          "conversation-memory",
+          "session-handoff",
+          "memory-search"
+        ],
+        "save session handoff resume later": [
+          "session-handoff",
+          "handoff",
+          "backend-to-frontend-handoff-docs"
+        ],
+        "track claude token spend budgets": [
+          "cost-tracking",
+          "token-budget-advisor",
+          "context-budget"
+        ],
+        "cut LLM spend route models tiers": [
+          "cost-aware-llm-pipeline",
+          "model-architecture-litgpt",
+          "llm-trading-agent-security"
+        ],
+        "argue both sides before I decide": [
+          "council",
+          "verification-before-completion",
+          "think-tank"
+        ],
+        "design agent loop no spin no cheat": [
+          "loop-design-check",
+          "continuous-agent-loop",
+          "autonomous-agent-patterns"
+        ],
+        "run agent loop self-check evals recover": [
+          "continuous-agent-loop",
+          "agent-self-evaluation",
+          "agent-introspection-debugging"
+        ],
+        "capture lesson instinct skill promote": [
+          "continuous-learning-v2",
+          "skill-developer",
+          "skill-creation-guide"
+        ],
+        "write growth log reusable pattern": [
+          "growth-log",
+          "developer-growth-analysis",
+          "perl-patterns"
+        ],
+        "verify session work before done claim": [
+          "verification-before-completion",
+          "session-handoff",
+          "claude-code-sessions"
+        ],
+        "block finish until checks pass hook": [
+          "hook-development",
+          "delivery-gate",
+          "finishing-a-development-branch"
+        ],
+        "run eval before trusted changed": [
+          "eval-harness",
+          "healthcare-eval-harness",
+          "agent-eval"
+        ],
+        "optimize prompt rewrite paste-ready": [
+          "prompt-optimizer",
+          "prompt-library",
+          "prompt-engineer"
+        ],
+        "control answer length token budget": [
+          "token-budget-advisor",
+          "context-budget",
+          "nasiko-control-plane"
+        ],
+        "research topic cited dossier file repo": [
+          "deep-research",
+          "research",
+          "market-research"
+        ],
+        "deep research web cited report": [
+          "deep-research",
+          "deep-research-notebooklm",
+          "market-research-reports"
+        ],
+        "search web exa neural code examples": [
+          "exa-search",
+          "tavily-web",
+          "algolia-search"
+        ],
+        "lookup docs context7 API examples": [
+          "documentation-lookup",
+          "context7-auto-research",
+          "docs-search"
+        ],
+        "find pubmed biomedical papers mesh": [
+          "scientific-db-pubmed-database",
+          "pubmed-database",
+          "ml-paper-writing"
+        ],
+        "check USPTO patent trademark records": [
+          "uspto-database",
+          "scientific-db-uspto-database",
+          "flutter-pr-checks-finder"
+        ],
+        "review paper methods evidence rubric": [
+          "peer-review",
+          "scientific-thinking-scholar-evaluation",
+          "ml-paper-writing"
+        ],
+        "synthesize literature screen cite": [
+          "scientific-thinking-literature-review",
+          "literature-review",
+          "notion-research-documentation"
+        ],
+        "query gget genomic BLAST enrichment": [
+          "scientific-pkg-gget",
+          "gget",
+          "biopython"
+        ],
+        "size market competitors fund research": [
+          "market-research",
+          "market-research-reports",
+          "marketing-strategy-pmm"
+        ],
+        "make pitch deck projections milestones": [
+          "investor-materials",
+          "pptx-official",
+          "pptx"
+        ],
+        "draft cold email angels VCs followup": [
+          "investor-outreach",
+          "email-ops",
+          "email-composer"
+        ],
+        "plan launch landing email social ads": [
+          "paid-ads",
+          "launch-strategy",
+          "competitive-ads-extractor"
+        ],
+        "audit SEO schema sitemap keywords": [
+          "seo",
+          "seo-audit",
+          "web-quality-audit"
+        ],
+        "make social posts threads scripts calendar": [
+          "social-content",
+          "social-publisher",
+          "social-graph-ranker"
+        ],
+        "edit video cut footage captions ffmpeg": [
+          "video-editing",
+          "remotion-video-creation",
+          "video-downloader"
+        ],
+        "make remotion charts captions transitions": [
+          "remotion-video-creation",
+          "remotion",
+          "remotion-best-practices"
+        ],
+        "record UI demo walkthrough webm": [
+          "ui-demo",
+          "generative_ui",
+          "architecture-decision-records"
+        ],
+        "smoke test deployed URL console errors": [
+          "canary-watch",
+          "golang-testing",
+          "test-fixing"
+        ],
+        "test windows app pywinauto E2E": [
+          "windows-desktop-e2e",
+          "e2e-testing-patterns",
+          "e2e-testing"
+        ],
+        "write playwright page objects fix flakes": [
+          "playwright-skill",
+          "playwright-java",
+          "playwright"
+        ],
+        "convert screenshot to vue vant batch": [
+          "ui-to-vue",
+          "vue-patterns",
+          "screenshot-feature-extractor"
+        ],
+        "manage uncloud deploy caddy ports": [
+          "uncloud",
+          "pb-deploy",
+          "deploy"
+        ],
+        "triage inbox dedupe escalate alerts": [
+          "curviate-inbox",
+          "unified-notifications-ops",
+          "triage"
+        ],
+        "operate github linear backlog PR triage": [
+          "github-ops",
+          "project-flow-ops",
+          "github-workflow-automation"
+        ],
+        "run command repo debug CI push fix": [
+          "gh-fix-ci",
+          "orch-fix-defect",
+          "git-pushing"
+        ],
+        "open interactive CLI new terminal argv": [
+          "terminal-opener",
+          "wiki-cli",
+          "obsidian-cli"
+        ],
+        "drive sheets docs slides cleanup": [
+          "google-workspace-ops",
+          "frontend-slides",
+          "scientific-slides"
+        ],
+        "triage mailbox draft verify sent": [
+          "email-ops",
+          "triage",
+          "messages-ops"
+        ],
+        "read texts DMs recover code thread": [
+          "messages-ops",
+          "regex-vs-llm-structured-text",
+          "git-context-controller"
+        ],
+        "route alerts github linear desktop hooks": [
+          "unified-notifications-ops",
+          "address-github-comments",
+          "pb-hooks"
+        ],
+        "operate billing subs refunds churn stripe": [
+          "customer-billing-ops",
+          "stripe-integration",
+          "finance-billing-ops"
+        ],
+        "snapshot pricing refunds duplicates code": [
+          "finance-billing-ops",
+          "pricing-strategy",
+          "returns-reverse-logistics"
+        ],
+        "fix duplicate charge from code": [
+          "finance-billing-ops",
+          "orch-fix-defect",
+          "gh-fix-ci"
+        ],
+        "negotiate freight rates scorecard RFP": [
+          "carrier-relationship-management",
+          "energy-procurement",
+          "logistics-exception-management"
+        ],
+        "handle shipment delay damage claim": [
+          "logistics-exception-management",
+          "customs-trade-compliance",
+          "returns-reverse-logistics"
+        ],
+        "forecast demand safety stock promo": [
+          "inventory-demand-planning",
+          "safety-stock-review",
+          "forecast-accuracy-review"
+        ],
+        "schedule line balance bottleneck TOC": [
+          "production-scheduling",
+          "performance-optimizer",
+          "evm-token-decimals"
+        ],
+        "investigate NCR root cause CAPA SPC": [
+          "quality-nonconformance",
+          "capa-officer",
+          "root-cause-pareto"
+        ],
+        "process returns fraud warranty grading": [
+          "returns-reverse-logistics",
+          "pdf-processing-pro",
+          "data-processing-ray-data"
+        ],
+        "classify tariff HS FTA duty": [
+          "customs-trade-compliance",
+          "energy-procurement",
+          "skill-comply"
+        ],
+        "buy electricity tariff PPA demand": [
+          "energy-procurement",
+          "inventory-demand-planning",
+          "marketing-demand-acquisition"
+        ],
+        "generate e-sign fields envelope draft": [
+          "esign-field-placement",
+          "generate-image",
+          "pdf-fill-studio"
+        ],
+        "draft master agreement schedule A": [
+          "master-agreement-generator",
+          "esign-field-placement",
+          "crosspost"
+        ],
+        "get operator approval outbound hashed": [
+          "operator-approval-loop",
+          "content-hash-cache-pattern",
+          "get-available-resources"
+        ],
+        "approve agent spend wallet budget": [
+          "agent-payment-x402",
+          "context-budget",
+          "llm-trading-agent-security"
+        ],
+        "simulate tx spend limits MEV keys": [
+          "llm-trading-agent-security",
+          "regulatory-threat-model",
+          "agent-payment-x402"
+        ],
+        "lookup token decimals chain bridge": [
+          "evm-token-decimals",
+          "supply-chain-guard",
+          "research-lookup"
+        ],
+        "dont mix sha3 keccak selector bug": [
+          "nodejs-keccak256",
+          "api-fuzzing-bug-bounty",
+          "find-bugs"
+        ],
+        "audit AMM reentrancy oracle slippage": [
+          "defi-amm-security",
+          "prediction-market-oracle-research",
+          "seo-audit"
+        ],
+        "review basket oracle venue risk keys": [
+          "prediction-market-risk-review",
+          "ito-baskets",
+          "venue-templates"
+        ],
+        "browse ito baskets compare thesis": [
+          "ito-baskets",
+          "ito-inference",
+          "ito-training"
+        ],
+        "find H100 fixed rate RFQ nodes": [
+          "ito-compute",
+          "n8n-node-configuration",
+          "orch-fix-defect"
+        ],
+        "research prediction market signal": [
+          "prediction-market-oracle-research",
+          "market-research-reports",
+          "market-research"
+        ],
+        "make pytorch training reproducible loader": [
+          "distributed-training-pytorch-lightning",
+          "pytorch-patterns",
+          "distributed-training-pytorch-fsdp"
+        ],
+        "harden ML contracts deploy rollback": [
+          "mle-workflow",
+          "pb-deploy",
+          "senior-ml-engineer"
+        ],
+        "add ML baseline to non-ML codebase": [
+          "ml-adoption-playbook",
+          "improve-codebase-architecture",
+          "codebase-onboarding"
+        ],
+        "speed ETL backfill keep correct": [
+          "data-throughput-accelerator",
+          "network-interface-health",
+          "performance"
+        ],
+        "build monitoring dashboard grafana": [
+          "grafana-dashboards",
+          "dashboard-builder",
+          "building-blog"
+        ],
+        "make realtime p95 latency fresh": [
+          "latency-critical-systems",
+          "zapier-make-patterns",
+          "benchmark-optimization-loop"
+        ],
+        "try variants benchmark latency pick best": [
+          "benchmark-optimization-loop",
+          "latency-critical-systems",
+          "benchmark"
+        ],
+        "collect job board prices scheduled free": [
+          "production-scheduling",
+          "data-scraper-agent",
+          "curviate-jobs"
+        ],
+        "enrich notion sheets supabase free LLM": [
+          "data-scraper-agent",
+          "notion-template-business",
+          "notion-research-documentation"
+        ],
+        "process PDF OCR redact sign fill": [
+          "nutrient-document-processing",
+          "pdf-processing-pro",
+          "pdf-processing"
+        ],
+        "translate visa docs bilingual PDF": [
+          "visa-doc-translate",
+          "pdf--scientific",
+          "pdf-official"
+        ],
+        "index video search moments clips": [
+          "multimodal-clip",
+          "algolia-search",
+          "videodb"
+        ],
+        "make music video taste style pack": [
+          "taste",
+          "taste-application",
+          "tasteforge-video"
+        ],
+        "capture reference look LUT rhythm": [
+          "taste-distillation",
+          "taste-application",
+          "reference-list-builder"
+        ],
+        "plan video offline fail-closed EDL": [
+          "video-downloader",
+          "video-editing",
+          "plan-writing"
+        ],
+        "animate manim explainer graphs": [
+          "manim-video",
+          "manim",
+          "graph-query"
+        ],
+        "build slides animation PPTX web": [
+          "frontend-slides",
+          "pptx--scientific",
+          "scientific-slides"
+        ],
+        "make html presentation convert ppt": [
+          "frontend-slides",
+          "pptx--scientific",
+          "html-injection-testing"
+        ],
+        "generate fal image video audio": [
+          "fal-ai-media",
+          "video-editing",
+          "generate-image"
+        ],
+        "check blender rig feet ground": [
+          "blender-motion-state-inspection",
+          "flutter-pr-checks-finder",
+          "loop-design-check"
+        ],
+        "make Nuitka windows installer slim": [
+          "generating-python-installer",
+          "skill-installer",
+          "context-window-management"
+        ],
+        "make pythonic pep8 type hints": [
+          "python-patterns",
+          "zapier-make-patterns",
+          "python-pro"
+        ],
+        "fix perl taint DBI XSS": [
+          "perl-security",
+          "perl-patterns",
+          "perl-testing"
+        ],
+        "write perl Test2 prove coverage": [
+          "perl-testing",
+          "perl-security",
+          "perl-patterns"
+        ],
+        "write modern perl 5.36 idioms": [
+          "perl-patterns",
+          "perl-security",
+          "perl-testing"
+        ],
+        "write java spring naming optional": [
+          "java-coding-standards",
+          "java-pro",
+          "naming-analyzer"
+        ],
+        "write fsharp xunit fscheck": [
+          "fsharp-testing",
+          "csharp-pro",
+          "dotnet-backend"
+        ],
+        "write csharp xunit fluent mocks": [
+          "csharp-testing",
+          "csharp-pro",
+          "fsharp-testing"
+        ],
+        "use tinystruct action routes tests": [
+          "tinystruct-patterns",
+          "test-detect",
+          "e2e-testing"
+        ],
+        "make dart null-safe riverpod router": [
+          "dart-flutter-patterns",
+          "flutter-dart-code-review",
+          "dart-log-failure-parser"
+        ],
+        "review flutter bloc riverpod perf a11y": [
+          "flutter-dart-code-review",
+          "flutter-expert",
+          "dart-flutter-patterns"
+        ],
+        "pick flutter cherry branches tool": [
+          "flutter-cherry-pick",
+          "rebuilding-flutter-tool",
+          "flutter-pr-checks-finder"
+        ],
+        "fix flutter rebuild tool PR checks": [
+          "rebuilding-flutter-tool",
+          "flutter-pr-checks-finder",
+          "gh-fix-ci"
+        ],
+        "parse dart logs failure tool": [
+          "dart-log-failure-parser",
+          "flutter-dart-code-review",
+          "dart-flutter-patterns"
+        ],
+        "update android SDK packages tool": [
+          "updating-android-sdk",
+          "rebuilding-flutter-tool",
+          "android-clean-architecture"
+        ],
+        "upgrade browser automation tool": [
+          "upgrade-browser",
+          "browser-automation",
+          "browser-qa"
+        ],
+        "find release notes tool": [
+          "find-release",
+          "red-team-tools",
+          "n8n-mcp-tools-expert"
+        ],
+        "shepherd PRs review merge tool": [
+          "shepherd-prs",
+          "dependabot-review",
+          "requesting-code-review"
+        ],
+        "migrate workflows codemod tool": [
+          "migrate-workflows",
+          "n8n-workflow-patterns",
+          "github-workflow-automation--workflow-automation"
+        ],
+        "migrate tests shoehorn fixtures": [
+          "migrate-to-shoehorn",
+          "python-testing-patterns",
+          "python-testing"
+        ],
+        "fix github flake analyze tool": [
+          "analyze-github-flake",
+          "gh-fix-ci",
+          "address-github-comments"
+        ],
+        "scan skills changed quick stocktake": [
+          "skill-stocktake",
+          "skill-scout",
+          "repo-scan"
+        ],
+        "check agents follow skills rules rate": [
+          "skill-comply",
+          "skill-judge",
+          "agent-manager-skill"
+        ],
+        "find skill before building new one": [
+          "skill-scout",
+          "skill-creation-guide",
+          "skill-creator"
+        ],
+        "audit context window bloat tokens": [
+          "context-window-management",
+          "context-budget",
+          "context-architecture"
+        ],
+        "clean claude config bloat confirm": [
+          "config-gc",
+          "claude-code-guide",
+          "everything-claude-code"
+        ],
+        "scan claude dir injection MCP hooks": [
+          "security-scan",
+          "git-guardrails-claude-code",
+          "claude-code-guide"
+        ],
+        "hunt bounty remotely reachable vulns": [
+          "security-bounty-hunter",
+          "api-fuzzing-bug-bounty",
+          "red-team-tools"
+        ],
+        "review auth input secrets payments": [
+          "security-review",
+          "cc-skill-security-review",
+          "secrets-management"
+        ],
+        "prevent destructive prod operations": [
+          "safety-guard",
+          "production-audit",
+          "git-guardrails-claude-code"
+        ],
+        "diagnose bug before fixing loop": [
+          "diagnosing-bugs",
+          "verification-loop",
+          "continuous-agent-loop"
+        ],
+        "click buttons full state trace audit": [
+          "click-path-audit",
+          "agent-architecture-audit",
+          "react-state-management"
+        ],
+        "run production readiness local audit": [
+          "production-audit",
+          "production-code-audit",
+          "qms-audit-expert"
+        ],
+        "regress AI-written code sandbox API": [
+          "ai-regression-testing",
+          "ai-first-engineering",
+          "ai-product"
+        ],
+        "verify django migrate lint coverage": [
+          "django-verification",
+          "django-tdd",
+          "lint-and-validate"
+        ],
+        "verify laravel lint tests security": [
+          "laravel-verification",
+          "laravel-security",
+          "laravel-tdd"
+        ],
+        "verify quarkus build coverage native": [
+          "quarkus-verification",
+          "quarkus-security",
+          "quarkus-tdd"
+        ],
+        "verify springboot build coverage diff": [
+          "springboot-verification",
+          "springboot-tdd",
+          "springboot-patterns"
+        ],
+        "run TDD red green refactor 80pct": [
+          "tdd",
+          "tdd-orchestrator",
+          "tdd-workflow"
+        ],
+        "build feature test-first TDD": [
+          "tdd",
+          "tdd-workflow",
+          "test-driven-development"
+        ],
+        "who can merge main, permission model github": [
+          "permissioned-github",
+          "github-automation",
+          "github-ops"
+        ],
+        "everything claude code guide, what can it do": [
+          "claude-code-guide",
+          "everything-claude-code",
+          "claude-code-sessions"
+        ],
+        "hand conversation to fresh background agent": [
+          "claude-handoff",
+          "voice-agents",
+          "agents-langchain"
+        ],
+        "guide ECC agents skills commands hooks": [
+          "ecc-guide",
+          "agent-manager-skill",
+          "configure-ecc"
+        ],
+        "browse ECC command recipes run-order": [
+          "ecc-recipes",
+          "doordash-order-ledger",
+          "ecc-guide"
+        ],
+        "configure ECC install update reconfigure": [
+          "configure-ecc",
+          "ecc-guide",
+          "ecc-tools-cost-audit"
+        ],
+        "extract content webpage markdown cheap": [
+          "web-to-markdown",
+          "obsidian-markdown",
+          "defuddle"
+        ],
+        "decide regex vs LLM parse text": [
+          "regex-vs-llm-structured-text",
+          "llm-evaluation",
+          "llm-app-patterns"
+        ],
+        "cache file processing sha256 content": [
+          "content-hash-cache-pattern",
+          "nutrient-document-processing",
+          "data-processing-nemo-curator"
+        ],
+        "refine retrieval subagent passes": [
+          "iterative-retrieval",
+          "orch-refine-code",
+          "subagent-driven-development"
+        ],
+        "rank feed topK scorer selector": [
+          "recsys-pipeline-architect",
+          "data-feeds",
+          "seo-optimizer"
+        ],
+        "rollouts ledger stochastic visible trail": [
+          "recursive-decision-ledger",
+          "doordash-order-ledger",
+          "algorithmic-art"
+        ],
+        "build MCP server tools zod stdio": [
+          "mcp-server-patterns",
+          "mcp-builder",
+          "n8n-mcp-tools-expert"
+        ],
+        "handle typed errors retries breakers": [
+          "error-handling",
+          "error-resolver",
+          "test-fixing"
+        ],
+        "design REST status paging versioning": [
+          "api-design",
+          "api-design-principles",
+          "resume-version-manager"
+        ],
+        "match repo integration pattern connector": [
+          "api-connector-builder",
+          "hubspot-integration",
+          "kotlin-exposed-patterns"
+        ],
+        "evolve API schema no drift contract": [
+          "contract-first",
+          "api-integration-specialist",
+          "api-connector-builder"
+        ],
+        "design ports adapters usecase go": [
+          "hexagonal-architecture",
+          "golang-pro",
+          "golang-patterns"
+        ],
+        "deepen module seams testable AI": [
+          "codebase-design",
+          "ai-regression-testing",
+          "ai-product"
+        ],
+        "inherit legacy style no drift": [
+          "inherit-legacy-style",
+          "gan-style-harness",
+          "continuous-learning"
+        ],
+        "distill principles rules files": [
+          "rules-distill",
+          "writing-rules",
+          "hookify-rules"
+        ],
+        "write skills AGENTS.md agents guide": [
+          "writing-for-agents",
+          "skill-creation-guide",
+          "agent-md-refactor"
+        ],
+        "shape article paragraph by paragraph": [
+          "writing-shape",
+          "article-writing",
+          "scientific-writing"
+        ],
+        "mine fragments no structure yet": [
+          "writing-fragments",
+          "plugin-structure",
+          "gtars"
+        ],
+        "assemble beats journey terms": [
+          "writing-beats",
+          "taste",
+          "taste-application"
+        ],
+        "clone canvas nodes edges groups": [
+          "canvas",
+          "plan-canvas",
+          "motion-canvas"
+        ],
+        "edit obsidian base views filters": [
+          "obsidian-bases",
+          "obsidian-markdown",
+          "obsidian-clipper-template-creator"
+        ],
+        "use obsidian CLI vault search notes": [
+          "obsidian-cli",
+          "wiki-cli",
+          "obsidian-bases"
+        ],
+        "write wikilinks callouts frontmatter": [
+          "obsidian-markdown",
+          "wiki-lint",
+          "wiki-mode"
+        ],
+        "put notes on canvas board": [
+          "canvas",
+          "motion-canvas",
+          "plan-canvas"
+        ],
+        "open plan browser annotate approve": [
+          "plan-canvas",
+          "plan-writing",
+          "executing-plans"
+        ],
+        "ingest URL vault provenance ledger": [
+          "wiki-ingest",
+          "doordash-order-ledger",
+          "wiki-lint"
+        ],
+        "lint wiki orphans dead links": [
+          "wiki-lint",
+          "wiki-cli",
+          "wiki-query"
+        ],
+        "query wiki vault-scoped answer": [
+          "wiki-query",
+          "wiki-mode",
+          "wiki-ingest"
+        ],
+        "retrieve BM25 rerank vault passages": [
+          "wiki-retrieve",
+          "wiki-query",
+          "swarmvault"
+        ],
+        "fold log rollup dry-run apply": [
+          "wiki-fold",
+          "growth-log",
+          "dart-log-failure-parser"
+        ],
+        "set vault mode PARA LYT": [
+          "wiki-mode",
+          "loki-mode",
+          "dynamic-workflow-mode"
+        ],
+        "setup vault scaffold second brain": [
+          "wiki",
+          "scaffold-exercises",
+          "helm-chart-scaffolding"
+        ],
+        "detect obsidian CLI transport read": [
+          "wiki-cli",
+          "obsidian-cli",
+          "obsidian-clipper-template-creator"
+        ],
+        "save answer obsidian vault reviewed": [
+          "save",
+          "obsidian-cli",
+          "obsidian-markdown"
+        ],
+        "make text file link group edge": [
+          "json-canvas",
+          "regex-vs-llm-structured-text",
+          "to-tickets"
+        ],
+        "decompose plan agent chain paste": [
+          "plan-orchestrate",
+          "autonomous-agents",
+          "agent-architecture-audit"
+        ],
+        "orchestrate feature research TDD review": [
+          "tdd-orchestrator",
+          "tdd-workflow",
+          "tdd"
+        ],
+        "orchestrate MVP slices scaffold TDD": [
+          "orch-build-mvp",
+          "helm-chart-scaffolding",
+          "plan-orchestrate"
+        ],
+        "orchestrate bug reproduce regression": [
+          "orch-fix-defect",
+          "diagnosing-bugs",
+          "ai-regression-testing"
+        ],
+        "orchestrate behavior change tests new": [
+          "orch-change-feature",
+          "e2e-testing",
+          "test-detect"
+        ],
+        "orchestrate refactor green keep green": [
+          "orch-refine-code",
+          "plan-orchestrate",
+          "agent-md-refactor"
+        ],
+        "run RFC DAG gates merge queue": [
+          "ralphinho-rfc-pipeline",
+          "delivery-gate",
+          "autonomous-loops"
+        ],
+        "build GAN generator evaluator loop": [
+          "gan-style-harness",
+          "evaluation-nemo-evaluator",
+          "loop-me"
+        ],
+        "two reviewers must pass ship": [
+          "code-reviewer",
+          "santa-method",
+          "ship-learn-next"
+        ],
+        "simulate PM architect dev QA panel": [
+          "dev-team",
+          "qa-test-planner",
+          "monorepo-architect"
+        ],
+        "compose dispatch parallel team": [
+          "dispatching-parallel-agents--development",
+          "dispatching-parallel-agents",
+          "team-builder"
+        ],
+        "interview sharpen plan adversarial": [
+          "grill-me",
+          "interview-prep-generator",
+          "create-plan"
+        ],
+        "grill with ADR glossary docs": [
+          "grill-with-docs",
+          "grill-me",
+          "grilling"
+        ],
+        "grill me workflows workspace loop": [
+          "loop-me",
+          "grill-me",
+          "google-workspace-ops"
+        ],
+        "stop re-pitch that message": [
+          "wait-what",
+          "messages-ops",
+          "agent-messaging"
+        ],
+        "plan huge work decision tickets map": [
+          "wayfinder",
+          "plan-writing",
+          "to-tickets"
+        ],
+        "hand off fresh agent pick up": [
+          "claude-handoff",
+          "agent-management",
+          "agent-payment-x402"
+        ],
+        "compact conversation handoff doc": [
+          "handoff",
+          "backend-to-frontend-handoff-docs",
+          "claude-handoff"
+        ],
+        "retro my coding session": [
+          "retro",
+          "claude-code-sessions",
+          "session-handoff"
+        ],
+        "log growth pattern not diary": [
+          "growth-log",
+          "developer-growth-analysis",
+          "jpa-patterns"
+        ],
+        "dispatch dmux tmux panes agents parallel": [
+          "dmux-workflows",
+          "dispatching-parallel-agents",
+          "dispatching-parallel-agents--development"
+        ],
+        "I have ADHD next action first": [
+          "i-have-adhd",
+          "ship-learn-next",
+          "github-actions-templates"
+        ],
+        "conduct retro coding session": [
+          "retro",
+          "session-handoff",
+          "claude-code-sessions"
+        ],
+        "implement spec tickets code": [
+          "implement-spec",
+          "implement",
+          "notion-spec-to-implementation"
+        ],
+        "implement spec in code": [
+          "implement-spec",
+          "implement",
+          "notion-spec-to-implementation"
+        ],
+        "research question background agent file": [
+          "research",
+          "agent-md-refactor",
+          "agent-development"
+        ],
+        "ask which skill fits situation": [
+          "ask-matt",
+          "skill-creation-guide",
+          "skill-development"
+        ],
+        "steroids skill router how": [
+          "steroids",
+          "skill-creator",
+          "skill-creator--productivity"
+        ],
+        "route prompt skills index": [
+          "skill-creation-guide",
+          "skill-comply",
+          "skill-developer"
+        ]
+      }
     },
     "live16": {
       "n": 16,
       "p1": 0.875,
       "p3": 0.75,
       "mrr": 0.875,
-      "leaks": 2
+      "leaks": 2,
+      "queries": {
+        "build flutter mobile payments app": [
+          "dart-flutter-patterns",
+          "flutter-expert",
+          "flutter-dart-code-review"
+        ],
+        "merge conflict rebase resolve branch": [
+          "resolving-merge-conflicts",
+          "finishing-a-development-branch",
+          "git-workflow"
+        ],
+        "audit design system tokens palette typography spacing": [
+          "design-system",
+          "tailwind-design-system",
+          "ui-design-system"
+        ],
+        "take screenshot visual e2e check page": [
+          "screenshot",
+          "screenshot-feature-extractor",
+          "windows-desktop-e2e"
+        ],
+        "review diff standards spec pull request": [
+          "code-review",
+          "requesting-code-review",
+          "to-spec"
+        ],
+        "hero landing branding page design": [
+          "frontend-design-direction",
+          "brand-guidelines-community",
+          "premium-web-design"
+        ],
+        "layout theme component grid styling": [
+          "theme-factory",
+          "avalonia-layout-zafiro",
+          "core-components"
+        ],
+        "canvas obsidian mindmap spatial board": [
+          "canvas",
+          "canvas-design",
+          "motion-canvas"
+        ],
+        "antigravity agy guide cli setup": [
+          "antigravity_guide",
+          "environment-setup-guide",
+          "skill-creation-guide"
+        ],
+        "wireguard vpn remote access home network tunnel": [
+          "homelab-wireguard-vpn",
+          "homelab-network-readiness",
+          "homelab-network-setup"
+        ],
+        "django celery beat background tasks retries scheduling": [
+          "django-celery",
+          "django-pro",
+          "django-tdd"
+        ],
+        "kubernetes probes rbac autoscaling configmap secret": [
+          "kubernetes-patterns",
+          "secrets-management",
+          "kubernetes-architect"
+        ],
+        "postgres row level security slow query index": [
+          "postgres-patterns",
+          "postgres-schema-design",
+          "postgres-best-practices"
+        ],
+        "pytest fixtures mocks parametrization coverage tdd": [
+          "python-testing",
+          "django-tdd",
+          "python-testing-patterns"
+        ],
+        "remotion video captions charts transitions react rendering": [
+          "remotion-video-creation",
+          "remotion",
+          "remotion-best-practices"
+        ],
+        "swiftui observable state navigation performance ios": [
+          "swiftui-patterns",
+          "ios-icon-gen",
+          "cisco-ios-patterns"
+        ]
+      }
     }
   }
 }

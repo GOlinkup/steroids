@@ -57,12 +57,13 @@ def score(rows, has_acc):
     if missing:
         return None, missing
     p1 = p3 = leaks = rr = 0.0
-    misses = []
+    misses, tops = [], {}
     for row in rows:
         query, exp = row[0], row[1]
         acc, exc = (row[2], row[3]) if has_acc else ([], row[2])
         top = blind_eval_second.router.route_query(query, rules, idx)
         ranked = [s for _, s, _ in top]
+        tops[query] = ranked[:3]
         relevant = {exp} | set(acc)
         ok1 = ranked[:1] == [exp]
         ok3 = bool(relevant & set(ranked[:3])) and not (set(ranked[:3]) & set(exc))
@@ -78,7 +79,18 @@ def score(rows, has_acc):
     n = len(rows)
     return {"n": n, "p1": round(p1 / n, 3), "p3": round(p3 / n, 3),
             "mrr": round(rr / n, 3), "leaks": int(leaks),
-            "misses": [{"q": q, "exp": e, "got": g} for q, e, g in misses]}, None
+            "misses": [{"q": q, "exp": e, "got": g} for q, e, g in misses],
+            "tops": tops}, None
+
+
+def find_drifts(old_tops, new_tops):
+    """Per-query top-1 drift list [(q, then, now)]. Pure (J95 test seam)."""
+    drifts = []
+    for q, now in new_tops.items():
+        then = (old_tops.get(q) or [None])[0]
+        if (now[:1] or [None])[0] != then:
+            drifts.append((q, then, (now[:1] or [None])[0]))
+    return drifts
 
 
 def run_all(verbose=True):
@@ -94,7 +106,9 @@ def run_all(verbose=True):
                 print(f"{name}: MISSING FROM INDEX: {missing}")
             result["sets"][name] = {"error": "missing", "missing": missing}
             continue
-        result["sets"][name] = {k: v for k, v in metrics.items() if k != "misses"}
+        result["sets"][name] = {k: v for k, v in metrics.items()
+                                   if k not in ("misses", "tops")}
+        result["sets"][name]["_tops"] = metrics["tops"]
         m = result["sets"][name]
         if verbose:
             print(f"{name:<10} n={m['n']:<4} P@1={m['p1']:.3f}  P@3={m['p3']:.3f}  "
@@ -108,11 +122,39 @@ def main():
     if any("error" in m for m in result["sets"].values()):
         return 1
     if record:
+        for name in result["sets"]:
+            result["sets"][name]["queries"] = result["sets"][name].pop("_tops")
         with open(_BASELINE, "w", encoding="utf-8") as f:
             json.dump(result, f, indent=2)
             f.write("\n")
         print(f"recorded -> {_BASELINE}")
         return 0
+    if "--replay" in sys.argv:
+        # ponytail: J95 time travel — replay recorded queries, report per-query drift.
+        try:
+            with open(_BASELINE, encoding="utf-8") as f:
+                base = json.load(f)
+        except FileNotFoundError:
+            print(f"no baseline at {_BASELINE} — run with --record first")
+            return 2
+        drifts, total_q = [], 0
+        for name in result["sets"]:
+            old_tops = (base.get("sets", {}).get(name, {}).get("queries") or {})
+            new_tops = result["sets"][name].pop("_tops")
+            total_q += len(new_tops)
+            for q, then, now in find_drifts(old_tops, new_tops):
+                drifts.append((name, q, then, now))
+        for name in result["sets"]:
+            result["sets"][name].pop("_tops", None)
+        if drifts:
+            print(f"REPLAY DRIFT ({len(drifts)}):")
+            for name, q, then, now in drifts[:20]:
+                print(f"  [{name}] {then} -> {now} :: {q[:70]}")
+            return 1
+        print(f"replay clean: {total_q} queries, 0 drifts")
+        return 0
+    for name in result["sets"]:
+        result["sets"][name].pop("_tops", None)
     try:
         with open(_BASELINE, encoding="utf-8") as f:
             base = json.load(f)
