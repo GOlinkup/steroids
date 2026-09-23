@@ -41,10 +41,18 @@ every claim re-verifiable with the command next to it.
 - [x] body-text decision recorded
 
 ## Deferred (evidence forward, assumptions struck)
-
 - Full-bank P0-4/P0-5 waits on B-06..B-20 from real sessions; skeleton
   proves the harness shape on B-02/B-03 (4 rows, frozen clean).
 - Full AgentDojo waits on spend cap; proxy pair is the standing metric.
 - Live reinstall waits on a maintenance window (throwaway-HOME run).
+
+## V-next hold (user decision 2026-09-23: free-branch done, rest deferred)
+
+- Router emits run/task IDs into served.jsonl (P1-2 box 2): needs a
+  router-logging code change — held for next version, not V1.
+- CP-1 schema+bus review record (P1-3 box 3): needs human review line.
+- P1-4 live-run overhead: unmeasured, held (fixture + 80-col verified).
+- PAT in origin remote URL (LCH-3): user-only fix — rotate token, move to
+  credential helper; live exposure until then.
 
 Sign-off: PENDING human review + date (silence is not approval).

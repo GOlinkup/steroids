@@ -26,7 +26,7 @@ Do-not-touch: golden snapshot contents (benchmarks/golden-1265/ frozen)
 Acceptance:
 - [x] python3 tests/benchmark.py --golden --trials 5 prints mean + CI per metric
 - [x] 0.799 re-measured with trials; CI recorded in metadata-adjacent note
-- [ ] unit test for CI math on synthetic data (no model calls)
+- [x] unit test for CI math on synthetic data (no model calls)
 Verification: python3 tests/benchmark.py --golden --trials 5;
   python3 tests/test_router.py
 Dependencies: Task 1

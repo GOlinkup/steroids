@@ -41,7 +41,7 @@ Description: in-process event bus (stdlib only) + append-only JSONL sink;
 Do-not-touch: scoring semantics (emit around, never inside, hot paths)
 Acceptance:
 - [x] bus module with subscribe/emit; sink writes valid JSONL per event
-- [ ] golden benchmark output bit-identical with bus on vs off
+- [x] golden benchmark output bit-identical with bus on vs off
 - [ ] CP-1 review of schema + bus before CLI work
 Verification: diff golden output both modes; unit test emit/subscribe/replay
 Dependencies: P1-1, P1-2

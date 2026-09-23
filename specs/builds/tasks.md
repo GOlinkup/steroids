@@ -26,7 +26,7 @@ Do-not-touch: event names already consumed by CLI (additive only)
 Acceptance:
 - [x] run renders in stock OTel dashboard with zero custom glue
 - [x] content capture defaults off (sensitive-data rule honored)
-- [ ] emission overhead measured (<5% task cost or cut scope)
+- [x] emission overhead measured (<5% task cost or cut scope)
 Verification: dashboard dump attached to handover; overhead timing logged
 Dependencies: SP-2 (ADR recorded), P1-3 (bus exists)
 Files likely touched: src/steroids/otel.py (new), tests/test_otel.py

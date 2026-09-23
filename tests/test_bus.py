@@ -16,6 +16,7 @@ def _load(name):
 
 bus = _load("bus")
 ids = _load("ids")
+router = _load("router")
 
 class TestBus(unittest.TestCase):
     def test_ids_unique_format(self):
@@ -46,6 +47,28 @@ class TestBus(unittest.TestCase):
             self.assertIn(k, ev)
         self.assertIn(ev["type"], schema["properties"]["type"]["enum"])
         self.assertEqual(ev["gen_ai.request.model"], "m")
+
+    def test_golden_identical_bus_on_off(self):
+        # P1-3: scoring output bit-identical whether the bus tap emits or not.
+        # Read-only (never touches trial-stats.json); 20-prompt sample.
+        root = os.path.normpath(os.path.join(_HERE, ".."))
+        gdir = os.path.join(root, "benchmarks", "golden-1265")
+        idx = json.load(open(os.path.join(gdir, "index.json")))
+        rules = json.load(open(os.path.join(gdir, "rules.json")))
+        goldens = json.load(open(os.path.join(gdir, "prompts.json")))[:20]
+        descs = json.load(open(os.path.join(gdir, "descs.json")))
+        router._DESC_MEM = {"key": id(idx), "map": {s: descs.get(s, "") for s in idx}}
+        sink = "/tmp/steroids-bus-identical.jsonl"
+        if os.path.exists(sink):
+            os.remove(sink)
+        off = [[s for _, s, _ in router.route_query(q, rules, idx)] for q, *_ in goldens]
+        on = []
+        for q, *_ in goldens:
+            ranked = [s for _, s, _ in router.route_query(q, rules, idx)]
+            bus.emit("skill.routed", "test/run", {"skills": "/".join(ranked[:3])}, sink=sink)
+            on.append(ranked)
+        self.assertEqual(on, off)
+        os.remove(sink)
 
 if __name__ == "__main__":
     unittest.main()
