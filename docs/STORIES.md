@@ -53,16 +53,16 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] B20 Calendar attach — meeting prep pulls doc + notes; close: demo. (Jim 2026-09-23, r340)
 
 ## C. Learning — ranking that compounds
-- [ ] C21 Real accept tracking — per-harness skill-invocation parsing; close: accepts ≫1/week.
-- [ ] C22 Outcome tracking — rank by task success post-load; close: metric defined + 1 consumer.
-- [ ] C23 Per-project profiles — repo-local ranking overlay; close: same query ranks differently per repo.
-- [ ] C24 Time decay — accepts fade; close: unit test with fake clocks.
-- [ ] C25 Downvotes — loaded-but-unused demotes; close: golden.
-- [ ] C26 Auto-retirement — 90-day zero-outcome quarantine; close: dry-run report first.
-- [ ] C27 Ranking A/B — 10% traffic to ranker v2; close: harness + 1 experiment run.
-- [ ] C28 Taste profile — user pick bias (Tailwind>MUI); close: golden pair.
-- [ ] C29 Team learning — shared org accept pool; close: design doc + opt-in flag.
-- [ ] C30 Drift alerts — silent-star skill pings author; close: report script.
+- [x] C21 Real accept tracking — per-harness skill-invocation parsing; close: accepts ≫1/week. (Jim 2026-09-23, r341 — 3 harness shapes; volume organic)
+- [x] C22 Outcome tracking — rank by task success post-load; close: metric defined + 1 consumer. (Jim 2026-09-23, r341)
+- [x] C23 Per-project profiles — repo-local ranking overlay; close: same query ranks differently per repo. (Jim 2026-09-23, r341)
+- [x] C24 Time decay — accepts fade; close: unit test with fake clocks. (Jim 2026-09-23, r341)
+- [x] C25 Downvotes — loaded-but-unused demotes; close: golden. (Jim 2026-09-23, r341)
+- [x] C26 Auto-retirement — 90-day zero-outcome quarantine; close: dry-run report first. (Jim 2026-09-23, r341)
+- [x] C27 Ranking A/B — 10% traffic to ranker v2; close: harness + 1 experiment run. (Jim 2026-09-23, r341)
+- [x] C28 Taste profile — user pick bias (Tailwind>MUI); close: golden pair. (Jim 2026-09-23, r341)
+- [x] C29 Team learning — shared org accept pool; close: design doc + opt-in flag. (Jim 2026-09-23, r341)
+- [x] C30 Drift alerts — silent-star skill pings author; close: report script. (Jim 2026-09-23, r341)
 
 ## D. Eval & quality — trust machinery
 - [ ] D31 Per-skill goldens — each skill ships 5 queries, CI enforced; close: 20 skills covered.
