@@ -512,6 +512,18 @@ def council(prompt, rules, idx, accepts=None):
     return {"debate": debaters, "verdict": verdict}
 
 
+def validate_handoff(skill_a, skill_b, idx, needs_map):
+    # ponytail: E44 — B's declared needs (tokenized via toks, same stems as
+    # the index) vs A's index keywords. Heuristic overlap, verdict go/blocked.
+    needs = [t for n in needs_map.get(skill_b, []) for t in toks(n)]
+    akeys = set(idx.get(skill_a, []))
+    covered = sorted(set(needs) & akeys)
+    missing = sorted(set(needs) - akeys)
+    return {"a": skill_a, "b": skill_b, "b_needs": needs_map.get(skill_b, []),
+            "covered": covered, "missing": missing,
+            "verdict": "go" if not missing else "blocked"}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

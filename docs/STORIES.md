@@ -80,7 +80,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] E41 Dispatcher mode — subtasks to subagents with skills; close: 1 demo task. (Kevin 2026-09-23, r343)
 - [x] E42 Skill-pinned agents — agent never drops its skill; close: golden. (Kevin 2026-09-23, r343)
 - [x] E43 Skill council — 3 skills debate, judge picks; close: 1 hard-call demo. (Kevin 2026-09-23, r343)
-- [ ] E44 Typed handoffs — A-output validated vs B-input; close: schema + 1 chain.
+- [x] E44 Typed handoffs — A-output validated vs B-input; close: schema + 1 chain. (Kevin 2026-09-23, r343)
 - [ ] E45 Skill wallets — 2-skill cap per subagent; close: enforcement test.
 - [x] E46 One index, every harness — shared rank + learning; close: 2 harnesses same result. (Kevin 2026-09-23, r336)
 - [ ] E47 Sandboxed skills — restricted tools for untrusted; close: policy + 1 demo.

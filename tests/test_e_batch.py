@@ -64,5 +64,27 @@ class TestE43Council(unittest.TestCase):
                          router.council(q, RULES, IDX)["verdict"])
 
 
+class TestE44Handoff(unittest.TestCase):
+    def test_go_chain(self):
+        idx = {"sa": ["repo", "url"], "sb": ["other"]}
+        needs = {"sb": ["repo URL"]}
+        r = router.validate_handoff("sa", "sb", idx, needs)
+        self.assertEqual(r["verdict"], "go")
+        self.assertEqual(r["missing"], [])
+
+    def test_blocked_chain(self):
+        idx = {"sa": ["repo"], "sb": ["other"]}
+        needs = {"sb": ["api key"]}
+        r = router.validate_handoff("sa", "sb", idx, needs)
+        self.assertEqual(r["verdict"], "blocked")
+        self.assertTrue(r["missing"])
+
+    def test_live_schema(self):
+        needs = router.get_needs(RULES)
+        r = router.validate_handoff("deep-research", "autoresearch", IDX, needs)
+        self.assertEqual(set(r), {"a", "b", "b_needs", "covered", "missing", "verdict"})
+        self.assertIn(r["verdict"], ("go", "blocked"))
+
+
 if __name__ == "__main__":
     unittest.main()
