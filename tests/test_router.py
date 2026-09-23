@@ -940,6 +940,22 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_a10_dry_run_no_side_effects(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            idx = {"alpha": ["alpha", "zone"]}
+            out = router.dry_run_route("alpha zone", rules, idx)
+            self.assertEqual(out["skills"], ["alpha"])
+            self.assertEqual(out["why"][0]["skill"], "alpha")
+            self.assertIn("alpha", out["why"][0]["triggers"])
+            empty = router.dry_run_route("zxqv wobble", rules, idx)
+            self.assertEqual(empty["skills"], [])
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

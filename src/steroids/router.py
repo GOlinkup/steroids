@@ -745,6 +745,12 @@ def preauth_warnings(skills, session_path=SESSION_PATH):
             pass
     return out
 
+def dry_run_route(prompt, rules, idx, accepts=None):
+    # ponytail: A10 — what I'd load + why, no side effects (no logging, no inject).
+    top = route_query(prompt, rules, idx, accepts)
+    return {"skills": [s for _, s, _ in top],
+            "why": [{"skill": s, "score": sc, "triggers": hs} for sc, s, hs in top]}
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -1999,6 +2005,11 @@ def main():
 
     rules = load_rules()
     idx = get_index(rules, force_rebuild=args.reindex)
+
+    if args.dry_run:
+        # ponytail: A10 — preview only; returns before any logging/inject.
+        print(json.dumps(dry_run_route(" ".join(args.prompt), rules, idx)))
+        return
 
     if args.chain:
         print(json.dumps(chain(args.chain, rules, idx)))
