@@ -10,8 +10,8 @@ Description: schedule nightly_report.py + mine_misses.py + trust_report.py
 Do-not-touch: report contents logic (wiring only)
 Acceptance:
 - [ ] three consecutive nights produce dated reports unattended
-- [ ] a failed night leaves an explicit error marker (never silent absence)
-- [ ] scheduling documented (crontab line committed as docs snippet)
+- [x] a failed night leaves an explicit error marker (never silent absence)
+- [x] scheduling documented (crontab line committed as docs snippet)
 Verification: ls reports/nightly-*.md (3 dates); simulate failure → marker
 Dependencies: none (scripts exist)
 Files likely touched: docs/V1_PLANNING.md (cron snippet), crontab (local)
