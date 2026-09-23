@@ -545,6 +545,14 @@ class SkillWallet:
         return False
 
 
+def sandbox_policy(skill, rules):
+    # ponytail: E47 — skills in rules["sandbox"] (untrusted) get read-only
+    # tools; everything else runs full. Policy only; enforcement harness-side.
+    if skill in set(rules.get("sandbox") or []):
+        return {"sandboxed": True, "tools": ["read"]}
+    return {"sandboxed": False, "tools": ["read", "write", "exec", "net"]}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

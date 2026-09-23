@@ -103,5 +103,19 @@ class TestE45Wallet(unittest.TestCase):
         self.assertTrue(w.load("b"))
 
 
+class TestE47Sandbox(unittest.TestCase):
+    def test_untrusted_demo(self):
+        rules = dict(RULES)
+        rules["sandbox"] = ["evil-x"]
+        p = router.sandbox_policy("evil-x", rules)
+        self.assertTrue(p["sandboxed"])
+        self.assertEqual(p["tools"], ["read"])
+
+    def test_trusted_full(self):
+        p = router.sandbox_policy("code-review", RULES)
+        self.assertFalse(p["sandboxed"])
+        self.assertIn("exec", p["tools"])
+
+
 if __name__ == "__main__":
     unittest.main()
