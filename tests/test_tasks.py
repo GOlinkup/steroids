@@ -75,6 +75,46 @@ class TestMachine(unittest.TestCase):
               _t("pending", id="c", parent="a")]
         self.assertEqual(sorted(tasks.children("a", ts)), ["b", "c"])
 
+    def test_seed_queries(self):
+        t = _t("ready", title="Build harness",
+               unknowns=["bank missing"],
+               questions=[{"question": "which 2 tasks?", "answer": None},
+                          {"question": "done?", "answer": "yes"}])
+        self.assertEqual(tasks.seed_queries(t),
+                         ["Build harness", "bank missing", "which 2 tasks?"])
+        self.assertEqual(tasks.seed_queries(_t("ready", title="Solo")),
+                         ["Solo"])
+
+    def test_assumption_lifecycle(self):
+        t = _t("ready")
+        a = tasks.assume(t, "clean env prevents leakage", "high")
+        self.assertEqual(a["status"], "unverified")
+        with self.assertRaises(ValueError):
+            tasks.assume(t, "clean env prevents leakage")  # dup
+        with self.assertRaises(ValueError):
+            tasks.assume(t, "  ")
+        r = tasks.resolve_assumption(t, "clean env prevents leakage", True, "bench.py")
+        self.assertEqual(r["status"], "verified")
+        self.assertEqual(t["evidence"][-1]["kind"], "verified-fact")
+        tasks.assume(t, "2 tasks predict bank", "medium")
+        tasks.resolve_assumption(t, "2 tasks predict bank", False, "M4 review")
+        self.assertEqual(t["assumptions"][-1]["status"], "invalidated")
+        with self.assertRaises(ValueError):
+            tasks.resolve_assumption(t, "clean env prevents leakage", True, "x")
+        with self.assertRaises(ValueError):
+            tasks.resolve_assumption(t, "ghost", True, "x")
+        with self.assertRaises(ValueError):
+            tasks.resolve_assumption(t, "2 tasks predict bank", True, "  ")
+
+    def test_add_evidence(self):
+        t = _t("ready")
+        tasks.add_evidence(t, "P@1 0.799", "trial-stats.json")
+        self.assertEqual(t["evidence"][0]["kind"], "fact")
+        with self.assertRaises(ValueError):
+            tasks.add_evidence(t, "c", "s", "rumor")
+        with self.assertRaises(ValueError):
+            tasks.add_evidence(t, " ", "s")
+
     def test_emit_hook(self):
         seen = []
         t = _t("ready", id="R/T1")
