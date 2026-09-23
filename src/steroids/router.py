@@ -641,6 +641,20 @@ def resolve_pins(cwd, rules):
     return best
 
 
+def star_rating(fires, accepts, success, fail):
+    # ponytail: G67 — outcome-backed stars 1..5. Half accept rate, half
+    # success rate; under 10 evidence points the score caps at 3 stars
+    # ("provisional" — no 5-star debuts).
+    fires = max(fires, 0)
+    accept_rate = min(accepts / fires, 1.0) if fires else 0.0
+    outcomes = success + fail
+    success_rate = (success / outcomes) if outcomes else accept_rate
+    stars = 1 + 4 * (0.5 * accept_rate + 0.5 * success_rate)
+    if fires + outcomes < 10:
+        stars = min(stars, 3.0)
+    return round(max(stars, 1.0))
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

@@ -50,5 +50,16 @@ class TestG65Pins(unittest.TestCase):
         self.assertEqual(router.resolve_pins("/repo-evil", self.RULES), [])
 
 
+class TestG67Ratings(unittest.TestCase):
+    def test_perfect_track_record(self):
+        self.assertEqual(router.star_rating(100, 90, 80, 10), 5)
+
+    def test_provisional_cap(self):
+        self.assertLessEqual(router.star_rating(2, 2, 2, 0), 3)
+
+    def test_poor_record(self):
+        self.assertLessEqual(router.star_rating(100, 10, 1, 9), 2)
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -107,7 +107,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] G64 Duplicate detector — overlap → merge proposal; close: top-10 dup pairs listed. (Kevin 2026-09-23, r345)
 - [x] G65 Versioning + pins — per-project pins; close: pin respected in test. (Kevin 2026-09-23, r345)
 - [x] G66 Marketplace — publish/subscribe one command; close: design doc. (Kevin 2026-09-23, r345)
-- [ ] G67 Ratings — outcome-backed stars; close: metric defined.
+- [x] G67 Ratings — outcome-backed stars; close: metric defined. (Kevin 2026-09-23, r345)
 - [ ] G68 Author analytics — fires/accepts/outcomes per skill; close: first report.
 - [ ] G69 Auto-changelog — index-diff digest; close: generated from last reindex.
 - [ ] G70 Translation — inject-time language render; close: 1 skill × 2 languages.
