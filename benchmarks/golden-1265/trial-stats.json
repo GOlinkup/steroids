@@ -1,5 +1,5 @@
 {
- "trials": 2,
+ "trials": 3,
  "seed": 42,
  "n_resamples": 10000,
  "deterministic": true,
