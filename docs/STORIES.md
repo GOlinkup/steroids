@@ -82,7 +82,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [ ] E43 Skill council — 3 skills debate, judge picks; close: 1 hard-call demo.
 - [ ] E44 Typed handoffs — A-output validated vs B-input; close: schema + 1 chain.
 - [ ] E45 Skill wallets — 2-skill cap per subagent; close: enforcement test.
-- [ ] E46 One index, every harness — shared rank + learning; close: 2 harnesses same result.
+- [x] E46 One index, every harness — shared rank + learning; close: 2 harnesses same result. (Kevin 2026-09-23, r336)
 - [ ] E47 Sandboxed skills — restricted tools for untrusted; close: policy + 1 demo.
 - [ ] E48 Token budgets — per-skill session cap; close: cap triggers in test.
 - [ ] E49 Priority lanes — P0 skills bypass abstention; close: golden + abuse test.
