@@ -803,6 +803,29 @@ def meeting_skills(title, rules, idx, accepts=None, k=3):
     return [s for _, s, _ in top[:k]]
 
 
+def trace_signals(text):
+    # ponytail: I83 — pure extractor: exception type + top code frames.
+    signals, frames = [], []
+    for line in text.splitlines():
+        m = re.search(r"([A-Za-z_][\w.]*?(?:Error|Exception|Fault|Panic))\s*[:\(]", line)
+        if m:
+            signals.append(m.group(1).split(".")[-1].lower())
+        m = re.search(r'File "([^"]+)", line \d+, in (\S+)', line)
+        if m:
+            frames.append(f"{m.group(1).rsplit('/', 1)[-1]}:{m.group(2)}")
+        m = re.search(r"\bat\s+([\w.$<>]+)\s*\(", line)
+        if m:
+            frames.append(m.group(1))
+    return {"error": signals[-1] if signals else "", "frames": frames[:3]}
+
+
+def route_traceback(text, rules, idx, accepts=None):
+    # ponytail: I83 — pasted stack trace offers the fix skill.
+    sig = trace_signals(text)
+    query = " ".join([sig["error"]] + sig["frames"] + ["fix", "traceback"])
+    return route_query(query.strip(), rules, idx, accepts)
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

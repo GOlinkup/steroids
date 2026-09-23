@@ -40,5 +40,26 @@ class TestI82Meeting(unittest.TestCase):
         self.assertLessEqual(len(skills), 3)
 
 
+TRACE = """Traceback (most recent call last):
+  File \"app.py\", line 10, in main
+    run()
+  File \"app.py\", line 4, in run
+    int("xx")
+ValueError: invalid literal"""
+
+class TestI83Trace(unittest.TestCase):
+    def test_extractor(self):
+        sig = router.trace_signals(TRACE)
+        self.assertEqual(sig["error"], "valueerror")
+        self.assertTrue(any("app.py" in f for f in sig["frames"]))
+
+    def test_golden(self):
+        idx = {"debugger-x": ["valueerror", "traceback", "fix"],
+               "other": ["widget"]}
+        rules = {"glue": [], "max_recommendations": 3}
+        top = router.route_traceback(TRACE, rules, idx)
+        self.assertEqual(top[0][1], "debugger-x")
+
+
 if __name__ == "__main__":
     unittest.main()
