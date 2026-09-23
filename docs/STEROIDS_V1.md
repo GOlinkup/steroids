@@ -328,6 +328,184 @@ tokens) stands on the primary context-engineering essay.
 
 ---
 
+## 24. Lock-in additions (pre-roadmap review, grounded 2026-09-23)
+
+Each item was checked against the doc text for prior coverage and against live
+sources. Extensions of existing sections are marked (ext); genuinely new items
+are marked (new).
+
+**Measurement.** (1, new) Open the vision with our own numbers: index size,
+routed-vs-loaded token counts, P@1/P@3, embed/trigram ablations. A vision doc
+that cites its own data. (10, ext) Name fail-plausible output as the enemy:
+agents misreport their own status in ~1/4 episodes (20,574-session study,
+2026) — this is what completion contracts exist to defeat. (12, new) Leading
+indicators: tool-call rate drift (answering from memory = hallucinating with
+extra steps), any 4xx tool-error cluster as signal, repeat-call detection.
+(14, new) Trial policy: single-run pass@1 varies 2.2–6.0pp even at temperature
+0 with divergence in the first 1% of tokens (arXiv:2602.07150, 60K
+trajectories) — every reported number is N trials with variance or it is
+noise. (16, ext) Token economics: token usage alone explains ~80% of
+performance variance; agents burn ~4× chat tokens, multi-agent ~15× (Anthropic,
+2025) — tokens-first budgeting, and the cited reason multi-agent stays late.
+
+**Humility mechanisms.** (2, new) Router fallibility: confidence thresholds,
+abstention as a first-class output (the current router already abstains — say
+so), low-confidence fallback. A reliability layer that can't say "I don't know"
+isn't one. (8, new) Context placement: models use context start/end and lose
+the middle (U-shaped curve; Liu et al., arXiv:2307.03172) — order injected
+context by importance; keep context small enough that nothing is in the middle.
+(11, ext) Escalation format: "stop + one paragraph (tried / missing / needed),
+do not guess," enforced in code, routed to a human queue. (20, new) Partial
+results: escalation carries forward what was learned (partial_result_with_
+escalation), never a bare error; every task has a runtime budget.
+
+**Governance.** (3, new) Steroids' own cost budget: routing + verification
+overhead stays under X% of task cost or the feature doesn't ship. (4, new)
+Kill criteria per phase: each phase names its falsifier (e.g. recovery must
+reduce repeat-failures on benchmark or scope cuts to routing+verification).
+(5, new) Non-goals: no model hosting, no code-execution ownership, no harness
+replacement — written boundaries, not implications. (21, ext) Eval integrity:
+reference solutions, two-expert agreement on pass/fail, trial isolation
+(leaked state corrupts silently), model-grader calibration against humans,
+Goodhart warning; the frozen-golden + `--check` pattern is the template.
+
+**Trust.** (9, new) Skill supply chain: 1,265 third-party instruction sets in
+context; skill bundles include executable scripts. Vet skills, sandbox skill
+code, treat all retrieved/tool content as untrusted (MCP spec: descriptions
+untrusted). (17, new) Team memory: extend project memory to shared org pools
+(repo already prototypes `team-pool.json` + hash-only federated learning) —
+with provenance per fact. (19, open) Cold-start behavior and concept-drift
+invalidation are undecided — recorded in Appendix A, not pretended.
+
+**Strategy.** (6, ext) Open questions list maintained (Appendix A). (7, ext)
+What-kills-this + competitive corner: vendors ship native skill use and longer
+contexts; the moat is the full loop (route→verify→recover), stated before
+someone else states it. (13, ext) Align failure taxonomy with MAST (14 modes,
+3 categories, κ=0.88) instead of the home-grown 11; add the missing observed
+mode: abandoning a correct fix mid-trajectory. (15, new) Grader rules
+(Anthropic, Jan 2026): 20–50 real-failure tasks to start, grade outputs not
+paths, partial credit, transcripts read, grading bugs hunted (a float-format
+bug once cost 38pp on CORE-Bench). (18, new) Skill-vs-skill contradiction:
+precedence rule (project memory > official docs > recency) + surface the
+conflict, never silently concatenate both. (22, new) Adoption ladder:
+router-only → +state → +verification → +recovery; each rung standalone
+valuable (the current repo state IS rung one).
+
+## 25. Autonomous daily learning — Steroids learns while you sleep
+
+Goal: the system gets smarter every day with minutes of human attention, never
+by silent self-modification. The scaffolding already exists in-repo; this
+section wires it into a closed loop with a human gate.
+
+```
+DAY (automatic, every run)
+  prompt → route → log impression (served.jsonl, hash-only prompts)
+  accept/use signals → accepts + outcomes (memory.json)
+         ↓
+NIGHT (cron, automatic, no network)
+  1. BENCH      bench.py + benchmark.py --golden → precision/weather
+  2. HEALTH     abstention rate, top-1 instability (same query hash,
+                different top-1 = router disagreeing with itself), top skills
+  3. MINE       abstention clusters → proposed goldens (machine proposes,
+                humans dispose); drift candidates; vote tallies
+  4. REPORT     reports/nightly-YYYY-MM-DD.md (already built: nightly_report.py,
+                mine_misses.py, trust_report.py, weekly_digest.py)
+         ↓
+MORNING (human, ~5 min)
+  review nightly report → approve / reject / edit proposals
+         ↓
+APPLY (automatic on approval only)
+  approved goldens → golden sets; approved rule tweaks → skill-rules.json
+  (backup before overwrite, cache dropped — existing self_update pattern)
+  → re-run --golden + --check → commit with measured delta
+```
+
+Rules that keep it safe: (a) prompts stay hash-only in logs (J97 privacy rule —
+learning from shapes, never content); (b) nothing retrains routing without a
+passing `--golden` + `--check`; (c) low-risk auto-apply (e.g. decay tuning)
+only inside pre-approved bounds, everything else waits for the morning review;
+(d) every applied change records before/after metrics in the commit, so
+learning is auditable; (e) abstention and instability trends are the early
+warning — precision drops show up there first.
+
+Success metric for this section: weeks where the human does nothing but the
+morning review, and the benchmark still trends up. If review load grows with
+the system, the loop failed — simplify, don't staff it.
+
+## Appendix A — open questions, risks, kill criteria
+
+Open: cold-start behavior (no memory/history); concept-drift invalidation
+policy; event-bus technology; daemon vs library packaging; grader LLM choice;
+multi-agent threshold (what measured gain justifies 15× tokens?).
+Risks: vendors subsume routing (answer: harness-agnostic loop); longer
+contexts reduce routing value (answer: ordering + budget still matter; verify
+with ablations); benchmark gaming (answer: frozen goldens, calibrated
+graders, transcript reads); skill supply-chain incident (answer: §24 item 9).
+Kill criteria live per-phase in §20 expansions — no phase proceeds on vibes;
+Phase 0 baseline is the first gate (if MODEL vs MODEL+STEROIDS shows no
+separation on 20 real tasks, stop and simplify before building further).
+
+## 26. Path to 10 — five upgrades with acceptance tests (researched 2026-09-23)
+
+The 8/10 plan invents mechanisms; the 10/10 plan mostly adopts standards.
+Each item below names its source and the test that proves it. Record the
+build-vs-adopt choice for each in an ADR.
+
+**26.1 Durable execution.** The recovery loop assumes the process survives to
+retry it. Real options, all verified live docs: **Temporal** (durable
+workflows, event-history recovery; price: orchestration server + Cassandra/ES,
+tens–hundreds ms per step, operator burden); **DBOS** (Postgres-backed
+library, `@DBOS.workflow`/`@DBOS.step`, 1–2 ms step overhead, no new infra,
+purpose-built AI-agent integrations incl. OpenAI Agents and Vercel AI SDK);
+**Inngest** (step memoization, `waitForEvent` at zero infra); **AWS Lambda
+Durable Functions** (Dec 2025). Lean: DBOS-shaped durability fits the
+offline-first ethos (data stays in your Postgres; SQLite variant keeps
+zero-dependency installs possible) — but the Postgres-vs-SQLite and
+library-vs-server calls go in an ADR, not a default. Acceptance: kill -9 the
+agent mid-task → resumes from the last completed step; completed side effects
+never re-issue (DBOS's parallel-tool-call guarantee is the exact property
+needed for fan-out agent work).
+
+**26.2 Adversarial benchmark.** AgentDojo (ETH Zurich, NeurIPS 2024):
+97 tasks, 629 security cases, formal environment-state checks (never
+LLM-judged), benign utility <66%, attack success <25% (8% with detector
+defense), inverse scaling (more capable models easier to attack). Adopt its
+metric pair — Utility + Utility-Under-Attack — as a permanent eval dimension.
+Acceptance: a Steroids change raising P@1 while collapsing under injection is
+recorded as a regression; defenses (tool_filter-style scoping, secondary
+detector) are evaluated, not assumed.
+
+**26.3 Observability on standards.** OTel ships GenAI semantic conventions
+(`gen_ai.request.model`, usage tokens, finish reasons, opt-in content capture;
+consoles already render them) and CloudEvents has OTel span mappings. The §17
+event bus keeps its names but emits OTel-compatible spans/events in a
+CloudEvents envelope, so Grafana/Aspire/Datadog consume Steroids telemetry
+with zero custom glue. Content capture stays opt-in (sensitive-data default
+mirrors OTel's). Acceptance: a Steroids run renders in an unmodified OTel
+dashboard; no bespoke exporter required.
+
+**26.4 Statistical rigor.** arXiv:2602.07150 (60K trajectories): 2–3pp
+"improvements" are often noise; prescription is multi-run pass@1, power
+analysis for run counts, and the pass@1/pass@k/pasŝk envelope
+(expected/optimistic/consistency bounds), with nested bootstrap over
+runs-within-inputs when R≥3. Acceptance: `benchmark.py` gains `--trials N`,
+every reported number carries a confidence interval, and no claim ships on a
+single run. (This also back-protects our own 0.799: re-measure it with trials
+before it headlines anything.)
+
+**26.5 Body-text routing experiment.** SkillRouter's latest (v5, repo +
+0.6B open models on HuggingFace, reproducible eval scripts): two-stage
+bi-encoder top-20 → cross-encoder rerank, both full-text, 74.0% Hit@1 at
+1.2B total, 13× fewer params and 5.8× faster than the strongest base pipeline,
+consumer-hardware deployable — plus two methodological gifts: false-negative
+filtering for near-duplicate skills (our goldens likely penalize correct
+near-duplicate picks today — audit them), and listwise rerank loss for
+fine-grained candidate competition. Acceptance: a committed ablation (bodies
+indexed vs not; ΔP@1 vs Δtokens/latency) with a keep/drop decision recorded.
+The compact size keeps the offline-first promise intact.
+
+---
+
 *Status: vision doc. Start at Phase 0 → 1 → 2. Make the existing implementation
 observable before changing its intelligence — baseline first, then every new
 piece must prove itself in evaluation.*
