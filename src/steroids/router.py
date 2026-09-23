@@ -524,6 +524,27 @@ def validate_handoff(skill_a, skill_b, idx, needs_map):
             "verdict": "go" if not missing else "blocked"}
 
 
+class SkillWallet:
+    # ponytail: E45 — 2-skill cap per subagent; load() refuses when full, drop() frees.
+    def __init__(self, cap=2):
+        self.cap = cap
+        self.skills = []
+
+    def load(self, skill):
+        if skill in self.skills:
+            return True
+        if len(self.skills) >= self.cap:
+            return False
+        self.skills.append(skill)
+        return True
+
+    def drop(self, skill):
+        if skill in self.skills:
+            self.skills.remove(skill)
+            return True
+        return False
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

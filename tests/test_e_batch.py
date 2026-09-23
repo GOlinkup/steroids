@@ -86,5 +86,22 @@ class TestE44Handoff(unittest.TestCase):
         self.assertIn(r["verdict"], ("go", "blocked"))
 
 
+class TestE45Wallet(unittest.TestCase):
+    def test_cap_enforced(self):
+        w = router.SkillWallet()
+        self.assertTrue(w.load("a"))
+        self.assertTrue(w.load("b"))
+        self.assertFalse(w.load("c"))
+        self.assertEqual(w.skills, ["a", "b"])
+
+    def test_drop_frees_and_dup_ok(self):
+        w = router.SkillWallet()
+        w.load("a")
+        self.assertTrue(w.load("a"))
+        self.assertTrue(w.drop("a"))
+        self.assertFalse(w.drop("a"))
+        self.assertTrue(w.load("b"))
+
+
 if __name__ == "__main__":
     unittest.main()
