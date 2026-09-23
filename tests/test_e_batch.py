@@ -50,5 +50,19 @@ class TestE42Pinned(unittest.TestCase):
         self.assertGreater(row[0], 0.0)
 
 
+class TestE43Council(unittest.TestCase):
+    def test_hard_call_demo(self):
+        c = router.council("post this announcement to X and linkedin without duplicate text", RULES, IDX)
+        self.assertGreaterEqual(len(c["debate"]), 2)
+        self.assertIn(c["verdict"], [d["skill"] for d in c["debate"]])
+        for d in c["debate"]:
+            self.assertTrue(d["evidence"])
+
+    def test_verdict_deterministic(self):
+        q = "my django ORM does a hundred queries per page, fix it"
+        self.assertEqual(router.council(q, RULES, IDX)["verdict"],
+                         router.council(q, RULES, IDX)["verdict"])
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -499,6 +499,19 @@ def pinned_route(prompt, pinned, rules, idx, accepts=None):
     return (top[:keep] + [(0.0, pinned, [])])[:rules.get("max_recommendations", 3)]
 
 
+def council(prompt, rules, idx, accepts=None):
+    # ponytail: E43 — top-3 debate with token evidence; judge breaks ties by
+    # evidence breadth, then accepts, then name. Deterministic, no LLM.
+    top = route_query(prompt, rules, idx, accepts)
+    acc = accepts or {}
+    debaters = [{"skill": s, "score": sc, "evidence": sorted(h)} for sc, s, h in top[:3]]
+    verdict = None
+    if debaters:
+        verdict = sorted(debaters, key=lambda d: (-d["score"], -len(d["evidence"]),
+                         -acc.get(d["skill"], 0), d["skill"]))[0]["skill"]
+    return {"debate": debaters, "verdict": verdict}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
