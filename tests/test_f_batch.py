@@ -29,5 +29,20 @@ class TestF56Snapshot(unittest.TestCase):
         self.assertEqual([r["t"] for r in out], sorted(r["t"] for r in out))
 
 
+class TestF59Menubar(unittest.TestCase):
+    def test_rate_and_top(self):
+        import menubar_steroids
+        lines = ['{"t":1000,"q":"a","trigs":"x","skills":"sa/sb"}',
+                 '{"t":1900,"q":"b","trigs":"y","skills":"sa"}',
+                 '{"t":10,"q":"c","trigs":"","skills":""}']
+        p = os.path.join(tempfile.mkdtemp(), "served.jsonl")
+        open(p, "w").write("\n".join(lines) + "\n")
+        s = menubar_steroids.stats(p, window=500, now=2000)
+        self.assertEqual(s["rate_h"], 1)
+        self.assertEqual(s["total"], 3)
+        self.assertEqual(s["abst"], 1)
+        self.assertEqual(s["top"][0], ("sa", 2))
+
+
 if __name__ == "__main__":
     unittest.main()
