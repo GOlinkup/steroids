@@ -92,7 +92,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [ ] F51 Live fire display — blobs ignite on route; close: demo gif.
 - [x] F52 Click-to-inject — click blob loads skill; close: works against live index. (Kevin 2026-09-23, r344)
 - [x] F53 Drag-a-prompt — drop text, watch ripple; close: demo. (Kevin 2026-09-23, r344)
-- [ ] F54 Graph explorer — 1265 nodes zoom/pan/search; close: loads <2s.
+- [x] F54 Graph explorer — 1265 nodes zoom/pan/search; close: loads <2s. (Kevin 2026-09-23, r344)
 - [ ] F55 Fire heatmap — hot glow, dead dim; close: served-driven colors.
 - [ ] F56 Session replay — scrub routing history; close: 1 session replayed.
 - [ ] F57 Voice in — speak → equipped; close: demo.
