@@ -1701,8 +1701,13 @@ def chain(plan, rules, idx, needs=None, proof=None, accepts=None):
                 cum_unbacked.append(u)
     blocked = next((i for i, g in enumerate(out)
                     if any(v != "ready" for v in g["gate"].values())), None)
+    # ponytail: A02 — ordered handoff sequence (primary skill per step), not a flat top-3.
+    primaries = [g["skills"][0] for g in out if g["skills"]]
+    sequence = [{"skill": s, "hands_to": primaries[i + 1] if i + 1 < len(primaries) else ""}
+                for i, s in enumerate(primaries)]
     return {"steps": out, "evidence": carried, "missing": cum_missing[:5],
             "unbacked": cum_unbacked[:5],
+            "sequence": sequence,
             "verdict": "go" if blocked is None else f"blocked at step {blocked + 1}"}
 
 DRAFTS_DIR = os.path.join(os.path.expanduser("~"), "steroids", "drafts")

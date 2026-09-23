@@ -809,6 +809,20 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(out, [{"skill": "star", "served": 12}])
         self.assertEqual(router.drift_candidates({}, {}, idx={}), [])
 
+    def test_a02_ordered_chain_sequence(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            idx = {"fig": ["figma"], "front": ["frontend"], "dep": ["deploy"]}
+            out = router.chain("do figma work > do frontend work > do deploy work",
+                               rules, idx, needs={}, proof={})
+            seq = [(s["skill"], s["hands_to"]) for s in out["sequence"]]
+            self.assertEqual(seq, [("fig", "front"), ("front", "dep"), ("dep", "")])
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()
