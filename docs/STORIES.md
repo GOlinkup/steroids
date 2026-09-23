@@ -65,7 +65,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] C30 Drift alerts — silent-star skill pings author; close: report script. (Jim 2026-09-23, r341)
 
 ## D. Eval & quality — trust machinery
-- [ ] D31 Per-skill goldens — each skill ships 5 queries, CI enforced; close: 20 skills covered.
+- [x] D31 Per-skill goldens — each skill ships 5 queries, CI enforced; close: 20 skills covered. (Kevin 2026-09-23, r342)
 - [x] D32 Install gate — install.sh refuses deploy on eval regression; close: forced-fail demo. (Kevin 2026-09-23, r338)
 - [ ] D33 Adversarial bank — typos/paraphrase per skill; close: 50 rows.
 - [ ] D34 Golden rotation — monthly held-out swap; close: rotation script + log.
