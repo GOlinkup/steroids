@@ -940,6 +940,8 @@
     "designer": ["design-system", "frontend-patterns", "frontend-design-direction",
       "make-interfaces-feel-better", "figma", "tailwind-patterns"],
     "backend": ["backend-patterns", "api-design", "postgres-patterns",
-      "django-patterns", "fastapi-patterns", "database-migrations"]
+      "django-patterns", "fastapi-patterns", "database-migrations"],
+    "outage": ["incident-responder", "canary-watch", "prometheus-configuration",
+      "grafana-dashboards", "observability-engineer", "delivery-gate"]
   }
 }

@@ -119,7 +119,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] H74 PII guard — customer-data prompts block analytics skills; close: golden red-team pair. (Kevin 2026-09-23, r346)
 - [x] H75 Cost allocation — tokens per team/skill; close: first report from D38 data. (Kevin 2026-09-23, r346)
 - [x] H76 Policy skills — security-review auto on auth diffs; close: golden. (Kevin 2026-09-23, r346)
-- [ ] H77 Incident packs — outage bundle; close: 1 pack defined + drill.
+- [x] H77 Incident packs — outage bundle; close: 1 pack defined + drill. (Kevin 2026-09-23, r346)
 - [ ] H78 Leaver continuity — custom skills retained; close: policy doc.
 - [ ] H79 Federated indexes — N repos, one brain; close: 2-repo demo.
 - [ ] H80 Air-gap mode — full offline box; close: offline install test.

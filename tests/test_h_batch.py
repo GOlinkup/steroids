@@ -103,5 +103,21 @@ class TestH76Policy(unittest.TestCase):
         self.assertEqual([s for _, s, _ in top], [s for _, s, _ in normal])
 
 
+class TestH77Incident(unittest.TestCase):
+    def test_outage_pack_defined(self):
+        with open(_RULES_PATH, encoding="utf-8") as f:
+            rules = json.load(f)
+        pack = router.pack_skills("outage", rules, IDX)
+        self.assertGreaterEqual(len(pack), 5)
+
+    def test_outage_drill(self):
+        with open(_RULES_PATH, encoding="utf-8") as f:
+            rules = json.load(f)
+        plan = router.dispatch_task("production outage, errors spiking then page the on-call", rules, IDX)
+        self.assertTrue(plan)
+        for row in plan:
+            self.assertIsNotNone(row["top"])
+
+
 if __name__ == "__main__":
     unittest.main()
