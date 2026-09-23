@@ -74,5 +74,17 @@ class TestI84Hook(unittest.TestCase):
         self.assertEqual(precommit_auth_review.auth_diff_comment('+print("hi")\n'), "")
 
 
+RED_FIXTURE = """\x1b[31mFAIL\x1b[0m\x1b[1;31m: test_each_golden_top1 (x)
+AssertionError: 'git-helper' != 'resolving-merge-conflicts'
+"""
+
+class TestI85Triage(unittest.TestCase):
+    def test_real_red_fixture(self):
+        r = router.triage_build(RED_FIXTURE, RULES, IDX)
+        self.assertTrue(r["failed"])
+        self.assertIsNotNone(r["fix_skill"])
+        self.assertTrue(r["excerpt"])
+
+
 if __name__ == "__main__":
     unittest.main()

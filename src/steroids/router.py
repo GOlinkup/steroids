@@ -826,6 +826,20 @@ def route_traceback(text, rules, idx, accepts=None):
     return route_query(query.strip(), rules, idx, accepts)
 
 
+def triage_build(log_text, rules, idx, accepts=None):
+    # ponytail: I85 — red build -> fix skill + log excerpt. Extracts FAILED
+    # ids and error lines, routes "fix ..." for the top failure.
+    clean = re.sub(r"\x1b\[[0-9;]*m", "", log_text)
+    failed = sorted(set(re.findall(r"FAIL:\s*(\S+)", clean)))
+    errs = [l.strip()[:160] for l in log_text.splitlines()
+            if "Error" in l or "assert" in l.lower()][:3]
+    query = "fix failing test " + " ".join(failed[:2] + errs[:1])
+    top = route_query(query.strip(), rules, idx, accepts)
+    return {"failed": failed, "excerpt": errs,
+            "fix_skill": top[0][1] if top else None,
+            "skills": [s for _, s, _ in top]}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
