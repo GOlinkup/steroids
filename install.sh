@@ -7,6 +7,9 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIVE_DATA="$HOME/.config/opencode/plugins/steroids"
 BIN="$HOME/.local/bin/steroids"
 
+# r356 preflight: HOME-without-skills refuses before anything runs.
+python3 "$REPO/scripts/preflight_check.py" || { echo "PREFLIGHT FAILED — refusing install under this HOME"; exit 1; }
+
 # D32 gate: eval regression refuses deploy (nothing copied yet at this point).
 bash "$REPO/scripts/eval_gate.sh" || { echo "EVAL GATE FAILED — deploy refused, live files untouched"; exit 1; }
 

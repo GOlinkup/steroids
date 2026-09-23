@@ -81,5 +81,30 @@ class TestJ96MetaLoop(unittest.TestCase):
         self.assertEqual(top[0][1], "steroids")
 
 
+class TestR356Preflight(unittest.TestCase):
+    def test_refuse_empty_home(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import preflight_check
+        import tempfile
+        d = tempfile.mkdtemp()
+        r = preflight_check.preflight(d, {"index_dirs": ["~/.agents/skills"]})
+        self.assertEqual(r["verdict"], "refuse")
+        self.assertEqual(r["skills"], 0)
+
+    def test_go_and_model_warn(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import preflight_check
+        import tempfile
+        d = tempfile.mkdtemp()
+        sd = os.path.join(d, ".agents", "skills", "sa")
+        os.makedirs(sd)
+        open(os.path.join(sd, "SKILL.md"), "w").write("# x\n")
+        r = preflight_check.preflight(d, {"index_dirs": ["~/.agents/skills"]})
+        self.assertEqual(r["verdict"], "go")
+        self.assertEqual(r["skills"], 1)
+        self.assertFalse(r["model"])
+        self.assertTrue(r["warnings"])
+
+
 if __name__ == "__main__":
     unittest.main()
