@@ -786,6 +786,23 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_c29_team_pool_opt_in(self):
+        import tempfile, os, json as _json
+        tmp = tempfile.mkdtemp()
+        try:
+            pool = os.path.join(tmp, "team-pool.json")
+            with open(pool, "w") as f:
+                f.write(_json.dumps({"accepts": {"alpha": 3, "beta": 1}}))
+            loaded = router.load_team_pool(pool)
+            self.assertEqual(loaded, {"alpha": 3, "beta": 1})
+            self.assertEqual(router.load_team_pool(""), {})
+            self.assertEqual(router.load_team_pool(os.path.join(tmp, "nope")), {})
+            merged = router.merge_team_pool({"alpha": 2}, loaded)
+            self.assertEqual(merged, {"alpha": 5, "beta": 1})
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

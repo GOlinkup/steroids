@@ -589,6 +589,25 @@ def apply_taste(top, taste, bonus=0.5):
     out.sort(key=lambda t: (-t[0], t[1]))
     return out
 
+def load_team_pool(path):
+    # ponytail: C29 — shared org accept pool {accepts: {skill: n}}; opt-in only, missing = {}.
+    if not path:
+        return {}
+    try:
+        with open(os.path.expanduser(path), encoding="utf-8") as f:
+            doc = json.load(f)
+        pool = doc.get("accepts", {}) if isinstance(doc, dict) else {}
+        return {str(k): v for k, v in pool.items() if isinstance(v, (int, float))}
+    except Exception:
+        return {}
+
+def merge_team_pool(accepts, pool):
+    # ponytail: C29 — pool sums into local accepts (shared wins are additive).
+    out = dict(accepts or {})
+    for s, n in (pool or {}).items():
+        out[s] = out.get(s, 0) + n
+    return out
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -1937,6 +1956,8 @@ def main():
         return
 
     accepts = apply_downvotes(apply_decay(apply_outcomes(learn(tp), load_outcomes()), load_seen()), load_served_counts())
+    if args.team:
+        accepts = merge_team_pool(accepts, load_team_pool(args.team))
     if args.chain:
         print(json.dumps(chain(args.chain, rules, idx, accepts=accepts)))
         return
