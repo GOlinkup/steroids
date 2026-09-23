@@ -753,6 +753,19 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_c27_ab_assignment_and_challenger(self):
+        self.assertEqual(router.ab_assign("same-key"), router.ab_assign("same-key"))
+        v2 = sum(1 for i in range(1000) if router.ab_assign(f"k{i}") == "v2")
+        self.assertGreater(v2, 50)
+        self.assertLess(v2, 150)
+        rules = {"glue": [], "max_recommendations": 3}
+        idx = {"alpha": ["alpha", "zone"]}
+        top2 = router.route_v2("alpha zone", rules, idx)
+        self.assertEqual([n for _, n, _ in top2], ["alpha"])
+        run = router.ab_route("alpha zone", rules, idx, key="fixed-key")
+        self.assertIn(run["variant"], ("v1", "v2"))
+        self.assertTrue(run["skills"])
+
 
 if __name__ == "__main__":
     unittest.main()

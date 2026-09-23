@@ -543,6 +543,22 @@ def retirement_candidates(rules, idx, accepts=None, outcomes=None, seen=None, no
             out.append({"skill": name, "age_days": round(age, 1)})
     return sorted(out, key=lambda r: -r["age_days"])
 
+def ab_assign(key, pct=10):
+    # ponytail: C27 — stable hash bucketing; same key always lands the same variant. Pure.
+    h = int(hashlib.sha1(str(key).encode()).hexdigest(), 16) % 100
+    return "v2" if h < pct else "v1"
+
+def route_v2(prompt, rules, idx, accepts=None):
+    # ponytail: C27 — challenger: lexical-only (no sem/emb signal).
+    r2 = dict(rules, semantic_weight=0.0, embed_weight=0.0)
+    return route_query(prompt, r2, idx, accepts)
+
+def ab_route(prompt, rules, idx, accepts=None, key=None):
+    # ponytail: C27 — 10% auto-assigned to v2; returns variant + top for the run log.
+    variant = ab_assign(key if key is not None else prompt)
+    top = route_v2(prompt, rules, idx, accepts) if variant == "v2" else route_query(prompt, rules, idx, accepts)
+    return {"variant": variant, "skills": [s for _, s, _ in top]}
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -1899,6 +1915,15 @@ def main():
         return
     top = route_query(prompt, rules, idx, accepts)
     top = apply_project_profile(top, load_project_profile())
+
+    if args.ranker in ("v2", "ab"):
+        # ponytail: C27 — explicit challenger or 10% auto-assign experiment run.
+        if args.ranker == "v2":
+            top = route_v2(prompt, rules, idx, accepts)
+            print(json.dumps({"variant": "v2", "skills": [s for _, s, _ in top]}))
+        else:
+            print(json.dumps(ab_route(prompt, rules, idx, accepts)))
+        return
 
     if top:
         names = "/".join(s for _, s, _ in top)
