@@ -77,7 +77,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [ ] D40 Canary routing — 5% traffic, auto-rollback; close: design + flag.
 
 ## E. Multi-agent & orchestration
-- [ ] E41 Dispatcher mode — subtasks to subagents with skills; close: 1 demo task.
+- [x] E41 Dispatcher mode — subtasks to subagents with skills; close: 1 demo task. (Kevin 2026-09-23, r343)
 - [ ] E42 Skill-pinned agents — agent never drops its skill; close: golden.
 - [ ] E43 Skill council — 3 skills debate, judge picks; close: 1 hard-call demo.
 - [ ] E44 Typed handoffs — A-output validated vs B-input; close: schema + 1 chain.

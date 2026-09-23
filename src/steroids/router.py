@@ -469,6 +469,26 @@ def explain_route(prompt, rules, idx, top=None):
             "tokens_saved": max(saved, 0)}
 
 
+def split_subtasks(task):
+    # ponytail: E41 — explicit step markers only (then/;/newline/numbered); no NLP segmentation.
+    lines = [l.strip() for l in task.replace(";", "\n").split("\n") if l.strip()]
+    out = []
+    for ln in lines:
+        ln = re.sub(r"^\d+[.)]\s*", "", ln)
+        out.extend([s.strip() for s in re.split(r"\bthen\b", ln, flags=re.I) if s.strip()])
+    return [s for s in out if s] or [task.strip()]
+
+
+def dispatch_task(task, rules, idx, accepts=None):
+    # ponytail: E41 dispatcher — plan only (which skill per subtask); execution stays harness-side.
+    plan = []
+    for sub in split_subtasks(task):
+        top = route_query(sub, rules, idx, accepts)
+        plan.append({"subtask": sub, "top": top[0][1] if top else None,
+                     "skills": [s for _, s, _ in top]})
+    return plan
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
