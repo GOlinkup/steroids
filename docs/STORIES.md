@@ -143,7 +143,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] J94 Counterfactuals — "without X you'd miss Y"; close: 3 examples. (Kevin 2026-09-23, r348)
 - [x] J95 Time travel — replay past routing; close: CLI flag works. (Kevin 2026-09-23, r348)
 - [x] J96 Router-as-skill — self-indexed meta loop; close: "improve routing" routes inward. (Kevin 2026-09-23, r348)
-- [ ] J97 Federated private learning — shared gradients, no prompts; close: design doc.
+- [x] J97 Federated private learning — shared gradients, no prompts; close: design doc. (Kevin 2026-09-23, r348)
 - [ ] J98 Skill bounties — market for expertise; close: design doc.
 - [x] J99 Trust report — public abstention/precision page; close: first edition from D35. (Kevin 2026-09-23, r339)
 - [ ] J100 Off-switch demo — refusing nonsense live; close: recorded demo.
