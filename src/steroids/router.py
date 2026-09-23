@@ -927,6 +927,17 @@ def route_fused(prompt, fused, rules, idx, accepts=None):
     return route_query(prompt, rules, view, accepts)
 
 
+def precompute(queries, rules, idx, accepts=None):
+    # ponytail: J92 — offline precompute of top-3 names per query. The cache
+    # is plain data (JSON-safe); dream_route serves hits with zero routing.
+    return {q: [s for _, s, _ in route_query(q, rules, idx, accepts)] for q in queries}
+
+
+def dream_route(query, cache):
+    # ponytail: J92 — cache hit returns names, miss returns None (route live).
+    hit = cache.get(query)
+    return list(hit) if hit is not None else None
+
 
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:

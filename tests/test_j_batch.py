@@ -23,5 +23,16 @@ class TestJ91Fusion(unittest.TestCase):
         self.assertEqual(top[0][1], "sa+sb")
 
 
+class TestJ92Dream(unittest.TestCase):
+    def test_cache_hit_demo(self):
+        idx = {"sa": ["alpha"], "sb": ["beta"]}
+        rules = {"glue": [], "max_recommendations": 3}
+        cache = router.precompute(["alpha query", "beta query"], rules, idx)
+        self.assertEqual(router.dream_route("alpha query", cache),
+                         [s for _, s, _ in router.route_query("alpha query", rules, idx)])
+        self.assertEqual(cache["beta query"], ["sb"])
+        self.assertIsNone(router.dream_route("unseen query", cache))
+
+
 if __name__ == "__main__":
     unittest.main()
