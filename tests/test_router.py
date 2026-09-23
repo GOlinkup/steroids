@@ -714,6 +714,25 @@ class TestRouter(unittest.TestCase):
         fresh = router.apply_decay({"a": 8}, {"a": t0}, now=t0)
         self.assertEqual(fresh["a"], 8.0)
 
+    def test_c25_downvotes_demote_unused(self):
+        import tempfile, os, json as _json
+        tmp = tempfile.mkdtemp()
+        try:
+            log = os.path.join(tmp, "served.jsonl")
+            with open(log, "w") as f:
+                for _ in range(5):
+                    f.write(_json.dumps({"t": 1, "q": "x", "trigs": "y", "skills": "b"}) + "\n")
+                f.write(_json.dumps({"t": 2, "q": "x", "trigs": "y", "skills": "a"}) + "\n")
+            counts = router.load_served_counts(log)
+            self.assertEqual(counts, {"b": 5, "a": 1})
+            out = router.apply_downvotes({"a": 4, "b": 0}, counts)
+            self.assertEqual(out["a"], 4)  # used: untouched
+            self.assertEqual(out["b"], -1)  # served 5x, never used: demoted
+            self.assertEqual(router.load_served_counts(os.path.join(tmp, "nope")), {})
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

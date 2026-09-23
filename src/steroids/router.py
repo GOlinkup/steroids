@@ -495,6 +495,35 @@ def apply_decay(accepts, seen, now=None, halflife_days=30):
         out[s] = round(n * (0.5 ** (age_days / halflife_days)), 3)
     return out
 
+def load_served_counts(log_path=LOG_PATH):
+    # ponytail: C25 — {skill: impression count} from the served log; missing = {}.
+    counts = {}
+    try:
+        with open(log_path, encoding="utf-8") as f:
+            for line in f:
+                try:
+                    row = json.loads(line)
+                except Exception:
+                    continue
+                for s in (row.get("skills") or "").split("/"):
+                    if s:
+                        counts[s] = counts.get(s, 0) + 1
+    except OSError:
+        pass
+    return counts
+
+def apply_downvotes(accepts, served, threshold=3):
+    # ponytail: C25 — served>=threshold with zero accepts goes to -1 (demoted
+    # below neutral in the accepts bonus); used skills untouched. Pure.
+    out = dict(accepts or {})
+    for s, n in list(out.items()):
+        if n == 0 and (served or {}).get(s, 0) >= threshold:
+            out[s] = -1
+    for s, c in (served or {}).items():
+        if c >= threshold and s not in out:
+            out[s] = -1
+    return out
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -1829,7 +1858,7 @@ def main():
             parser.print_help()
         return
 
-    accepts = apply_decay(apply_outcomes(learn(tp), load_outcomes()), load_seen())
+    accepts = apply_downvotes(apply_decay(apply_outcomes(learn(tp), load_outcomes()), load_seen()), load_served_counts())
     if args.chain:
         print(json.dumps(chain(args.chain, rules, idx, accepts=accepts)))
         return
