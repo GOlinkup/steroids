@@ -655,6 +655,24 @@ def star_rating(fires, accepts, success, fail):
     return round(max(stars, 1.0))
 
 
+I18N = {
+    # ponytail: G70 — inject-time chrome in 2 languages. Only the chrome is
+    # translated; skill content stays source-language (stated, not hidden).
+    "en": {"hint": "Possibly relevant skills (load what applies, skip rest)",
+           "load": "load skill", "none": "no confident skill — abstaining"},
+    "es": {"hint": "Habilidades posiblemente relevantes (carga las que apliquen, omite el resto)",
+           "load": "cargar habilidad", "none": "sin habilidad confiable — abstención"},
+}
+
+
+def render_inject(skills, lang="en"):
+    # ponytail: G70 — one skill (or list) rendered in the requested language.
+    s = I18N.get(lang, I18N["en"])
+    if not skills:
+        return s["none"]
+    return f"{s['hint']}: " + ", ".join(f"{s['load']}: {skill}" for skill in skills)
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

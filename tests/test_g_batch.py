@@ -85,5 +85,19 @@ class TestG69Changelog(unittest.TestCase):
         self.assertEqual((added, removed, changed), (["c"], ["b"], ["a"]))
 
 
+class TestG70Translate(unittest.TestCase):
+    def test_one_skill_two_languages(self):
+        en = router.render_inject(["code-review"], "en")
+        es = router.render_inject(["code-review"], "es")
+        self.assertIn("code-review", en)
+        self.assertIn("code-review", es)
+        self.assertNotEqual(en, es)
+        self.assertIn("cargar habilidad", es)
+
+    def test_abstain_and_fallback(self):
+        self.assertIn("abstain", router.render_inject([], "en"))
+        self.assertEqual(router.render_inject(["x"], "fr"), router.render_inject(["x"], "en"))
+
+
 if __name__ == "__main__":
     unittest.main()

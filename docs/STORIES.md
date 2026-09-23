@@ -110,7 +110,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] G67 Ratings — outcome-backed stars; close: metric defined. (Kevin 2026-09-23, r345)
 - [x] G68 Author analytics — fires/accepts/outcomes per skill; close: first report. (Kevin 2026-09-23, r345)
 - [x] G69 Auto-changelog — index-diff digest; close: generated from last reindex. (Kevin 2026-09-23, r345)
-- [ ] G70 Translation — inject-time language render; close: 1 skill × 2 languages.
+- [x] G70 Translation — inject-time language render; close: 1 skill × 2 languages. (Kevin 2026-09-23, r345)
 
 ## H. Team & enterprise
 - [ ] H71 Role packs — designer/backend bundles; close: 2 packs defined.
