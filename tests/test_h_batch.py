@@ -119,5 +119,17 @@ class TestH77Incident(unittest.TestCase):
             self.assertIsNotNone(row["top"])
 
 
+class TestH79Federated(unittest.TestCase):
+    def test_two_repo_demo(self):
+        rules = {"glue": [], "max_recommendations": 3}
+        a = {"sa": ["alpha"], "common": ["alpha"]}
+        b = {"sb": ["alpha", "beta"], "common": ["alpha"]}
+        out = router.federated_route("alpha beta", rules, [("repoA", a), ("repoB", b)])
+        by_skill = {r["skill"]: r for r in out}
+        self.assertEqual(by_skill["sb"]["repo"], "repoB")
+        self.assertIn("common", by_skill)
+        self.assertTrue(all(set(r) == {"skill", "score", "hits", "repo"} for r in out))
+
+
 if __name__ == "__main__":
     unittest.main()

@@ -749,6 +749,19 @@ def policy_route(prompt, rules, idx, accepts=None):
     return top
 
 
+def federated_route(prompt, rules, repos, accepts=None):
+    # ponytail: H79 — N repos, one brain. repos = [(name, idx)]; route each
+    # with shared rules, merge by max score, source attached. New shape
+    # (dicts) — callers opt in.
+    merged = {}
+    for name, idx in repos:
+        for score, skill, hits in route_query(prompt, rules, idx, accepts):
+            if skill not in merged or score > merged[skill]["score"]:
+                merged[skill] = {"skill": skill, "score": score,
+                                 "hits": hits, "repo": name}
+    return sorted(merged.values(), key=lambda r: (-r["score"], r["skill"]))[:rules.get("max_recommendations", 3)]
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
