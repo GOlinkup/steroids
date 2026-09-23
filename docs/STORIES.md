@@ -72,7 +72,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] D35 Live dashboard — nightly P@1/P@3/leaks from served.jsonl; close: first report committed. (Kevin 2026-09-23, r332)
 - [x] D36 Miss mining — abstention clusters → proposed goldens; close: run on current served log. (Kevin 2026-09-23, r342)
 - [x] D37 Thumb votes — 👍/👎 on hints wired to accepts; close: end-to-end vote flow. (Kevin 2026-09-23, r342)
-- [ ] D38 Token cost per skill — context cost ledger; close: top-10 hogs listed.
+- [x] D38 Token cost per skill — context cost ledger; close: top-10 hogs listed. (Kevin 2026-09-23, r342)
 - [ ] D39 Latency SLO — route p99 <100ms @5000 skills; close: bench script + number.
 - [ ] D40 Canary routing — 5% traffic, auto-rollback; close: design + flag.
 

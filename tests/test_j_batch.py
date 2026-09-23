@@ -145,5 +145,15 @@ class TestD37Votes(unittest.TestCase):
         self.assertEqual(voted[0], "sa")
 
 
+class TestD38Hogs(unittest.TestCase):
+    def test_order_and_split(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import hogs
+        rows = hogs.hogs({"a": 100, "b": 50}, {"a": 10, "b": 5}, {"a": 10, "b": 10})
+        self.assertEqual([r["skill"] for r in rows], ["a", "b"])
+        self.assertEqual(rows[0]["size"], 10)
+        self.assertEqual(rows[0]["fires"], 10)
+
+
 if __name__ == "__main__":
     unittest.main()
