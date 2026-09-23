@@ -58,6 +58,18 @@ python3 tests/benchmark.py --check    # README claims match the snapshot metadat
 `--check` fails if the README table drifts from `benchmarks/golden-1265/metadata.json`
 (the class of error that once shipped 366-skill measurements under a 1265-skill header).
 
+### Honest comparison
+
+Full version with evidence links: `docs/STEROIDS_V1.md` §22 (D-3).
+
+| Context | Steroids | Alternative |
+|---|---|---|
+| Exact/near-vocabulary skill discovery | blind149 P@1 0.799 | Grep: no ranking, no typo-fix |
+| Cold machine, zero install | Routes from a clean checkout | Plugins needing install + warm-up |
+| Thousands of skills | 3915 indexed in ~4s, sub-second queries | Full docs in context: blows the window |
+| Miss recovery | `--correct` door, queryable rate | Misses evaporate |
+| **Paraphrased queries — STEROIDS LOSES** | Lexical-only; overlap miss → abstain | Embedding retrieval bridges paraphrase |
+
 ### Historical results
 
 | Date | Index | blind149 P@1 / P@3 | Notes |
@@ -98,3 +110,21 @@ Steroids runs fully offline on your machine. Routine routing sends nothing anywh
 
 Open `demo/skill-graph.html` in a browser — zero dependencies, works offline.
 Regenerate its data from your live index with `steroids graph --export demo/graph.json`.
+
+## Roadmap
+
+Milestones live in [`docs/V1_PLANNING.md`](docs/V1_PLANNING.md) §7 (10 milestones,
+relative weeks from kickoff). Phase 0 status: reference env frozen, trial
+policy in bench, task bank collecting real failures, paired harness in
+skeleton, grader policy set.
+
+## Contributing
+
+See [CONTRIBUTING.md](CONTRIBUTING.md) — process authority, card workflow,
+verify-before-commit, commit format.
+
+## License
+
+MIT — see [LICENSE](LICENSE). You may use, modify, and share this project,
+including commercially, provided the copyright notice and license travel
+with it.
