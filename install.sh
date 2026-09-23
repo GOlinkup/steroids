@@ -11,10 +11,15 @@ if [ "${1:-}" = "--uninstall" ]; then
   # Removes exactly what install copies. Settings registrations untouched.
   rm -f "$BIN" "$HOME/.local/bin/net.py" "$HOME/.local/bin/embed.py" \
     "$LIVE_DATA/hook.sh" "$LIVE_DATA/skill-rules.json" "$LIVE_DATA/skill-index.json" \
+    "$LIVE_DATA/skill-needs.json" "$LIVE_DATA/skill-proof.json" \
     "$HOME/.config/opencode/plugins/steroids-plugin.ts" \
     "$HOME/.config/steroids/steroids2d.py"
   rmdir "$LIVE_DATA" 2>/dev/null || true
-  rmdir "$HOME/.config/steroids" 2>/dev/null || true
+  if [ -L "$HOME/.config/steroids" ]; then
+    rm -f "$HOME/.config/steroids"
+  else
+    rmdir "$HOME/.config/steroids" 2>/dev/null || true
+  fi
   echo "Uninstalled steroids deploy files."
   exit 0
 fi
@@ -33,7 +38,11 @@ cp "$REPO/src/steroids/embed.py" "$HOME/.local/bin/embed.py"
 cp "$REPO/src/steroids/hook.sh" "$LIVE_DATA/hook.sh"
 cp "$REPO/skill-rules.json" "$LIVE_DATA/skill-rules.json"
 cp "$REPO/plugins/opencode/steroids-plugin.ts" "$HOME/.config/opencode/plugins/steroids-plugin.ts"
-mkdir -p "$HOME/.config/steroids"
+# ponytail: ~/.config/steroids is a symlink to LIVE_DATA (matches live
+# layout; otherwise reindex cache and verifier disagree on the index path).
+if [ ! -e "$HOME/.config/steroids" ]; then
+  ln -s "$LIVE_DATA" "$HOME/.config/steroids"
+fi
 cp "$REPO/src/steroids/steroids2d.py" "$HOME/.config/steroids/steroids2d.py"
 echo "Installed: $BIN + plugin. Index at $LIVE_DATA/skill-index.json"
 "$BIN" --reindex --count

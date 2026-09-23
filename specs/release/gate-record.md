@@ -54,5 +54,9 @@ every claim re-verifiable with the command next to it.
 - P1-4 live-run overhead: unmeasured, held (fixture + 80-col verified).
 - PAT in origin remote URL (LCH-3): user-only fix — rotate token, move to
   credential helper; live exposure until then.
+- install.sh has no Python-deps step (R-1 finding 2026-09-23): onnxruntime
+  lives in HOME-dependent user site, so a fresh machine hits silent
+  lexical fallback until `pip install onnxruntime numpy`. Fresh-HOME runs
+  need that step documented or automated — held for next version.
 
 Sign-off: PENDING human review + date (silence is not approval).

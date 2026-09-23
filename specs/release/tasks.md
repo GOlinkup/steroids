@@ -9,9 +9,9 @@ Description: install.sh + verify-hooks.sh pass on fresh HOME for
   leaves zero traces (60-second off-ramp per product requirement).
 Do-not-touch: live user config (use throwaway HOME)
 Acceptance:
-- [ ] install green on all 4 harnesses from clean state
-- [ ] uninstall script removes binary, hooks, index, plugin (verified absent)
-- [ ] eval gate passes as part of install (existing behavior preserved)
+- [x] install green on all 4 harnesses from clean state
+- [x] uninstall script removes binary, hooks, index, plugin (verified absent)
+- [x] eval gate passes as part of install (existing behavior preserved)
 Verification: HOME=/tmp/fakehome bash install.sh; uninstall; ls checks;
   bash scripts/eval_gate.sh
 Dependencies: Task 2 (gate must be green to mean anything)
