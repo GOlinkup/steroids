@@ -48,6 +48,26 @@ class TestBus(unittest.TestCase):
         self.assertIn(ev["type"], schema["properties"]["type"]["enum"])
         self.assertEqual(ev["gen_ai.request.model"], "m")
 
+    def test_impression_carries_ids(self):
+        # P1-2: served.jsonl rows carry run/task IDs; old readers unaffected.
+        p = "/tmp/steroids-ids-test.jsonl"
+        if os.path.exists(p):
+            os.remove(p)
+        old, router.LOG_PATH = router.LOG_PATH, p
+        try:
+            router._RUN_ID = None
+            tid = ids.task_id()
+            router.log_impression("id probe prompt", "a,b", "x/y", task_id=tid)
+            router.log_impression("id probe prompt", "a,b", "x/y", task_id=tid)  # dedup: skip
+            rows = [json.loads(l) for l in open(p, encoding="utf-8")]
+            self.assertEqual(len(rows), 1)
+            self.assertTrue(rows[0]["run"].startswith("run-") and ids.valid(rows[0]["run"]))
+            self.assertEqual(rows[0]["task"], tid)
+            self.assertEqual(router.load_served_counts(p), {"x": 1, "y": 1})
+        finally:
+            router.LOG_PATH = old
+            os.remove(p)
+
     def test_golden_identical_bus_on_off(self):
         # P1-3: scoring output bit-identical whether the bus tap emits or not.
         # Read-only (never touches trial-stats.json); 20-prompt sample.

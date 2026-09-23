@@ -27,7 +27,7 @@ Description: every run gets RUN-ID, every task TASK-ID; IDs flow into all
 Do-not-touch: router scoring code
 Acceptance:
 - [x] ID format documented (sortable, unique, human-readable)
-- [ ] IDs present in served.jsonl new fields without breaking old readers
+- [x] IDs present in served.jsonl new fields without breaking old readers
 - [x] unit test: 1000 IDs, all unique, all match format
 Verification: run ID generator unit test; inspect sample log line
 Dependencies: P1-1

@@ -5,6 +5,7 @@ Supports Antigravity, Claude Code, OpenCode, and Terminal CLI.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -1499,7 +1500,20 @@ def route_query(prompt, rules, idx, accepts=None):
     top = scored[:rules.get("max_recommendations", 3)]
     return top
 
-def log_impression(prompt, trigs, skills):
+_RUN_ID = None  # ponytail: one run-id per process; stamped on every impression.
+
+
+def log_impression(prompt, trigs, skills, task_id=""):
+    global _RUN_ID
+    if _RUN_ID is None:
+        try:
+            from . import ids as _ids
+        except ImportError:  # ponytail: spec-load without package falls back here
+            _spec_ids = importlib.util.spec_from_file_location(
+                "st_ids", os.path.join(os.path.dirname(os.path.abspath(__file__)), "ids.py"))
+            _ids = importlib.util.module_from_spec(_spec_ids)
+            _spec_ids.loader.exec_module(_ids)
+        _RUN_ID = _ids.run_id()
     try:
         os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
         q = hashlib.sha1(prompt.encode()).hexdigest()[:12]
@@ -1522,6 +1536,8 @@ def log_impression(prompt, trigs, skills):
         with open(LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps({
                 "t": now,
+                "run": _RUN_ID,
+                "task": task_id,
                 "q": q,
                 "trigs": trigs,
                 "skills": skills
