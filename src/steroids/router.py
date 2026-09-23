@@ -608,6 +608,16 @@ def merge_team_pool(accepts, pool):
         out[s] = out.get(s, 0) + n
     return out
 
+def drift_candidates(accepts, served, idx=None, min_served=10):
+    # ponytail: C30 — silent stars (served lots, accepted never). Report only;
+    # the human reading it is the author ping.
+    out = []
+    for s, c in (served or {}).items():
+        if c >= min_served and not (accepts or {}).get(s):
+            if idx is None or s in idx:
+                out.append({"skill": s, "served": c})
+    return sorted(out, key=lambda r: -r["served"])
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -1877,6 +1887,18 @@ def main():
         print(json.dumps({"dry_run": True, "candidates": retirement_candidates(
             rules, idx, accepts=mem.get("accepts", {}),
             outcomes=mem.get("outcomes", {}), seen=mem.get("seen", {}))}))
+        return
+
+    if args.prompt and args.prompt[0] == "drift":
+        # ponytail: C30 — silent-star report from the served log + live accepts.
+        mem = {}
+        try:
+            with open(MEM_PATH, encoding="utf-8") as f:
+                mem = json.load(f)
+        except Exception:
+            pass
+        print(json.dumps({"candidates": drift_candidates(
+            mem.get("accepts", {}), load_served_counts(), idx)}))
         return
 
     if args.count:

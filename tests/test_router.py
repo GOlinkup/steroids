@@ -803,6 +803,12 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_c30_drift_report(self):
+        served = {"star": 12, "used": 15, "quiet": 2}
+        out = router.drift_candidates({"used": 3}, served, idx={"star": 1, "used": 1, "quiet": 1})
+        self.assertEqual(out, [{"skill": "star", "served": 12}])
+        self.assertEqual(router.drift_candidates({}, {}, idx={}), [])
+
 
 if __name__ == "__main__":
     unittest.main()
