@@ -17,5 +17,17 @@ class TestF55Fire(unittest.TestCase):
         self.assertEqual(bake_fire.bake(p), {"sa": 2})
 
 
+class TestF56Snapshot(unittest.TestCase):
+    def test_bake_sorted_capped(self):
+        import bake_snapshot
+        p = os.path.join(tempfile.mkdtemp(), "served.jsonl")
+        rows = ['{"t":%d,"q":"q%d","trigs":"x","skills":"s%d"}' % (3 - i, i, i) for i in range(5)]
+        rows.append('{"t":9,"q":"z","trigs":"","skills":""}')
+        open(p, "w").write("\n".join(rows) + "\n")
+        out = bake_snapshot.bake(p, keep=3)
+        self.assertEqual([r["s"] for r in out], ["s2", "s1", "s0"])
+        self.assertEqual([r["t"] for r in out], sorted(r["t"] for r in out))
+
+
 if __name__ == "__main__":
     unittest.main()

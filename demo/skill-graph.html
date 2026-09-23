@@ -47,7 +47,7 @@ footer{font-size:11px;padding:5px 12px}
 </style>
 </head>
 <body>
-<header><h1>Steroids Skill Graph</h1><span class="sub" id="headline"></span><input id="search" placeholder="search skills…"></header>
+<header><h1>Steroids Skill Graph</h1><span class="sub" id="headline"></span><input id="search" placeholder="search skills…"><input id="scrub" type="range" min="0" max="1000" value="1000" title="Scrub routing history" style="width:110px"><span class="sub" id="scrublabel"></span></header>
 <canvas id="mascot"></canvas>
 <div id="wrap"><canvas id="canvas"></canvas><aside id="details"><p class="dim">Click a node for details.</p></aside></div>
 <div id="zoom"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button></div>
@@ -114,13 +114,21 @@ function fitView(){ // fit the FULL graph on load / double-click: nobody lands i
 function w2s(p){return [(p[0]-view.x)*view.k+W/2,(p[1]-view.y)*view.k+H/2];}
 function s2w(p){return [(p[0]-W/2)/view.k+view.x,(p[1]-H/2)/view.k+view.y];}
 function match(n){return !q||n.id.toLowerCase().indexOf(q)>-1;}
+var SNAP=[], replayOn=false, replaySet={};
+// ponytail: F56 session replay — slider scrubs served history, ±1h window lights up.
+function applyScrub(frac){if(!SNAP.length)return;replayOn=frac<1;
+  var t0=SNAP[0].t,t1=SNAP[SNAP.length-1].t,tc=t0+frac*(t1-t0);
+  replaySet={};var n=0;
+  SNAP.forEach(function(r){if(Math.abs(r.t-tc)<=3600){if(!replaySet[r.s])n++;replaySet[r.s]=1;}});
+  document.getElementById("scrublabel").textContent=n+" active @ "+new Date(tc*1000).toLocaleString();
+  draw();}
 function draw(){
   ctx.clearRect(0,0,W,H);
   data.links.forEach(function(l){var a=byId(l.source),b=byId(l.target);if(!a||!b)return;
     var p=w2s([a.x,a.y]),s=w2s([b.x,b.y]);
     ctx.strokeStyle="rgba(126,231,135,"+(0.12+0.1*l.weight)+")";ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(s[0],s[1]);ctx.stroke();});
-  nodes.forEach(function(n){var p=w2s([n.x,n.y]),r=(5+deg(n.id)*1.5)*view.k,m=match(n);
+  nodes.forEach(function(n){var p=w2s([n.x,n.y]),r=(5+deg(n.id)*1.5)*view.k,m=match(n)&&(!replayOn||replaySet[n.id]);
     ctx.globalAlpha=m?1:0.25;
     ctx.fillStyle=n===sel?"#7ee787":fireColor(n.id);
     ctx.beginPath();ctx.arc(p[0],p[1],r,0,6.283);ctx.fill();
@@ -165,7 +173,9 @@ window.addEventListener("mouseup",function(e){
 cv.addEventListener("wheel",function(e){e.preventDefault();
   var m=pos(e),w0=s2w(m);view.k=Math.min(2,Math.max(0.3,view.k*(e.deltaY<0?1.1:0.9)));
   view.x=w0[0]-(m[0]-W/2)/view.k;view.y=w0[1]-(m[1]-H/2)/view.k;draw();},{passive:false});
-cv.addEventListener("dblclick",function(){view.x=0;view.y=0;fitView();draw();});
+cv.addEventListener("dblclick",function(){view.x=0;view.y=0;replayOn=false;
+  document.getElementById("scrub").value=1000;document.getElementById("scrublabel").textContent="";fitView();draw();});
+document.getElementById("scrub").addEventListener("input",function(e){applyScrub(e.target.value/1000);});
 // ponytail: F53 drag-a-prompt — drop text, top-5 keyword matches ripple.
 function dropScore(text){var seen={},toks=(text||"").toLowerCase().match(/[a-z0-9+#]{3,}/g)||[];
   toks.forEach(function(t){seen[t]=1;});
@@ -198,8 +208,9 @@ init();draw();
 if(window.Mascot)window.Mascot.busy();
 Promise.all([fetch("skill-graph.json").then(function(r){if(!r.ok)throw 0;return r.json();}),
   fetch("skill-graph.positions.json").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
-  fetch("skill-fire.json").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})]
-  ).then(function(ab){var g=ab[0];window.GRAPH_POS=ab[1]||null;FIRE=ab[2]||null;return g;}).then(function(g){
+  fetch("skill-fire.json").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;}),
+  fetch("served-snapshot.json").then(function(r){return r.ok?r.json():null;}).catch(function(){return null;})]
+  ).then(function(ab){var g=ab[0];window.GRAPH_POS=ab[1]||null;FIRE=ab[2]||null;SNAP=ab[3]||[];return g;}).then(function(g){
   if(g&&g.nodes&&g.nodes.length){data={nodes:g.nodes.map(function(n){return {id:n.id,keywords:n.keywords,degree:n.degree||0};}),links:g.links||[]};
     sel=null;document.getElementById("details").innerHTML='<p class="dim">Click a node for details.</p>';
     if(window.Mascot)window.Mascot.busy();
