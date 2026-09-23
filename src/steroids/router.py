@@ -618,6 +618,31 @@ def drift_candidates(accepts, served, idx=None, min_served=10):
                 out.append({"skill": s, "served": c})
     return sorted(out, key=lambda r: -r["served"])
 
+STACK_FILES = {"package.json": "node", "requirements.txt": "python",
+               "pyproject.toml": "python", "go.mod": "go", "Cargo.toml": "rust",
+               "pubspec.yaml": "flutter", "Gemfile": "ruby", "composer.json": "php"}
+
+def detect_stack(root=None):
+    # ponytail: A04 — repo stack from manifest files present. Pure of network.
+    root = root or os.getcwd()
+    stacks = []
+    try:
+        names = set(os.listdir(root))
+    except OSError:
+        return stacks
+    for fname, stack in STACK_FILES.items():
+        if fname in names and stack not in stacks:
+            stacks.append(stack)
+    return stacks
+
+def prewarm(root, rules, idx, accepts=None):
+    # ponytail: A04 — route "<stack> project development" per stack; 2-3 skills each.
+    out = {}
+    for stack in detect_stack(root):
+        top = route_query(f"{stack} project development", rules, idx, accepts)
+        out[stack] = [s for _, s, _ in top[:3]]
+    return out
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -1895,6 +1920,12 @@ def main():
             print(json.dumps({"ok": False, "error": "usage: steroids build <spec>"}))
             return
         print(json.dumps(build_loop(" ".join(args.prompt[1:]), rules, idx), default=str))
+        return
+
+    if args.prompt and args.prompt[0] == "prewarm":
+        # ponytail: A04 — detect repo stack, preload 2-3 skills per stack (session start: no accepts yet).
+        root = args.prompt[1] if len(args.prompt) > 1 else None
+        print(json.dumps(prewarm(root, rules, idx)))
         return
 
     if args.prompt and args.prompt[0] == "outcome":

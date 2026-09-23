@@ -834,6 +834,29 @@ class TestRouter(unittest.TestCase):
         _, miss = router.extract_section("# flat doc, no sections", "anything")
         self.assertFalse(miss)
 
+    def test_a04_prewarm_detects_two_repos(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            node = os.path.join(tmp, "nodeapp")
+            py = os.path.join(tmp, "pyapp")
+            os.makedirs(node)
+            os.makedirs(py)
+            open(os.path.join(node, "package.json"), "w").write('{}')
+            open(os.path.join(py, "requirements.txt"), "w").write('x\n')
+            self.assertEqual(router.detect_stack(node), ["node"])
+            self.assertEqual(router.detect_stack(py), ["python"])
+            self.assertEqual(router.detect_stack(tmp), [])
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            idx = {"ns": ["node"], "ps": ["python"]}
+            out = router.prewarm(node, rules, idx)
+            self.assertEqual([s for s in out["node"]][:1], ["ns"])
+            out2 = router.prewarm(py, rules, idx)
+            self.assertEqual([s for s in out2["python"]][:1], ["ps"])
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()
