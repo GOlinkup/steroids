@@ -131,5 +131,25 @@ class TestE48Budget(unittest.TestCase):
         self.assertIsNone(b.remaining("any"))
 
 
+class TestE49Priority(unittest.TestCase):
+    def test_golden_fast_lane(self):
+        idx = {"p0": ["alpha", "common"], "z": ["common"]}
+        rules = {"glue": [], "max_recommendations": 3, "priority": ["p0"]}
+        top = router.priority_route("alpha common", rules, idx)
+        self.assertEqual(top[0][1], "p0")
+        self.assertIn("alpha", top[0][2])
+
+    def test_abuse_no_bypass(self):
+        idx = {"p0": ["zzz"], "z": ["common"]}
+        rules = {"glue": [], "max_recommendations": 3, "priority": ["p0"]}
+        top = router.priority_route("common query", rules, idx)
+        self.assertEqual(top[0][1], "z")
+
+    def test_empty_priority_falls_through(self):
+        top = router.priority_route("review my PR", RULES, IDX)
+        normal = router.route_query("review my PR", RULES, IDX)
+        self.assertEqual([s for _, s, _ in top], [s for _, s, _ in normal])
+
+
 if __name__ == "__main__":
     unittest.main()

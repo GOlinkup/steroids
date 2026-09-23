@@ -573,6 +573,26 @@ class TokenBudget:
         return cap - self.spent.get(skill, 0)
 
 
+def priority_route(prompt, rules, idx, accepts=None):
+    # ponytail: E49 — rules["priority"] (P0) skills with lexical hits take a
+    # fast lane past normal routing (including its abstention paths); score
+    # mirrors route tf-idf. No P0 hits (or empty list) falls through untouched.
+    prio = [s for s in (rules.get("priority") or []) if s in idx]
+    if prio:
+        ptoks = set(toks(prompt)) - set(rules.get("glue", []))
+        cands = [(s, sorted(set(idx[s]) & ptoks)) for s in prio]
+        cands = [(s, h) for s, h in cands if h]
+        if cands:
+            df = {}
+            for keys in idx.values():
+                for k in set(keys) & ptoks:
+                    df[k] = df.get(k, 0) + 1
+            rows = sorted(((round(sum(1.0 / df[h] for h in hits), 3), s, hits)
+                           for s, hits in cands), key=lambda t: (-t[0], t[1]))
+            return rows[:rules.get("max_recommendations", 3)]
+    return route_query(prompt, rules, idx, accepts)
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
