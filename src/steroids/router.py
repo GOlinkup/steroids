@@ -682,6 +682,15 @@ def pack_skills(role, rules, idx=None):
     return skills
 
 
+def visible_skills(clearance, rules, idx):
+    # ponytail: H72 — rules["restricted"] skills hidden unless clearance
+    # is "full". Policy only; enforcement at the call site.
+    if clearance == "full":
+        return sorted(idx)
+    hidden = set(rules.get("restricted") or [])
+    return sorted(s for s in idx if s not in hidden)
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

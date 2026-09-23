@@ -28,5 +28,17 @@ class TestH71Packs(unittest.TestCase):
         self.assertEqual(router.pack_skills("nope", RULES, IDX), [])
 
 
+class TestH72Clearance(unittest.TestCase):
+    RULES = {"restricted": ["vault-x"]}
+
+    def test_restricted_hidden(self):
+        idx = {"vault-x": ["k"], "open-y": ["k"]}
+        self.assertEqual(router.visible_skills("standard", self.RULES, idx), ["open-y"])
+
+    def test_full_sees_all(self):
+        idx = {"vault-x": ["k"], "open-y": ["k"]}
+        self.assertEqual(router.visible_skills("full", self.RULES, idx), ["open-y", "vault-x"])
+
+
 if __name__ == "__main__":
     unittest.main()
