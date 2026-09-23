@@ -683,6 +683,29 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_c23_project_profile_reranks(self):
+        import tempfile, os, json as _json
+        tmp = tempfile.mkdtemp()
+        try:
+            top = [(3.0, "alpha", ["a"]), (2.0, "beta", ["b"])]
+            plain = router.apply_project_profile(top, {})
+            self.assertEqual([n for _, n, _ in plain], ["alpha", "beta"])
+            boosted = router.apply_project_profile(
+                top, {"boost": {"beta": 10.0}, "bury": []})
+            self.assertEqual([n for _, n, _ in boosted], ["beta", "alpha"])
+            buried = router.apply_project_profile(
+                top, {"boost": {}, "bury": ["alpha"]})
+            self.assertEqual([n for _, n, _ in buried], ["beta", "alpha"])
+            prof = os.path.join(tmp, ".steroids-profile.json")
+            with open(prof, "w") as f:
+                f.write(_json.dumps({"boost": {"beta": 10.0}, "bury": []}))
+            loaded = router.load_project_profile(tmp)
+            self.assertEqual(loaded["boost"], {"beta": 10.0})
+            self.assertEqual(router.load_project_profile(os.path.join(tmp, "nope")), {})
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

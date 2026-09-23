@@ -468,6 +468,32 @@ def apply_outcomes(accepts, outcomes):
             out[s] = round(out[s] * (ok / tot), 3)
     return out
 
+def load_project_profile(root=None):
+    # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
+    root = root or os.getcwd()
+    try:
+        with open(os.path.join(root, ".steroids-profile.json"), encoding="utf-8") as f:
+            doc = json.load(f)
+        if not isinstance(doc, dict):
+            return {}
+        boost = doc.get("boost", {})
+        bury = doc.get("bury", [])
+        return {"boost": boost if isinstance(boost, dict) else {},
+                "bury": [str(s) for s in bury] if isinstance(bury, list) else []}
+    except Exception:
+        return {}
+
+def apply_project_profile(top, profile):
+    # ponytail: C23 — boosted scores multiply, buried sink below all unburied. Pure.
+    if not top or not profile:
+        return top
+    boost = profile.get("boost", {})
+    bury = set(profile.get("bury", []))
+    scored = [((s * float(boost.get(n, 1.0))), n, h) if n not in bury else (-1.0, n, h)
+              for s, n, h in top]
+    scored.sort(key=lambda t: (-t[0], t[1]))
+    return [(round(s, 3), n, h) for s, n, h in scored]
+
 def _ed1_variants(tok):
     # ponytail: edit-distance-1 set for typo fix; len>=4 only, stdlib.
     v = set()
@@ -1784,6 +1810,7 @@ def main():
         print(json.dumps(gather(prompt, rules, idx, accepts=accepts)))
         return
     top = route_query(prompt, rules, idx, accepts)
+    top = apply_project_profile(top, load_project_profile())
 
     if top:
         names = "/".join(s for _, s, _ in top)
