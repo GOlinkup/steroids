@@ -126,7 +126,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 
 ## I. Proactive & ambient — skills before you ask
 - [x] I81 Watch mode — file events surface skills; close: Dockerfile demo. (Kevin 2026-09-23, r347)
-- [ ] I82 Calendar-aware — meeting preload; close: demo.
+- [x] I82 Calendar-aware — meeting preload; close: demo. (Kevin 2026-09-23, r347)
 - [ ] I83 Paste-to-route — stack-trace offered fix skill; close: golden.
 - [ ] I84 Pre-commit hook — auth diffs get review comment; close: demo repo.
 - [ ] I85 CI triage — red build → fix skill + logs; close: 1 real red build.

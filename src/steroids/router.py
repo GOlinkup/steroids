@@ -796,6 +796,13 @@ def watch_suggest(changed_files, rules, idx, accepts=None):
     return out
 
 
+def meeting_skills(title, rules, idx, accepts=None, k=3):
+    # ponytail: I82 — meeting title pre-equips skills (calendar fetch stays
+    # harness-side; this is the preload half).
+    top = route_query(title, rules, idx, accepts)
+    return [s for _, s, _ in top[:k]]
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

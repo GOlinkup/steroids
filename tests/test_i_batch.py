@@ -33,5 +33,12 @@ class TestI81Watch(unittest.TestCase):
         self.assertTrue(dockery)
 
 
+class TestI82Meeting(unittest.TestCase):
+    def test_meeting_demo(self):
+        skills = router.meeting_skills("Sprint review: slow checkout endpoint", RULES, IDX)
+        self.assertTrue(skills)
+        self.assertLessEqual(len(skills), 3)
+
+
 if __name__ == "__main__":
     unittest.main()
