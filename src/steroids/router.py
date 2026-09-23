@@ -684,6 +684,15 @@ def track_session(top, session_path=SESSION_PATH):
         pass
     return {"pivoted": pivoted, "dropped": prev if pivoted else []}
 
+def team_dispatch(prompt, top, n=3):
+    # ponytail: A07 — top-N skills become specialist briefs (one subagent each).
+    return [{"skill": s, "brief": f"As {s}, handle the '{s}' aspect of: {prompt}. Report findings only, no chatter."}
+            for _, s, _ in (top or [])[:n]]
+
+def merge_team_reports(reports):
+    # ponytail: A07 — merge per-specialist findings under skill headers.
+    return "\n\n".join(f"## {s}\n\n{t}" for s, t in reports or [])
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()

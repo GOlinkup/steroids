@@ -889,6 +889,16 @@ class TestRouter(unittest.TestCase):
             import shutil
             shutil.rmtree(tmp, ignore_errors=True)
 
+    def test_a07_specialist_teams(self):
+        top = [(3.0, "alpha", ["a"]), (2.0, "beta", ["b"]), (1.0, "gamma", ["g"])]
+        briefs = router.team_dispatch("build the thing", top)
+        self.assertEqual([b["skill"] for b in briefs], ["alpha", "beta", "gamma"])
+        self.assertTrue(all("build the thing" in b["brief"] for b in briefs))
+        merged = router.merge_team_reports([("alpha", "found A"), ("beta", "found B")])
+        self.assertIn("## alpha", merged)
+        self.assertIn("found B", merged)
+        self.assertEqual(router.team_dispatch("x", []), [])
+
 
 if __name__ == "__main__":
     unittest.main()
