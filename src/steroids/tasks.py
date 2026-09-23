@@ -111,6 +111,49 @@ def add_evidence(task, claim, source, kind="fact"):
     return ev
 
 
+def set_contract(task, checks):
+    checks = [str(c or "").strip() for c in (checks or [])]
+    if not checks or not all(checks):
+        raise ValueError("contract needs >=1 non-empty check")
+    if len(set(checks)) != len(checks):
+        raise ValueError("duplicate check")
+    task["contract"] = {"required": checks}
+    return task["contract"]
+
+
+def unmet(task):
+    required = (task.get("contract") or {}).get("required", [])
+    evidenced = {e.get("check") for e in task.get("evidence", []) or []
+                 if isinstance(e, dict)}
+    return [c for c in required if c not in evidenced]
+
+
+def complete(task, emit=None):
+    if task.get("status") != "verifying":
+        raise ValueError(f"done from {task.get('status')}: verify first")
+    if not (task.get("contract") or {}).get("required"):
+        raise ValueError("done with no contract: rejected")
+    missing = unmet(task)
+    if missing:
+        raise ValueError(f"unmet checks: {missing}")
+    return transition(task, "completed", emit=emit)
+
+
+def force_complete(task, reason, emit=None):
+    if not str(reason or "").strip():
+        raise ValueError("force-complete needs a reason, never silent")
+    old = task.get("status")
+    if old in ("completed", "cancelled"):
+        raise ValueError(f"force-complete from terminal {old}: rejected")
+    task.setdefault("decisions", []).append(
+        "FORCE-COMPLETE: " + str(reason).strip())
+    task["status"] = "completed"
+    if emit:
+        emit("task.state", task.get("id", "?"),
+             {"from": old, "to": "completed", "forced": True})
+    return task
+
+
 def children(parent_id, tasks):
     # ponytail: O(n) scan; index by parent if task lists grow large
     return [t["id"] for t in tasks if t.get("parent") == parent_id]

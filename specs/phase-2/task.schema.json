@@ -32,6 +32,10 @@
     },
     "evidence": {
       "properties": {
+        "check": {
+          "description": "P2-4: contract check id this evidence satisfies",
+          "type": "string"
+        },
         "claim": {
           "minLength": 1,
           "type": "string"
@@ -91,6 +95,23 @@
         "cancelled"
       ],
       "type": "string"
+    },
+    "contract": {
+      "description": "P2-4 completion contract: required checks, each needing evidence with matching check id",
+      "properties": {
+        "required": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "minItems": 1,
+          "type": "array"
+        }
+      },
+      "required": [
+        "required"
+      ],
+      "type": "object"
     }
   },
   "description": "Steroids Phase 2 task object (vision \u00a75 + P2-1). IDs accept dotted hierarchy (AUTH-2.4.3) or timestamp form (ids.py); envelope id pattern from P1-1 intentionally NOT enforced here. P2-1.",
@@ -124,6 +145,9 @@
         "$ref": "#/definitions/evidence"
       },
       "type": "array"
+    },
+    "contract": {
+      "$ref": "#/definitions/contract"
     },
     "failures": {
       "items": {

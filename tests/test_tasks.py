@@ -75,6 +75,44 @@ class TestMachine(unittest.TestCase):
               _t("pending", id="c", parent="a")]
         self.assertEqual(sorted(tasks.children("a", ts)), ["b", "c"])
 
+    def test_contract_gate(self):
+        seen = []
+        emit = lambda *a: seen.append(a)
+        t = _t("verifying", id="C/1")
+        with self.assertRaises(ValueError):  # no contract, no done
+            tasks.complete(t, emit=emit)
+        tasks.set_contract(t, ["tests-green", "report-written"])
+        with self.assertRaises(ValueError) as cm:  # premature done
+            tasks.complete(t, emit=emit)
+        self.assertIn("tests-green", str(cm.exception))
+        tasks.add_evidence(t, "10/10 pass", "unittest", kind="fact")["check"] = "tests-green"
+        with self.assertRaises(ValueError) as cm:
+            tasks.complete(t, emit=emit)
+        self.assertNotIn("tests-green", str(cm.exception))
+        self.assertIn("report-written", str(cm.exception))
+        tasks.add_evidence(t, "handover noted", "retro.md")["check"] = "report-written"
+        self.assertEqual(tasks.complete(t, emit=emit)["status"], "completed")
+        self.assertEqual(seen[-1][2], {"from": "verifying", "to": "completed"})
+        with self.assertRaises(ValueError):  # done from running, not verifying
+            tasks.complete(_t("running", id="C/2"), emit=emit)
+        with self.assertRaises(ValueError):
+            tasks.set_contract(_t("ready"), [])
+        with self.assertRaises(ValueError):
+            tasks.set_contract(_t("ready"), ["a", "a"])
+
+    def test_force_complete(self):
+        seen = []
+        emit = lambda *a: seen.append(a)
+        t = _t("failed", id="F/1")
+        with self.assertRaises(ValueError):
+            tasks.force_complete(t, "  ", emit=emit)
+        tasks.force_complete(t, "human accepts residual risk", emit=emit)
+        self.assertEqual(t["status"], "completed")
+        self.assertTrue(any("FORCE-COMPLETE" in d for d in t["decisions"]))
+        self.assertTrue(seen[-1][2].get("forced"))
+        with self.assertRaises(ValueError):
+            tasks.force_complete(_t("completed"), "again")
+
     def test_seed_queries(self):
         t = _t("ready", title="Build harness",
                unknowns=["bank missing"],
