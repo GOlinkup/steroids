@@ -96,5 +96,13 @@ class TestI86Upgrade(unittest.TestCase):
         self.assertEqual((r["dep"], r["from"], r["to"]), ("stripe", "v15", "v16"))
 
 
+class TestI87Equip(unittest.TestCase):
+    def test_timed_demo(self):
+        r = router.equip_repo(["Dockerfile", "pyproject.toml", "app/main.py"], RULES, IDX)
+        self.assertTrue(r["skills"])
+        self.assertIsInstance(r["elapsed"], float)
+        self.assertTrue(any("docker" in s for s in r["skills"][:2]))
+
+
 if __name__ == "__main__":
     unittest.main()

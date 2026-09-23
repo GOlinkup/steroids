@@ -850,6 +850,36 @@ def summarize_upgrade(dep, old_ver, new_ver, rules, idx, accepts=None):
             "skills": [s for _, s, _ in top]}
 
 
+EQUIP_HINTS = (("dockerfile", "docker container deploy"),
+                 ("pyproject.toml", "python project"), ("package.json", "node javascript project"),
+                 ("go.mod", "golang project"), ("cargo.toml", "rust project"),
+                 ("pubspec.yaml", "flutter dart project"), (".py", "python"),
+                 (".ts", "typescript"), (".go", "golang"), (".rs", "rust"))
+
+
+def equip_repo(file_list, rules, idx, accepts=None):
+    # ponytail: I87 — new repo equipped pre-README. Filename signals become
+    # stack queries; union of tops (max 5), timed. Clone itself harness-side.
+    import time as _time
+    t0, seen, out = _time.time(), set(), []
+    for path in file_list:
+        base = path.rsplit("/", 1)[-1].lower()
+        queries = [q for frag, q in EQUIP_HINTS
+                   if frag in base or base.endswith(frag)]
+        for q in queries:
+            for _, skill, _ in route_query(q, rules, idx, accepts):
+                if skill not in seen:
+                    seen.add(skill)
+                    out.append(skill)
+                if len(out) >= 5:
+                    break
+            if len(out) >= 5:
+                break
+        if len(out) >= 5:
+            break
+    return {"skills": out, "elapsed": round(_time.time() - t0, 2)}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
