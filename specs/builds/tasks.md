@@ -9,9 +9,9 @@ Description: implement the SP-1 ADR decision; demonstrate kill -9 resume
   with completed side effects never re-issued.
 Do-not-touch: router scoring; benchmark harnesses
 Acceptance:
-- [ ] kill -9 mid-task resumes from last completed step (recorded demo)
-- [ ] completed side effects provably never re-issue (fan-out case covered)
-- [ ] ADR decision + rejected alternatives linked in handover
+- [x] kill -9 mid-task resumes from last completed step (recorded demo)
+- [x] completed side effects provably never re-issue (fan-out case covered)
+- [x] ADR decision + rejected alternatives linked in handover
 Verification: run kill -9 demo twice (same outcome); unit tests for step
   boundaries; grep ADR exists
 Dependencies: SP-1 (ADR recorded), P2-2 (task states to persist)
@@ -24,8 +24,8 @@ Description: emit the §17 bus as OTel spans/events in a CloudEvents
   envelope; a run renders in an unmodified dashboard.
 Do-not-touch: event names already consumed by CLI (additive only)
 Acceptance:
-- [ ] run renders in stock OTel dashboard with zero custom glue
-- [ ] content capture defaults off (sensitive-data rule honored)
+- [x] run renders in stock OTel dashboard with zero custom glue
+- [x] content capture defaults off (sensitive-data rule honored)
 - [ ] emission overhead measured (<5% task cost or cut scope)
 Verification: dashboard dump attached to handover; overhead timing logged
 Dependencies: SP-2 (ADR recorded), P1-3 (bus exists)
@@ -52,9 +52,9 @@ Description: apply the SP-3 keep/drop decision; if keep, index bodies and
   re-baseline golden + metadata together (never numbers without snapshot).
 Do-not-touch: live skill files
 Acceptance:
-- [ ] SP-3 decision applied exactly as recorded
-- [ ] if keep: --golden + --check green on new numbers + metadata
-- [ ] ΔP@1 vs Δtokens/Δlatency published in handover
+- [x] SP-3 decision applied exactly as recorded
+- [x] if keep: --golden + --check green on new numbers + metadata
+- [x] ΔP@1 vs Δtokens/Δlatency published in handover
 Verification: python3 tests/benchmark.py --golden --check (both green)
 Dependencies: SP-3 (ablation recorded)
 Files likely touched: src/steroids/router.py, benchmarks/golden-*/metadata.json

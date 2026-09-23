@@ -11,9 +11,9 @@ Description: formalize the §9 task object (id, title, parent, status,
   as versioned schemas.
 Do-not-touch: src/ (schemas first)
 Acceptance:
-- [ ] specs/phase-2/task.schema.json + goal.schema.json validate samples
-- [ ] all 11 statuses have documented entry/exit conditions
-- [ ] our own specs/phase-0 tasks validate against the schema (dogfood)
+- [x] specs/phase-2/task.schema.json + goal.schema.json validate samples
+- [x] all 11 statuses have documented entry/exit conditions
+- [x] our own specs/phase-0 tasks validate against the schema (dogfood)
 Verification: validate samples + existing task files with a script
 Dependencies: P1-1 (envelope conventions reused)
 Files likely touched: specs/phase-2/*.schema.json
@@ -25,9 +25,9 @@ Description: parent/child links, dependency edges, status transitions
   enforced (no illegal jumps, e.g. pending → completed).
 Do-not-touch: router, benchmark
 Acceptance:
-- [ ] transition table implemented + unit-tested (all legal/illegal pairs)
-- [ ] blocked records its missing input (never waits silently)
-- [ ] cycle detection on dependency edges
+- [x] transition table implemented + unit-tested (all legal/illegal pairs)
+- [x] blocked records its missing input (never waits silently)
+- [x] cycle detection on dependency edges
 Verification: unit tests incl. adversarial transitions
 Dependencies: P2-1
 Files likely touched: src/steroids/tasks.py, tests/test_tasks.py
@@ -40,9 +40,9 @@ Description: task questions drive context retrieval (router queries seeded
   links to sources.
 Do-not-touch: scoring weights (reuse, don't retune)
 Acceptance:
-- [ ] one task's unknowns demonstrably change retrieved context vs baseline
-- [ ] assumption lifecycle demoed (unverified → verified | invalidated)
-- [ ] CP-2 review of object model before contracts build on it
+- [x] one task's unknowns demonstrably change retrieved context vs baseline
+- [x] assumption lifecycle demoed (unverified → verified | invalidated)
+- [x] CP-2 review of object model before contracts build on it
 Verification: scripted demo with before/after context diff
 Dependencies: P2-2
 Files likely touched: src/steroids/tasks.py, tests/test_tasks.py
@@ -55,9 +55,9 @@ Description: task completes iff its contract's checks pass with evidence;
 Do-not-touch: human override path (must exist: explicit force-complete
   with reason, logged)
 Acceptance:
-- [ ] contract schema (required checks + evidence pointers)
-- [ ] premature "done" rejected in a recorded demo (the fail-plausible test)
-- [ ] force-complete path exists, logged, auditable
+- [x] contract schema (required checks + evidence pointers)
+- [x] premature "done" rejected in a recorded demo (the fail-plausible test)
+- [x] force-complete path exists, logged, auditable
 Verification: adversarial test (declare done early → rejected); unit tests
 Dependencies: P2-3
 Files likely touched: src/steroids/tasks.py, tests/test_tasks.py
@@ -69,9 +69,9 @@ Description: drive one real Steroids feature (e.g. trial-policy bench or
   OTel emission) entirely through the engine, on the record.
 Do-not-touch: nothing (this one touches the world — that's the point)
 Acceptance:
-- [ ] full trace: goal → tree → evidence → verification → report
-- [ ] end-of-task report generated with real numbers
-- [ ] retro notes what the engine caught that ad-hoc work would have missed
+- [x] full trace: goal → tree → evidence → verification → report
+- [x] end-of-task report generated with real numbers
+- [x] retro notes what the engine caught that ad-hoc work would have missed
 Verification: read the generated report; replay the trace from events
 Dependencies: P2-4, P1-4 (streaming shows it live)
 Files likely touched: (whatever the feature needs) + specs/phase-2/e2e-report.md
@@ -82,8 +82,8 @@ Task P2-6: Phase 2 retro (M6)
 Description: one page + M6 gate (task tree for one real feature, verified).
 Do-not-touch: code
 Acceptance:
-- [ ] specs/phase-2/retro.md with keep/kill decisions
-- [ ] M6 boxes ticked or cut in writing
+- [x] specs/phase-2/retro.md with keep/kill decisions
+- [x] M6 boxes ticked or cut in writing
 Verification: read retro + gate record
 Dependencies: P2-5
 Files likely touched: specs/phase-2/retro.md

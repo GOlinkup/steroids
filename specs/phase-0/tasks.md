@@ -9,9 +9,9 @@ Description: write benchmarks/REFERENCE.md with index size, skill-rules
   hash, model versions, vectors digest, commit hash.
 Do-not-touch: src/, tests/, skill-rules.json
 Acceptance:
-- [ ] benchmarks/REFERENCE.md exists with all five values
-- [ ] values re-verified by an independent re-read (same output twice)
-- [ ] committed on the working branch
+- [x] benchmarks/REFERENCE.md exists with all five values
+- [x] values re-verified by an independent re-read (same output twice)
+- [x] committed on the working branch
 Verification: cat benchmarks/REFERENCE.md; sha256sum skill-rules.json;
   python3 src/steroids/router.py --count
 Dependencies: None
@@ -24,8 +24,8 @@ Description: benchmark.py gains --trials N; every reported number carries a
   95% bootstrap CI (stdlib only); golden re-measured with trials.
 Do-not-touch: golden snapshot contents (benchmarks/golden-1265/ frozen)
 Acceptance:
-- [ ] python3 tests/benchmark.py --golden --trials 5 prints mean + CI per metric
-- [ ] 0.799 re-measured with trials; CI recorded in metadata-adjacent note
+- [x] python3 tests/benchmark.py --golden --trials 5 prints mean + CI per metric
+- [x] 0.799 re-measured with trials; CI recorded in metadata-adjacent note
 - [ ] unit test for CI math on synthetic data (no model calls)
 Verification: python3 tests/benchmark.py --golden --trials 5;
   python3 tests/test_router.py

@@ -9,9 +9,9 @@ Description: answer DBOS-shaped vs Temporal vs Inngest for offline-first
   durability; record ADR with rejected alternatives.
 Do-not-touch: src/ (spike output is knowledge, never product code)
 Acceptance:
-- [ ] docs/ADRs/001-durable-execution.md exists (choice + 2 rejections + why)
-- [ ] decision respects offline-first + solo-operable constraints
-- [ ] timebox honored (2 days max, then decide with available evidence)
+- [x] docs/ADRs/001-durable-execution.md exists (choice + 2 rejections + why)
+- [x] decision respects offline-first + solo-operable constraints
+- [x] timebox honored (2 days max, then decide with available evidence)
 Verification: cat docs/ADRs/001-durable-execution.md
 Dependencies: P2 task-engine draft readable (for interface fit)
 Files likely touched: docs/ADRs/001-durable-execution.md
@@ -23,9 +23,9 @@ Description: emit natively in OTel GenAI semconv vs translate at export;
   sketch emission point in event bus.
 Do-not-touch: src/ (knowledge only)
 Acceptance:
-- [ ] docs/ADRs/002-otel-emission.md (native vs translate + why)
-- [ ] attribute list mapped (gen_ai.request.model, usage, finish reasons)
-- [ ] content-capture default decided (mirrors OTel opt-in)
+- [x] docs/ADRs/002-otel-emission.md (native vs translate + why)
+- [x] attribute list mapped (gen_ai.request.model, usage, finish reasons)
+- [x] content-capture default decided (mirrors OTel opt-in)
 Verification: cat docs/ADRs/002-otel-emission.md
 Dependencies: P1 event schema drafted
 Files likely touched: docs/ADRs/002-otel-emission.md
@@ -37,9 +37,9 @@ Description: measure bodies-indexed vs not on golden: ΔP@1 vs Δtokens/latency;
   record keep/drop.
 Do-not-touch: golden snapshot contents
 Acceptance:
-- [ ] ablation numbers run (same trials policy as golden)
-- [ ] keep/drop recorded with ΔP@1, Δtokens, Δlatency
-- [ ] near-duplicate false-negative audit included
+- [x] ablation numbers run (same trials policy as golden)
+- [x] keep/drop recorded with ΔP@1, Δtokens, Δlatency
+- [x] near-duplicate false-negative audit included
 Verification: rerun ablation command from the ADR text, same numbers
 Dependencies: Task 2 (trial policy)
 Files likely touched: docs/ADRs/003-body-text.md (+ temp scripts, removed after)
@@ -51,9 +51,9 @@ Description: which suites map to the coding-agent threat model; cost estimate
   for a Utility + Utility-Under-Attack run.
 Do-not-touch: src/, benchmarks/
 Acceptance:
-- [ ] suite list with mapping rationale
-- [ ] cost estimate recorded (per-cycle budget input)
-- [ ] defense set named (tool scoping + detector baseline)
+- [x] suite list with mapping rationale
+- [x] cost estimate recorded (per-cycle budget input)
+- [x] defense set named (tool scoping + detector baseline)
 Verification: cat docs/ADRs/004-agentdojo-scope.md
 Dependencies: None
 Files likely touched: docs/ADRs/004-agentdojo-scope.md
