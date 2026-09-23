@@ -2484,6 +2484,10 @@ def main():
             print(json.dumps({}))
         elif args.json:
             print(json.dumps({"triggers": [], "skills": [], "hint": ""}))
+        else:
+            # ponytail: D-1 — plain CLI abstained silently (exit 0, 0 bytes);
+            # say so with the existing inject-chrome string. Scoring untouched.
+            print(I18N["en"]["none"])
 
     if args.explain and prompt:
         # ponytail: J93 output lives here (pure addition) so --json/hook paths stay untouched.

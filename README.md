@@ -19,6 +19,21 @@ bash scripts/demo-serve.sh                # demo on :8903, auto-closes with the 
 
 `steroids "query"` prints a short hint like `build,flutter -> dart-flutter-patterns/...`. Load what applies, skip the rest.
 
+### First-run edge states
+
+Works from a clean checkout with zero install (the `install.sh` binary
+copy is convenience). Four states, all demoed in [`demo/edge-states.md`](demo/edge-states.md):
+
+- **No skills** — preflight refuses the install (exit 1) before copying anything; an empty index would be useless.
+- **No embed model** — install proceeds with a loud warning; routing falls back to lexical-only.
+- **Thousands of skills** — 3915 indexed in ~4s, queries sub-second; scale is linear-ish, not a cliff.
+- **Pure-noise query** — prints `no confident skill — abstaining` (exit 0) and logs it hash-only for later mining; near-misses still route by design.
+
+Note: `install.sh` runs the eval gate first, and the gate is calibrated
+to the dev machine's exact index + warmed memory — a fresh machine with
+a different skill set can be refused on precision grounds. Refusal lands
+before any file is copied, so retrying after syncing skills is safe.
+
 ## Results (verified 2026-09-23; live index 1265 skills — re-run `steroids --count`)
 
 | Eval | n | precision@1 | precision@3 | exclusion-leaks | MRR | MAP |
