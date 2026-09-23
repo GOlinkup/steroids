@@ -118,5 +118,14 @@ class TestD34Rotation(unittest.TestCase):
         self.assertEqual(active, ["b", "c"])
 
 
+class TestD36Misses(unittest.TestCase):
+    def test_proposals(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import mine_misses
+        rows = mine_misses.propose_goldens([{"trigs": ["a", "b"], "count": 3}])
+        self.assertEqual(rows, [{"query": "a b", "expected": "TBD (human assigns)", "count": 3}])
+        self.assertEqual(mine_misses.propose_goldens([]), [])
+
+
 if __name__ == "__main__":
     unittest.main()
