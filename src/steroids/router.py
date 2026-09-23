@@ -1315,6 +1315,39 @@ def counterfactual(prompt, without, rules, idx, accepts=None):
             "top_without": alt_top, "miss": miss}
 
 
+VOTES_PATH = os.path.join(BASE_DIR, "votes.jsonl")
+
+
+def record_vote(skill, up, path=None):
+    # ponytail: D37 — thumb vote persisted (machine-local votes file).
+    row = {"t": int(time.time()), "skill": skill, "up": bool(up)}
+    try:
+        with open(path or VOTES_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(row) + "\n")
+    except OSError:
+        pass
+    return row
+
+
+def load_votes(path=None):
+    # ponytail: D37 — votes merged into accepts-weight (up +1, down -1, floor 0).
+    counts = {}
+    try:
+        with open(path or VOTES_PATH, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if not line:
+                    continue
+                try:
+                    r = json.loads(line)
+                except ValueError:
+                    continue
+                counts[r.get("skill", "")] = counts.get(r.get("skill", ""), 0) + (1 if r.get("up") else -1)
+    except OSError:
+        pass
+    return {s: v for s, v in counts.items() if v > 0}
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

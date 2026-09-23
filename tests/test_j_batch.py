@@ -127,5 +127,23 @@ class TestD36Misses(unittest.TestCase):
         self.assertEqual(mine_misses.propose_goldens([]), [])
 
 
+class TestD37Votes(unittest.TestCase):
+    def test_end_to_end_vote_flow(self):
+        import tempfile
+        p = os.path.join(tempfile.mkdtemp(), "votes.jsonl")
+        for _ in range(10):
+            router.record_vote("sa", True, p)
+        router.record_vote("sb", False, p)
+        accepts = router.load_votes(p)
+        self.assertEqual(accepts, {"sa": 10})
+        idx = {"sa": ["alpha"], "sb": ["alpha", "beta"],
+               "sc": ["beta"], "sd": ["beta"]}
+        rules = {"glue": [], "max_recommendations": 3}
+        plain = [s for _, s, _ in router.route_query("alpha beta", rules, idx)]
+        voted = [s for _, s, _ in router.route_query("alpha beta", rules, idx, dict(accepts))]
+        self.assertEqual(plain[0], "sb")
+        self.assertEqual(voted[0], "sa")
+
+
 if __name__ == "__main__":
     unittest.main()
