@@ -7,6 +7,18 @@ REPO="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LIVE_DATA="$HOME/.config/opencode/plugins/steroids"
 BIN="$HOME/.local/bin/steroids"
 
+if [ "${1:-}" = "--uninstall" ]; then
+  # Removes exactly what install copies. Settings registrations untouched.
+  rm -f "$BIN" "$HOME/.local/bin/net.py" "$HOME/.local/bin/embed.py" \
+    "$LIVE_DATA/hook.sh" "$LIVE_DATA/skill-rules.json" "$LIVE_DATA/skill-index.json" \
+    "$HOME/.config/opencode/plugins/steroids-plugin.ts" \
+    "$HOME/.config/steroids/steroids2d.py"
+  rmdir "$LIVE_DATA" 2>/dev/null || true
+  rmdir "$HOME/.config/steroids" 2>/dev/null || true
+  echo "Uninstalled steroids deploy files."
+  exit 0
+fi
+
 # r356 preflight: HOME-without-skills refuses before anything runs.
 python3 "$REPO/scripts/preflight_check.py" || { echo "PREFLIGHT FAILED — refusing install under this HOME"; exit 1; }
 
