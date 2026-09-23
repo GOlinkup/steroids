@@ -332,6 +332,310 @@ class TestRouter(unittest.TestCase):
             shutil.rmtree(router.DRAFTS_DIR, ignore_errors=True)
             router.DRAFTS_DIR = os.path.join(os.path.expanduser("~"), "steroids", "drafts")
 
+    def test_self_update_check_and_apply(self):
+        import json as _json, tempfile, os
+        good = _json.dumps({"skills": {"alpha": ["a"], "beta": ["b"]}}).encode()
+        tmp = tempfile.mkdtemp()
+        rules = os.path.join(tmp, "skill-rules.json")
+        cache = os.path.join(tmp, "skill-index.json")
+        with open(rules, "wb") as f:
+            f.write(b'{"skills": {"old": ["o"]}}')
+        with open(cache, "wb") as f:
+            f.write(b"stale-cache")
+        real = router._fetch_bytes
+        try:
+            router._fetch_bytes = lambda *a, **k: good
+            stale = router.check_skill_update(rules_path=rules)
+            self.assertTrue(stale["ok"] and stale["stale"])
+            out = router.self_update(rules_path=rules, cache_path=cache)
+            self.assertTrue(out["ok"] and out["updated"])
+            self.assertEqual(out["skills"], 2)
+            with open(out["backup"], "rb") as f:
+                self.assertIn(b"old", f.read())
+            self.assertFalse(os.path.exists(cache))  # dropped so overrides rebuild
+            again = router.self_update(rules_path=rules, cache_path=cache)
+            self.assertTrue(again["ok"] and not again["updated"])
+            fresh = router.check_skill_update(rules_path=rules)
+            self.assertTrue(fresh["ok"] and not fresh["stale"])
+            router._fetch_bytes = lambda *a, **k: None
+            self.assertFalse(router.check_skill_update(rules_path=rules)["ok"])
+            self.assertFalse(router.self_update(rules_path=rules)["ok"])
+            router._fetch_bytes = lambda *a, **k: b"not json{"
+            self.assertFalse(router.check_skill_update(rules_path=rules)["ok"])
+            self.assertFalse(router.self_update(rules_path=rules)["ok"])
+        finally:
+            router._fetch_bytes = real
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_fetch_bytes_local_server(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        class H(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = b'{"skills": {}}'
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *a):
+                pass
+        srv = HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            raw = router._fetch_bytes(f"http://127.0.0.1:{srv.server_port}/skill-rules.json")
+            self.assertEqual(raw, b'{"skills": {}}')
+            self.assertIsNone(router._fetch_bytes("http://127.0.0.1:1/nope", timeout=1))
+        finally:
+            srv.shutdown()
+
+    def test_autoinject_fires_above_threshold(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            os.makedirs(os.path.join(tmp, "alpha"))
+            with open(os.path.join(tmp, "alpha", "SKILL.md"), "w") as f:
+                f.write("# alpha\nFull body here.")
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            idx = {"alpha": ["alpha"]}
+            hit = router.autoinject([(2.5, "alpha", ["alpha"])], rules, idx)
+            self.assertIsNotNone(hit)
+            self.assertEqual(hit["skill"], "alpha")
+            self.assertIn("Full body here.", hit["content"])
+            self.assertIsNone(router.autoinject([(1.9, "alpha", ["alpha"])], rules, idx))
+            self.assertIsNone(router.autoinject([], rules, idx))
+            low = dict(rules, autoinject_threshold=1.0)
+            self.assertIsNotNone(router.autoinject([(1.9, "alpha", ["alpha"])], low, idx))
+            self.assertIsNone(router.autoinject([(2.5, "ghost", ["g"])], rules, idx))
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_build_loop_goes_green_and_records(self):
+        import tempfile, os, json as _json
+        tmp = tempfile.mkdtemp()
+        try:
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            idx = {"alpha": ["alpha", "zone"]}
+            out = router.build_loop("alpha zone", rules, idx, demo_dir=tmp)
+            self.assertEqual(out["verdict"], "go")
+            self.assertEqual(len(out["steps"]), 3)
+            with open(out["record"], encoding="utf-8") as f:
+                rec = _json.load(f)
+            self.assertEqual(rec["verdict"], "go")
+            self.assertEqual(rec["spec"], "alpha zone")
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_gather_reports_over_cap_links(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            idx = {"alpha": ["alpha"]}
+            calls = []
+            real = router.fetch_text
+            router.fetch_text = lambda u, *a, **k: (calls.append(u), "content " * 50)[1]
+            try:
+                out = router.gather(
+                    "alpha http://x/1 http://x/2 http://x/3 http://x/4", rules, idx)
+            finally:
+                router.fetch_text = real
+            self.assertEqual(len(calls), 3)
+            for u in ("http://x/1", "http://x/2", "http://x/3"):
+                self.assertIn(u, out["evidence"])
+            self.assertIn("http://x/4", out["unfetched"])
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_b11_five_annotated_and_enforced(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            for i in range(5):
+                d = os.path.join(tmp, f"s{i}")
+                os.makedirs(d)
+                with open(os.path.join(d, "SKILL.md"), "w") as f:
+                    f.write(f"---\nname: s{i}\nneeds: [input-{i}]\n---\n# S{i}\n")
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            needs = router.get_needs(rules, force_rebuild=True)
+            self.assertGreaterEqual(len([v for v in needs.values() if v]), 5)
+            idx = {"s0": ["s0"]}
+            out = router.gather("s0 do the thing", rules, idx, needs=needs)
+            self.assertIn("blocked:input-0", out["gate"]["s0"])
+            self.assertIn("input-0", out["missing"])
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_b15_exactly_one_question(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            idx = {"fig": ["fig"]}
+            needs = {"fig": ["figma-url", "extra-thing"]}
+            out = router.gather("fig implement this design", rules, idx, needs=needs)
+            self.assertEqual(out["question"],
+                             "Which figma-url should I use? Reply with it to proceed.")
+            self.assertNotIn("extra-thing", out["question"])
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_b19_traceback_pulls_source_lines(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            src = os.path.join(tmp, "app.py")
+            with open(src, "w") as f:
+                f.write("".join(f"line{i}\n" for i in range(1, 21)))
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            idx = {"alpha": ["alpha"]}
+            prompt = f'alpha fix this crash\nTraceback:\n  File "{src}", line 10, in main\n    boom()'
+            out = router.gather(prompt, rules, idx)
+            key = f"source:{src}:10"
+            self.assertIn(key, out["evidence"])
+            self.assertIn("10: line10", out["evidence"][key])
+            self.assertIn("5: line5", out["evidence"][key])
+            self.assertNotIn("16: line16", out["evidence"][key])
+            missing = router.gather("alpha File \"/nope/missing.py\", line 3", rules, idx)
+            self.assertNotIn("source:/nope/missing.py:3", missing["evidence"])
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_b14_b18_b20_context_files(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        cwd = os.getcwd()
+        try:
+            with open(os.path.join(tmp, "package.json"), "w") as f:
+                f.write('{"name": "demo"}')
+            with open(os.path.join(tmp, "schema.sql"), "w") as f:
+                f.write("CREATE TABLE t (id INT);")
+            with open(os.path.join(tmp, "MEETING-notes.md"), "w") as f:
+                f.write("# standup\n")
+            os.chdir(tmp)
+            rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+            idx = {"alpha": ["alpha"]}
+            out = router.gather("alpha build the thing", rules, idx)
+            self.assertIn("repo:package.json", out["evidence"])
+            slow = router.gather("alpha slow query on users", rules, idx)
+            self.assertIn("db:schema:schema.sql", slow["evidence"])
+            mtg = router.gather("alpha meeting prep for standup", rules, idx)
+            self.assertIn("meeting:MEETING-notes.md", mtg["evidence"])
+            plain = router.gather("alpha hello there", rules, idx)
+            self.assertNotIn("db:schema:schema.sql", plain["evidence"])
+            self.assertNotIn("meeting:MEETING-notes.md", plain["evidence"])
+        finally:
+            os.chdir(cwd)
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
+    def test_b13_headless_screenshot(self):
+        import threading
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        class H(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = b"<html><body><h1>shot page</h1></body></html>"
+                self.send_response(200)
+                self.send_header("Content-Type", "text/html")
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *a):
+                pass
+        srv = HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            import tempfile, os
+            tmp = tempfile.mkdtemp()
+            try:
+                shot = router.capture_screenshot(
+                    f"http://127.0.0.1:{srv.server_port}/p", out_dir=tmp)
+                self.assertIsNotNone(shot)
+                self.assertGreater(os.path.getsize(shot), 1024)
+                rules = {"index_dirs": [tmp], "glue": [], "max_recommendations": 3}
+                idx = {"browser-qa": ["visual", "screenshot"]}
+                out = router.gather(
+                    f"visual screenshot check http://127.0.0.1:{srv.server_port}/p",
+                    rules, idx)
+                self.assertTrue(any(k.startswith("screenshot:") for k in out["evidence"]))
+            finally:
+                import shutil
+                shutil.rmtree(tmp, ignore_errors=True)
+        finally:
+            srv.shutdown()
+
+    def test_b16_openapi_skew(self):
+        import threading, json as _json
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        versions = {"v": "2024-01-01"}
+        class H(BaseHTTPRequestHandler):
+            def do_GET(self):
+                body = _json.dumps({"info": {"version": versions["v"]},
+                                    "paths": {"/a": {}, "/b": {}}}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *a):
+                pass
+        srv = HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            import tempfile, os
+            tmp = tempfile.mkdtemp()
+            try:
+                url = f"http://127.0.0.1:{srv.server_port}/spec.json"
+                cache = os.path.join(tmp, "openapi.json")
+                old = router.openapi_spec_info(url, cache_path=cache)
+                self.assertEqual(old, {"version": "2024-01-01", "paths": 2})
+                versions["v"] = "2024-06-01"
+                cached = router.openapi_spec_info(url, cache_path=cache)
+                self.assertEqual(cached, old)  # day-cache: no refetch
+                fresh = router.openapi_spec_info(url, cache_path=cache, ttl=0)
+                self.assertTrue(fresh["version"] != old["version"])  # skew detected
+                self.assertIsNone(router.openapi_spec_info(
+                    "http://127.0.0.1:1/nope.json", cache_path=cache, ttl=0))
+            finally:
+                import shutil
+                shutil.rmtree(tmp, ignore_errors=True)
+        finally:
+            srv.shutdown()
+
+    def test_b17_figma_node_gated_and_fetched(self):
+        self.assertFalse(router.figma_node(
+            "https://www.figma.com/file/K123/name?node-id=1%3A2", token="")["ok"])
+        import threading, json as _json
+        from http.server import BaseHTTPRequestHandler, HTTPServer
+        class H(BaseHTTPRequestHandler):
+            def do_GET(self):
+                if self.path.startswith("/v1/images/"):
+                    body = _json.dumps({"images": {"1:2": "http://img/x.png"}}).encode()
+                else:
+                    body = _json.dumps({"nodes": {"1:2": {"document": {"name": "N"}}}}).encode()
+                self.send_response(200)
+                self.send_header("Content-Length", str(len(body)))
+                self.end_headers()
+                self.wfile.write(body)
+            def log_message(self, *a):
+                pass
+        srv = HTTPServer(("127.0.0.1", 0), H)
+        threading.Thread(target=srv.serve_forever, daemon=True).start()
+        try:
+            base = f"http://127.0.0.1:{srv.server_port}"
+            out = router.figma_node("https://www.figma.com/file/K123/n?node-id=1%3A2",
+                                    token="t", base=base)
+            self.assertTrue(out["ok"])
+            self.assertEqual(out["image"], "http://img/x.png")
+            self.assertFalse(router.figma_node("https://example.com/x", token="t")["ok"])
+        finally:
+            srv.shutdown()
+
 
 if __name__ == "__main__":
     unittest.main()
