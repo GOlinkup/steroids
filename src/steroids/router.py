@@ -691,6 +691,38 @@ def visible_skills(clearance, rules, idx):
     return sorted(s for s in idx if s not in hidden)
 
 
+AUDIT_PATH = os.path.join(BASE_DIR, "audit.jsonl")
+
+
+def audit_log(who, skills, path=None):
+    # ponytail: H73 — who loaded what/when. Hash-free: skill names only,
+    # never prompt text. Returns the row.
+    row = {"t": int(time.time()),
+           "who": who, "skills": list(skills)}
+    try:
+        with open(path or AUDIT_PATH, "a", encoding="utf-8") as f:
+            f.write(json.dumps(row) + "\n")
+    except OSError:
+        pass
+    return row
+
+
+def audit_query(who=None, path=None):
+    # ponytail: H73 — read the trail, optionally filtered by who.
+    rows = []
+    try:
+        with open(path or AUDIT_PATH, encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line:
+                    rows.append(json.loads(line))
+    except OSError:
+        pass
+    if who is not None:
+        rows = [r for r in rows if r.get("who") == who]
+    return rows
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

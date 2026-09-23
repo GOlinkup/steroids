@@ -40,5 +40,18 @@ class TestH72Clearance(unittest.TestCase):
         self.assertEqual(router.visible_skills("full", self.RULES, idx), ["open-y", "vault-x"])
 
 
+class TestH73Audit(unittest.TestCase):
+    def test_log_format_and_query(self):
+        import tempfile
+        p = os.path.join(tempfile.mkdtemp(), "audit.jsonl")
+        router.audit_log("ann", ["a", "b"], p)
+        router.audit_log("bob", ["c"], p)
+        self.assertEqual(len(router.audit_query(path=p)), 2)
+        got = router.audit_query("ann", p)
+        self.assertEqual(len(got), 1)
+        self.assertEqual(set(got[0]), {"t", "who", "skills"})
+        self.assertEqual(got[0]["who"], "ann")
+
+
 if __name__ == "__main__":
     unittest.main()
