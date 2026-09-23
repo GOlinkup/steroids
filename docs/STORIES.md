@@ -41,16 +41,16 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [ ] A10 Dry-run preview — "what I'd load + why" mode; close: flag works, default off.
 
 ## B. Auto-context — the "goes and gets it" half
-- [ ] B11 `needs:` declarations — skills list required inputs in frontmatter; close: 5 skills annotated, enforced.
-- [ ] B12 URL snatch-and-fetch — extract + fetch links from prompt; close: docs-URL probe attaches content.
-- [ ] B13 Screenshot auto-capture — visual task triggers headless capture; close: no-upload demo.
-- [ ] B14 Repo file attach — auto-attach package.json/schema when needed; close: 3 probes.
-- [ ] B15 Surgical questions — missing context → exactly one question; close: golden no-link Figma query.
-- [ ] B16 API schema pull — stripe skill pulls live OpenAPI; close: version-skew test.
-- [ ] B17 Figma node fetch — URL → node JSON + image in context; close: demo with real URL.
-- [ ] B18 DB snapshot — "slow query" attaches schema + EXPLAIN; close: golden.
-- [ ] B19 Error-tail attach — stack trace pulls source lines; close: golden.
-- [ ] B20 Calendar attach — meeting prep pulls doc + notes; close: demo.
+- [x] B11 `needs:` declarations — skills list required inputs in frontmatter; close: 5 skills annotated, enforced. (Jim 2026-09-23, r340)
+- [x] B12 URL snatch-and-fetch — extract + fetch links from prompt; close: docs-URL probe attaches content. (Jim 2026-09-23, r337)
+- [x] B13 Screenshot auto-capture — visual task triggers headless capture; close: no-upload demo. (Jim 2026-09-23, r340)
+- [x] B14 Repo file attach — auto-attach package.json/schema when needed; close: 3 probes. (Jim 2026-09-23, r340)
+- [x] B15 Surgical questions — missing context → exactly one question; close: golden no-link Figma query. (Jim 2026-09-23, r340)
+- [x] B16 API schema pull — stripe skill pulls live OpenAPI; close: version-skew test. (Jim 2026-09-23, r340)
+- [ ] B17 Figma node fetch — URL → node JSON + image in context; close: demo with real URL. (code+test Jim r340, live demo BLOCKED: no FIGMA_TOKEN)
+- [x] B18 DB snapshot — "slow query" attaches schema + EXPLAIN; close: golden. (Jim 2026-09-23, r340)
+- [x] B19 Error-tail attach — stack trace pulls source lines; close: golden. (Jim 2026-09-23, r340)
+- [x] B20 Calendar attach — meeting prep pulls doc + notes; close: demo. (Jim 2026-09-23, r340)
 
 ## C. Learning — ranking that compounds
 - [ ] C21 Real accept tracking — per-harness skill-invocation parsing; close: accepts ≫1/week.
