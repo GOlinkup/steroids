@@ -911,6 +911,35 @@ class TestRouter(unittest.TestCase):
         self.assertEqual(expired, ["a", "b"])
         self.assertEqual(router.ttl_tick({}), ({}, []))
 
+    def test_a09_preauth_warns_once(self):
+        import tempfile, os
+        tmp = tempfile.mkdtemp()
+        try:
+            sess = os.path.join(tmp, "session.json")
+            env = dict(os.environ)
+            env.pop("STRIPE_API_KEY", None)
+            env.pop("FIGMA_TOKEN", None)
+            real = dict(os.environ)
+            try:
+                os.environ.clear()
+                os.environ.update(env)
+                first = router.preauth_warnings(["stripe-integration"], session_path=sess)
+                self.assertEqual(len(first), 1)
+                self.assertIn("STRIPE_API_KEY", first[0])
+                second = router.preauth_warnings(["stripe-integration"], session_path=sess)
+                self.assertEqual(second, [])  # once only
+                os.environ["STRIPE_API_KEY"] = "sk-test"
+                third = router.preauth_warnings(["stripe-integration"],
+                                                session_path=os.path.join(tmp, "s2.json"))
+                self.assertEqual(third, [])  # set key stays silent
+                self.assertEqual(router.preauth_warnings(["no-key-skill"], session_path=sess), [])
+            finally:
+                os.environ.clear()
+                os.environ.update(real)
+        finally:
+            import shutil
+            shutil.rmtree(tmp, ignore_errors=True)
+
 
 if __name__ == "__main__":
     unittest.main()

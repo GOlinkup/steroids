@@ -710,6 +710,41 @@ def ttl_tick(state):
             expired.append(s)
     return alive, sorted(expired)
 
+SKILL_ENV_KEYS = {"stripe-integration": "STRIPE_API_KEY",
+                   "figma-implement-design": "FIGMA_TOKEN"}
+
+def preauth_warnings(skills, session_path=SESSION_PATH):
+    # ponytail: A09 — missing env key warns once (persisted in session.json); set keys stay silent.
+    warned = set()
+    try:
+        with open(session_path, encoding="utf-8") as f:
+            warned = set(json.load(f).get("warned_env", []))
+    except Exception:
+        pass
+    out = []
+    for s in skills or []:
+        key = SKILL_ENV_KEYS.get(s)
+        if key and not os.environ.get(key) and key not in warned:
+            out.append(f"{s} needs {key} (unset) — set it before loading or expect fallback behavior.")
+            warned.add(key)
+    if out:
+        try:
+            doc = {}
+            try:
+                with open(session_path, encoding="utf-8") as f:
+                    doc = json.load(f)
+            except Exception:
+                pass
+            if not isinstance(doc, dict):
+                doc = {}
+            doc["warned_env"] = sorted(warned)
+            os.makedirs(os.path.dirname(session_path) or ".", exist_ok=True)
+            with open(session_path, "w", encoding="utf-8") as f:
+                json.dump(doc, f)
+        except OSError:
+            pass
+    return out
+
 def load_project_profile(root=None):
     # ponytail: C23 — repo-local overlay <cwd>/.steroids-profile.json {boost:{s:f}, bury:[s]}.
     root = root or os.getcwd()
@@ -2119,6 +2154,8 @@ def main():
     top = apply_taste(top, load_taste_profile())
     top = stall_rescue(top, idx, prompt)
     session = track_session(top)
+    for w in preauth_warnings([n for _, n, _ in top or []]):
+        print(f"[Steroids] {w}", file=sys.stderr)
 
     if args.ranker in ("v2", "ab"):
         # ponytail: C27 — explicit challenger or 10% auto-assign experiment run.
