@@ -113,7 +113,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] G70 Translation — inject-time language render; close: 1 skill × 2 languages. (Kevin 2026-09-23, r345)
 
 ## H. Team & enterprise
-- [ ] H71 Role packs — designer/backend bundles; close: 2 packs defined.
+- [x] H71 Role packs — designer/backend bundles; close: 2 packs defined. (Kevin 2026-09-23, r346)
 - [ ] H72 Clearance gating — restricted skills hidden; close: policy test.
 - [ ] H73 Audit trail — who loaded what/when; close: log format + 1 query.
 - [ ] H74 PII guard — customer-data prompts block analytics skills; close: golden red-team pair.

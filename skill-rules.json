@@ -917,8 +917,29 @@
       [
         "fix"
       ]
+    ],
+    "doordash-spend-guard": [
+      [
+        "spend",
+        "stablecoin",
+        "payout",
+        "cap"
+      ],
+      [
+        "doordash",
+        "food",
+        "order",
+        "delivery",
+        "restaurant"
+      ]
     ]
   },
   "embed_weight": 3.0,
-  "embed_defer_above": 2.2
+  "embed_defer_above": 2.2,
+  "packs": {
+    "designer": ["design-system", "frontend-patterns", "frontend-design-direction",
+      "make-interfaces-feel-better", "figma", "tailwind-patterns"],
+    "backend": ["backend-patterns", "api-design", "postgres-patterns",
+      "django-patterns", "fastapi-patterns", "database-migrations"]
+  }
 }

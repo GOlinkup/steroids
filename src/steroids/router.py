@@ -673,6 +673,15 @@ def render_inject(skills, lang="en"):
     return f"{s['hint']}: " + ", ".join(f"{s['load']}: {skill}" for skill in skills)
 
 
+def pack_skills(role, rules, idx=None):
+    # ponytail: H71 — named role bundles from rules["packs"]; unknown role
+    # -> []; optional idx filters to indexed skills.
+    skills = list((rules.get("packs") or {}).get(role, []))
+    if idx is not None:
+        skills = [s for s in skills if s in idx]
+    return skills
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
