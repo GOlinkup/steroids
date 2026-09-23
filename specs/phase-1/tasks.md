@@ -42,7 +42,7 @@ Do-not-touch: scoring semantics (emit around, never inside, hot paths)
 Acceptance:
 - [x] bus module with subscribe/emit; sink writes valid JSONL per event
 - [x] golden benchmark output bit-identical with bus on vs off
-- [ ] CP-1 review of schema + bus before CLI work
+- [x] CP-1 review of schema + bus before CLI work
 Verification: diff golden output both modes; unit test emit/subscribe/replay
 Dependencies: P1-1, P1-2
 Files likely touched: src/steroids/bus.py, tests/test_bus.py
@@ -76,3 +76,4 @@ RQ tag: RQ-4
 Size: S (XS, honestly — one page)
 
 Checkpoint CP-1: after P1-3 — schema + bus reviewed before P1-4 builds on it.
+CP-1 approved 2026-09-23 by GOlinkup.

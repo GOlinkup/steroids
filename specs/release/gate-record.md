@@ -63,4 +63,4 @@ every claim re-verifiable with the command next to it.
   lexical fallback until `pip install onnxruntime numpy`. Fresh-HOME runs
   need that step documented or automated — held for next version.
 
-Sign-off: PENDING human review + date (silence is not approval).
+Sign-off: GOlinkup, 2026-09-23.
