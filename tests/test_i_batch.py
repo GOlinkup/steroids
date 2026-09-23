@@ -124,5 +124,13 @@ class TestI89Digest(unittest.TestCase):
         self.assertEqual(weekly_digest.new_since_snapshot(["a", "b"], p), ["b"])
 
 
+class TestI90Nudge(unittest.TestCase):
+    def test_golden(self):
+        fires = {"used": 10}
+        sizes = {"used": 5, "big-idle": 900, "small-idle": 10}
+        self.assertEqual(router.neglected_nudge(fires, sizes, top_n=5),
+                         ["big-idle", "small-idle"])
+
+
 if __name__ == "__main__":
     unittest.main()

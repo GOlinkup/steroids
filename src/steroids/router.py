@@ -903,6 +903,14 @@ def reindex_async(rules, on_done=None):
     return t, slot
 
 
+def neglected_nudge(fires, sizes, top_n=5):
+    # ponytail: I90 — zero-fire skills first, biggest (priciest to load
+    # blind) first. fires/sizes are plain maps; sources harness-side.
+    zero = [s for s in sizes if not fires.get(s)]
+    zero.sort(key=lambda s: (-sizes[s], s))
+    return zero[:top_n]
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

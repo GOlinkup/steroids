@@ -134,7 +134,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] I87 Clone-and-equip — new repo equipped pre-README; close: timed demo. (Kevin 2026-09-23, r347)
 - [x] I88 Idle reindex — background refresh; close: never-blocks proof. (Kevin 2026-09-23, r347)
 - [x] I89 Weekly digest — new/better skills for your stack; close: first digest generated. (Kevin 2026-09-23, r347)
-- [ ] I90 Neglected nudge — unused-skill reminder; close: golden.
+- [x] I90 Neglected nudge — unused-skill reminder; close: golden. (Kevin 2026-09-23, r347)
 
 ## J. Wild lab
 - [ ] J91 Skill fusion — ephemeral 2-skill hybrid; close: 1 fusion demo.
