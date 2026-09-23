@@ -1,6 +1,7 @@
 """G-batch (r345): per-story tests. G63 doctor."""
 import importlib.util
 import os
+import sys
 import unittest
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
@@ -25,6 +26,16 @@ class TestG63Doctor(unittest.TestCase):
     def test_neg_blocked(self):
         r = router.diagnose_fire("sx", "bad", RULES, IDX)
         self.assertEqual(r["verdict"], "neg-blocked")
+
+
+class TestG64Dup(unittest.TestCase):
+    def test_identical_top(self):
+        sys.path.insert(0, os.path.normpath(os.path.join(_HERE, "..", "scripts")))
+        import dup_detect
+        idx = {"a": ["x", "y"], "b": ["x", "y"], "c": ["z"]}
+        top = dup_detect.top_pairs(idx, n=5)
+        self.assertEqual(top[0][1:3], ("a", "b"))
+        self.assertAlmostEqual(top[0][0], 1.0)
 
 
 if __name__ == "__main__":

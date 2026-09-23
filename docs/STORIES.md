@@ -104,7 +104,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] G61 Skill generator — task description → SKILL.md + goldens; close: 1 generated skill passes D31. (`draft` writes template + nearby refs to drafts/ (never indexed); goldens per generated skill still open.)
 - [x] G62 Skill linter — frontmatter/freshness/collisions; close: lints all 1265, report committed. (Kevin 2026-09-23, r334)
 - [x] G63 Skill doctor — "why won't mine fire?" analyzer; close: 3 diagnosed cases. (Kevin 2026-09-23, r345)
-- [ ] G64 Duplicate detector — overlap → merge proposal; close: top-10 dup pairs listed.
+- [x] G64 Duplicate detector — overlap → merge proposal; close: top-10 dup pairs listed. (Kevin 2026-09-23, r345)
 - [ ] G65 Versioning + pins — per-project pins; close: pin respected in test.
 - [ ] G66 Marketplace — publish/subscribe one command; close: design doc.
 - [ ] G67 Ratings — outcome-backed stars; close: metric defined.
