@@ -16,6 +16,7 @@ bash "$REPO/scripts/eval_gate.sh" || { echo "EVAL GATE FAILED — deploy refused
 mkdir -p "$LIVE_DATA" "$HOME/.local/bin"
 cp "$REPO/src/steroids/router.py" "$BIN"
 chmod +x "$BIN"
+cp "$REPO/src/steroids/net.py" "$HOME/.local/bin/net.py"
 cp "$REPO/src/steroids/embed.py" "$HOME/.local/bin/embed.py"
 cp "$REPO/src/steroids/hook.sh" "$LIVE_DATA/hook.sh"
 cp "$REPO/skill-rules.json" "$LIVE_DATA/skill-rules.json"

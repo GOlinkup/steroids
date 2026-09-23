@@ -1559,33 +1559,62 @@ def extract_prompt_from_transcript(tp):
         pass
     return last_prompt
 
-def extract_urls(prompt):
-    # ponytail: http(s) only; bare domains stay out (precision over recall).
-    found = re.findall(r"https?://[^\s) '\"<>]+", prompt)
-    return list(dict.fromkeys(u.rstrip(".,;:!?") for u in found))[:5]
-
-def fetch_text(url, timeout=10, max_bytes=20000):
-    # ponytail: stdlib urllib; any failure (DNS, TLS, timeout, huge) = None, never raise.
+def _load_net():
+    # ponytail: thin-slice split — net.py is canonical; file-path load keeps
+    # single-file deploy (binary + net.py alongside) and spec-load tests working.
     try:
-        import urllib.request
-        req = urllib.request.Request(url, headers={"User-Agent": "Steroids-gather/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as res:
-            raw = res.read(max_bytes + 1)
-        text = raw[:max_bytes].decode("utf-8", "replace")
-        text = re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>|<!--[\s\S]*?-->", " ", text)
-        text = re.sub(r"<[^>]+>", " ", text)
-        text = re.sub(r"\s+", " ", text).strip()
-        return text[:max_bytes] or None
+        import importlib.util as _ilu
+        _np = os.path.join(os.path.dirname(os.path.abspath(__file__)), "net.py")
+        if os.path.isfile(_np):
+            _spec = _ilu.spec_from_file_location("steroids_net", _np)
+            _mod = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_mod)
+            return _mod
     except Exception:
-        return None
+        pass
+    return None
 
-SHELL_MARKERS = ("loading", "enable javascript", "just a moment",
-                 "checking your browser", "cloudflare", "nreum", "__next_f")
 
-def looks_like_shell(text):
-    # ponytail: >=2 JS-shell markers in the head = bot-wall/SPA shell, not content.
-    head = (text or "")[:2000].lower()
-    return sum(1 for m in SHELL_MARKERS if m in head) >= 2
+_net = _load_net()
+
+if _net is not None:
+    extract_urls = _net.extract_urls
+    fetch_text = _net.fetch_text
+    SHELL_MARKERS = _net.SHELL_MARKERS
+    looks_like_shell = _net.looks_like_shell
+else:
+    def extract_urls(prompt):
+        # ponytail: http(s) only; bare domains stay out (precision over recall).
+        found = re.findall(r"https?://[^\s) '\"<>]+", prompt)
+        return list(dict.fromkeys(u.rstrip(".,;:!?") for u in found))[:5]
+
+    def fetch_text(url, timeout=10, max_bytes=20000):
+        # ponytail: stdlib urllib; any failure (DNS, TLS, timeout, huge) = None, never raise.
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={"User-Agent": "Steroids-gather/1.0"})
+            with urllib.request.urlopen(req, timeout=timeout) as res:
+                raw = res.read(max_bytes + 1)
+            text = raw[:max_bytes].decode("utf-8", "replace")
+            text = re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>|<!--[\s\S]*?-->", " ", text)
+            text = re.sub(r"<[^>]+>", " ", text)
+            text = re.sub(r"\s+", " ", text).strip()
+            return text[:max_bytes] or None
+        except Exception as e:
+            # ponytail: HTTPError is file-like; close to avoid ResourceWarning.
+            try:
+                e.close()
+            except Exception:
+                pass
+            return None
+
+    SHELL_MARKERS = ("loading", "enable javascript", "just a moment",
+                     "checking your browser", "cloudflare", "nreum", "__next_f")
+
+    def looks_like_shell(text):
+        # ponytail: >=2 JS-shell markers in the head = bot-wall/SPA shell, not content.
+        head = (text or "")[:2000].lower()
+        return sum(1 for m in SHELL_MARKERS if m in head) >= 2
 
 def resolve_mcp(need, rules):
     # ponytail: static map only; execution stays agent-side (no MCP client in stdlib).
@@ -1781,6 +1810,10 @@ def figma_node(node_url, token=None, base="https://api.figma.com", timeout=10):
         with urllib.request.urlopen(req2, timeout=timeout) as res2:
             imgs = json.loads(res2.read(100000).decode("utf-8"))
     except Exception as e:
+        try:
+            e.close()
+        except Exception:
+            pass
         return {"ok": False, "error": str(e)[:120]}
     images = (imgs.get("images") or {})
     return {"ok": True, "key": key, "node": node,
@@ -2467,6 +2500,9 @@ def _sha8(raw):
     return hashlib.sha256(raw).hexdigest()[:8]
 
 def _fetch_bytes(url, timeout=15, max_bytes=1000000):
+    # ponytail: canonical in net.py; delegate when loaded, else local fallback.
+    if _net is not None:
+        return _net._fetch_bytes(url, timeout=timeout, max_bytes=max_bytes)
     # ponytail: raw bytes, not fetch_text (that strips tags/whitespace meant for evidence HTML).
     try:
         import urllib.request
@@ -2474,7 +2510,11 @@ def _fetch_bytes(url, timeout=15, max_bytes=1000000):
         with urllib.request.urlopen(req, timeout=timeout) as res:
             raw = res.read(max_bytes + 1)
         return raw if len(raw) <= max_bytes else None
-    except Exception:
+    except Exception as e:
+        try:
+            e.close()
+        except Exception:
+            pass
         return None
 
 def _validate_skill_rules(raw):

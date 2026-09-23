@@ -12,4 +12,6 @@ python3 tests/test_eval.py >> /tmp/gate_units.log 2>&1
 python3 tests/goldens_per_skill.py >> /tmp/gate_units.log 2>&1
 echo "[gate] bench precision vs baseline..."
 python3 scripts/bench.py > /tmp/gate_bench.log 2>&1
+echo "[gate] README claims match golden metadata..."
+python3 tests/benchmark.py --check > /tmp/gate_bench_check.log 2>&1
 echo "[gate] PASS — deploy allowed"

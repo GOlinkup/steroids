@@ -1,0 +1,1031 @@
+{
+ "browser_fallback": {
+  "server": "playwright"
+ },
+ "embed_defer_above": 2.2,
+ "embed_weight": 3.0,
+ "glue": [
+  "onto",
+  "main",
+  "file",
+  "files",
+  "folder",
+  "folders",
+  "repo",
+  "code",
+  "thing",
+  "stuff",
+  "them",
+  "mention"
+ ],
+ "index_dirs": [
+  "~/.agents/skills",
+  "~/.claude/skills",
+  "~/.claude/.agents/skills",
+  "~/.config/opencode/skills",
+  "~/.gemini/antigravity-cli/builtin/skills",
+  "~/.codex/skills",
+  "~/claude-obsidian/skills",
+  "~/flutter/.agents/skills",
+  "./.agents/skills",
+  "./.claude/skills",
+  "./skills",
+  "~/steroids/skills"
+ ],
+ "max_recommendations": 3,
+ "mcp_needs": {
+  "query-or-url": {
+   "server": "exa-web-search",
+   "tool": "web_search"
+  },
+  "source-file-or-url": {
+   "server": "firecrawl",
+   "tool": "scrape"
+  },
+  "topic-or-url": {
+   "server": "exa-web-search",
+   "tool": "web_search"
+  }
+ },
+ "min_evidence_chars": null,
+ "needs_overlay": {
+  "blender-motion-state-inspection": [
+   "motion-catalog-url"
+  ],
+  "game-art": [
+   "reference-url-or-brief"
+  ],
+  "pdf-official": [
+   "source-file-or-url"
+  ]
+ },
+ "neg": {
+  "agent-architecture-audit": [
+   [
+    "architecture"
+   ],
+   [
+    "agent",
+    "audit",
+    "memory",
+    "wrapper",
+    "loop"
+   ]
+  ],
+  "agent-eval": [
+   [
+    "worktree"
+   ],
+   [
+    "compare",
+    "pass",
+    "rate",
+    "consistency",
+    "eval"
+   ]
+  ],
+  "agent-sort": [
+   [
+    "sort"
+   ],
+   [
+    "skill",
+    "install",
+    "plugin",
+    "rank",
+    "recommend"
+   ]
+  ],
+  "agy-customizations": [
+   [
+    "guide",
+    "setup",
+    "cli"
+   ],
+   [
+    "customization",
+    "hook",
+    "rule",
+    "plugin",
+    "custom"
+   ]
+  ],
+  "analyze-github-flake": [
+   [
+    "flake"
+   ],
+   [
+    "github",
+    "action",
+    "workflow",
+    "ci"
+   ]
+  ],
+  "android-clean-architecture": [
+   [
+    "clean"
+   ],
+   [
+    "android",
+    "kotlin",
+    "module",
+    "compose"
+   ]
+  ],
+  "api-design": [
+   [
+    "rest",
+    "api"
+   ],
+   [
+    "endpoint",
+    "name",
+    "error",
+    "paging",
+    "design"
+   ]
+  ],
+  "architecture-decision-records": [
+   [
+    "architecture"
+   ],
+   [
+    "decision",
+    "record",
+    "adr",
+    "rationale"
+   ]
+  ],
+  "brand-voice": [
+   [
+    "blunt"
+   ],
+   [
+    "voice",
+    "style",
+    "tone",
+    "post",
+    "write"
+   ]
+  ],
+  "canary-watch": [
+   [
+    "watch"
+   ],
+   [
+    "deploy",
+    "healthy",
+    "smoke",
+    "release",
+    "post"
+   ]
+  ],
+  "click-path-audit": [
+   [
+    "audit",
+    "click"
+   ],
+   [
+    "button",
+    "state",
+    "touchpoint",
+    "flow"
+   ]
+  ],
+  "code-review": [
+   [
+    "review"
+   ],
+   [
+    "diff",
+    "standards",
+    "spec",
+    "pr",
+    "branch"
+   ]
+  ],
+  "codebase-design": [
+   [
+    "another",
+    "codebase"
+   ],
+   [
+    "seam",
+    "module",
+    "hexagonal",
+    "pattern",
+    "boundary"
+   ]
+  ],
+  "competitive-platform-analysis": [
+   [
+    "platform"
+   ],
+   [
+    "competitor",
+    "benchmark",
+    "landscape",
+    "position"
+   ]
+  ],
+  "competitive-report-structure": [
+   [
+    "structure"
+   ],
+   [
+    "competitor",
+    "report",
+    "benchmark",
+    "matrix"
+   ]
+  ],
+  "council-multi-model": [
+   [
+    "model",
+    "review",
+    "same"
+   ],
+   [
+    "council",
+    "codex",
+    "external",
+    "synthesis"
+   ]
+  ],
+  "data-scraper-agent": [
+   [
+    "track",
+    "agent",
+    "run"
+   ],
+   [
+    "scrape",
+    "sheet",
+    "price",
+    "schedule",
+    "monitor"
+   ]
+  ],
+  "domain-modeling": [
+   [
+    "domain",
+    "model"
+   ],
+   [
+    "vocabulary",
+    "glossary",
+    "context",
+    "language"
+   ]
+  ],
+  "doordash-spend-guard": [
+   [
+    "spend",
+    "stablecoin",
+    "payout",
+    "cap"
+   ],
+   [
+    "doordash",
+    "food",
+    "order",
+    "delivery",
+    "restaurant"
+   ]
+  ],
+  "error-handling": [
+   [
+    "error"
+   ],
+   [
+    "exception",
+    "retry",
+    "circuit",
+    "breaker",
+    "fallback"
+   ]
+  ],
+  "evm-token-decimals": [
+   [
+    "token"
+   ],
+   [
+    "decimal",
+    "evm",
+    "chain",
+    "bridge",
+    "precision"
+   ]
+  ],
+  "flutter-cherry-pick": [
+   [
+    "branch",
+    "merge",
+    "merg"
+   ],
+   [
+    "cherry",
+    "pick",
+    "harvest"
+   ]
+  ],
+  "flutter-dart-code-review": [
+   [
+    "review"
+   ],
+   [
+    "flutter",
+    "dart",
+    "widget",
+    "mobile",
+    "app"
+   ]
+  ],
+  "free-tool-strategy": [
+   [
+    "free"
+   ],
+   [
+    "marketing",
+    "lead",
+    "leads",
+    "seo",
+    "traffic",
+    "brand",
+    "startup",
+    "growth",
+    "landing",
+    "monetize",
+    "calculator",
+    "generator",
+    "grader",
+    "saas",
+    "nurture",
+    "marketer"
+   ]
+  ],
+  "fsharp-testing": [
+   [
+    "dotnet",
+    "integration"
+   ],
+   [
+    "fsharp",
+    "property",
+    "bas"
+   ]
+  ],
+  "i-have-adhd": [
+   [
+    "have"
+   ],
+   [
+    "adhd",
+    "focus",
+    "attention",
+    "distract"
+   ]
+  ],
+  "improve-codebase-architecture": [
+   [
+    "architecture"
+   ],
+   [
+    "improve",
+    "deep",
+    "module",
+    "seam",
+    "opportunity"
+   ]
+  ],
+  "json-canvas": [
+   [
+    "obsidian",
+    "mindmap",
+    "spatial",
+    "board",
+    "canvas"
+   ],
+   [
+    "json",
+    "format",
+    "schema",
+    "parse"
+   ]
+  ],
+  "make-interfaces-feel-better": [
+   [
+    "make"
+   ],
+   [
+    "spacing",
+    "typography",
+    "polish",
+    "interface",
+    "feel"
+   ]
+  ],
+  "manim-video": [
+   [
+    "video"
+   ],
+   [
+    "manim",
+    "python",
+    "math",
+    "animation",
+    "scene"
+   ]
+  ],
+  "network-interface-health": [
+   [
+    "health"
+   ],
+   [
+    "interface",
+    "crc",
+    "flap",
+    "duplex",
+    "counter",
+    "port"
+   ]
+  ],
+  "openclaw-persona-forge": [
+   [
+    "character"
+   ],
+   [
+    "persona",
+    "lobster",
+    "soul",
+    "openclaw",
+    "gacha",
+    "avatar",
+    "forge"
+   ]
+  ],
+  "orch-add-feature": [
+   [
+    "feature",
+    "exist"
+   ],
+   [
+    "orch",
+    "add",
+    "pipeline",
+    "gated"
+   ]
+  ],
+  "orch-change-feature": [
+   [
+    "feature",
+    "exist"
+   ],
+   [
+    "orch",
+    "change",
+    "pipeline",
+    "gated"
+   ]
+  ],
+  "orch-fix-defect": [
+   [
+    "defect"
+   ],
+   [
+    "fix"
+   ]
+  ],
+  "perl-security": [
+   [
+    "tap",
+    "tiny"
+   ],
+   [
+    "perl",
+    "taint",
+    "dbi",
+    "injection"
+   ]
+  ],
+  "prediction-market-risk-review": [
+   [
+    "review",
+    "handle"
+   ],
+   [
+    "prediction",
+    "market",
+    "risk",
+    "oracle"
+   ]
+  ],
+  "programmatic-seo": [
+   [
+    "city"
+   ],
+   [
+    "seo",
+    "landing",
+    "directory",
+    "location",
+    "keyword",
+    "template",
+    "scale",
+    "programmatic",
+    "audit",
+    "traffic"
+   ]
+  ],
+  "project-flow-ops": [
+   [
+    "keep",
+    "project"
+   ],
+   [
+    "linear",
+    "github",
+    "duplicate",
+    "triage",
+    "execution"
+   ]
+  ],
+  "rebuilding-flutter-tool": [
+   [
+    "rebuild"
+   ],
+   [
+    "tool",
+    "broken",
+    "doctor",
+    "fix"
+   ]
+  ],
+  "remotion-video-creation": [
+   [
+    "video",
+    "cover"
+   ],
+   [
+    "remotion",
+    "react",
+    "chart",
+    "caption",
+    "transition"
+   ]
+  ],
+  "resolving-merge-conflicts": [
+   [
+    "merge"
+   ],
+   [
+    "conflict",
+    "rebase",
+    "branch",
+    "marker"
+   ]
+  ],
+  "rust-patterns": [
+   [
+    "concurrency",
+    "error"
+   ],
+   [
+    "rust",
+    "borrow",
+    "ownership",
+    "lifetime"
+   ]
+  ],
+  "rust-testing": [
+   [
+    "property"
+   ],
+   [
+    "rust",
+    "ownership",
+    "lifetime",
+    "borrow"
+   ]
+  ],
+  "scientific-thinking-literature-review": [
+   [
+    "review"
+   ],
+   [
+    "literature",
+    "paper",
+    "scholar",
+    "citation"
+   ]
+  ],
+  "setup-pre-commit": [
+   [
+    "commit"
+   ],
+   [
+    "husky",
+    "hook",
+    "lint",
+    "staged"
+   ]
+  ],
+  "setup-ts-deep-modules": [
+   [
+    "module",
+    "seam"
+   ],
+   [
+    "typescript",
+    "cruiser",
+    "deep",
+    "entry",
+    "package"
+   ]
+  ],
+  "swift-concurrency-6-2": [
+   [
+    "concurrency"
+   ],
+   [
+    "swift",
+    "actor",
+    "protocol",
+    "concurrent",
+    "isolated",
+    "observable"
+   ]
+  ],
+  "tasteforge-video": [
+   [
+    "image",
+    "video"
+   ],
+   [
+    "taste",
+    "style",
+    "plate",
+    "overlay",
+    "grade"
+   ]
+  ],
+  "terminal-opener": [
+   [
+    "terminal"
+   ],
+   [
+    "open",
+    "window",
+    "visible",
+    "launch",
+    "argv"
+   ]
+  ],
+  "terminal-ops": [
+   [
+    "proof",
+    "terminal"
+   ],
+   [
+    "command",
+    "repo",
+    "execute",
+    "ci"
+   ]
+  ],
+  "token-budget-advisor": [
+   [
+    "token"
+   ],
+   [
+    "budget",
+    "limit",
+    "length",
+    "depth",
+    "cost"
+   ]
+  ],
+  "unified-memory": [
+   [
+    "memory"
+   ],
+   [
+    "vault",
+    "unified",
+    "share",
+    "palace",
+    "transfer",
+    "agent"
+   ]
+  ],
+  "video-editing": [
+   [
+    "remotion",
+    "react",
+    "chart",
+    "caption",
+    "cover",
+    "voiceover",
+    "generate"
+   ],
+   [
+    "premiere",
+    "cut",
+    "timeline",
+    "export",
+    "ffmpeg",
+    "clip"
+   ]
+  ],
+  "wait-what": [
+   [
+    "did",
+    "last"
+   ],
+   [
+    "pitch",
+    "land",
+    "again"
+   ]
+  ],
+  "wiki-query": [
+   [
+    "query"
+   ],
+   [
+    "wiki",
+    "vault",
+    "notes",
+    "ask",
+    "mode"
+   ]
+  ]
+ },
+ "proof_overlay": {
+  "blender-motion-state-inspection": [
+   "motions-listed"
+  ],
+  "game-art": [
+   "asset-sourced"
+  ],
+  "pdf-official": [
+   "output-opens",
+   "text-extractable"
+  ]
+ },
+ "semantic_weight": 2.0,
+ "skills": {
+  "accessibility": [
+   "sizes",
+   "button",
+   "tap"
+  ],
+  "agent-self-evaluation": [
+   "scorecard",
+   "axes"
+  ],
+  "agent-sort": [
+   "buckets",
+   "trimmed"
+  ],
+  "agy-customizations": [
+   "antigravity",
+   "agy",
+   "customization",
+   "hook",
+   "rule",
+   "plugin"
+  ],
+  "ai-first-engineering": [
+   "ownership",
+   "gates"
+  ],
+  "antigravity-guide": [
+   "antigravity",
+   "agy",
+   "guide",
+   "cli"
+  ],
+  "api-connector-builder": [
+   "codebase",
+   "another",
+   "wire",
+   "thirdparty"
+  ],
+  "archify": [
+   "diagram",
+   "draw",
+   "visual"
+  ],
+  "ask-matt": [
+   "lost",
+   "fit"
+  ],
+  "benchmark": [
+   "faster",
+   "compare"
+  ],
+  "blueprint": [
+   "rambling",
+   "idea"
+  ],
+  "browser-qa": [
+   "deployed",
+   "flows",
+   "verify",
+   "screenshot",
+   "visual",
+   "e2e"
+  ],
+  "canvas": [
+   "canvas",
+   "obsidian",
+   "mindmap",
+   "spatial"
+  ],
+  "ck": [
+   "reexplain",
+   "alive",
+   "session",
+   "persist",
+   "survive"
+  ],
+  "claude-devfleet": [
+   "fleet",
+   "dispatch",
+   "parallel",
+   "once",
+   "worktree",
+   "isolated"
+  ],
+  "click-path-audit": [
+   "alone",
+   "together",
+   "combination"
+  ],
+  "code-review": [
+   "delete",
+   "straight",
+   "remove",
+   "review",
+   "pr",
+   "diff",
+   "standards",
+   "spec"
+  ],
+  "codehealth-mcp": [
+   "structure",
+   "file",
+   "worse"
+  ],
+  "cost-tracking": [
+   "money",
+   "spend"
+  ],
+  "council": [
+   "sides",
+   "argue",
+   "tradeoff"
+  ],
+  "crosspost": [
+   "announcement",
+   "schedule"
+  ],
+  "dart-flutter-patterns": [
+   "listview",
+   "memoize",
+   "flutter",
+   "dart",
+   "widget",
+   "mobile",
+   "app"
+  ],
+  "data-scraper-agent": [
+   "nightly",
+   "sheet",
+   "save"
+  ],
+  "defuddle": [
+   "strip",
+   "clutter"
+  ],
+  "deployment-patterns": [
+   "rollback",
+   "deploys"
+  ],
+  "design-system": [
+   "tokens",
+   "palette",
+   "typography",
+   "spacing",
+   "audit"
+  ],
+  "diagnosing-bugs": [
+   "crash",
+   "hunt",
+   "intermittent"
+  ],
+  "django-security": [
+   "lock",
+   "auth",
+   "cookies"
+  ],
+  "dmux-workflows": [
+   "drive",
+   "cli",
+   "tmux",
+   "panes",
+   "side",
+   "parallel"
+  ],
+  "docker-patterns": [
+   "holes",
+   "write",
+   "usual",
+   "without",
+   "dockerfile"
+  ],
+  "documentation-lookup": [
+   "quoting",
+   "lookup",
+   "instead"
+  ],
+  "domain-modeling": [
+   "vocabulary",
+   "glossary",
+   "settle"
+  ],
+  "fal-ai-media": [
+   "launch",
+   "voiceover",
+   "generate"
+  ],
+  "flox-environments": [
+   "hurt"
+  ],
+  "frontend-design-direction": [
+   "hero",
+   "landing",
+   "branding"
+  ],
+  "frontend-patterns": [
+   "ui",
+   "layout",
+   "theme",
+   "component"
+  ],
+  "golang-patterns": [
+   "error",
+   "handling",
+   "idiomatic",
+   "concurrency"
+  ],
+  "improve-codebase-architecture": [
+   "simplification",
+   "ranked",
+   "cut"
+  ],
+  "javascript-testing-patterns": [
+   "vitest",
+   "jest"
+  ],
+  "manim-video": [
+   "math",
+   "theorem",
+   "proof"
+  ],
+  "messages-ops": [
+   "flood"
+  ],
+  "nutrient-document-processing": [
+   "merge"
+  ],
+  "postgres-patterns": [
+   "row"
+  ],
+  "pr": [
+   "body",
+   "description"
+  ],
+  "pytorch-patterns": [
+   "stabilize",
+   "reproduce",
+   "different"
+  ],
+  "resolving-merge-conflicts": [
+   "branch",
+   "merge",
+   "conflict",
+   "rebase"
+  ],
+  "social-publisher": [
+   "episode",
+   "publish"
+  ],
+  "systematic-debugging": [
+   "heisenbug",
+   "debugger",
+   "methodical"
+  ]
+ }
+}

@@ -19,15 +19,36 @@ bash scripts/demo-serve.sh                # demo on :8903, auto-closes with the 
 
 `steroids "query"` prints a short hint like `build,flutter -> dart-flutter-patterns/...`. Load what applies, skip the rest.
 
-## Results (verified 2026-09-20; live index 1265 skills — re-run `steroids --count`)
+## Results (verified 2026-09-23; live index 1265 skills — re-run `steroids --count`)
 
 | Eval | n | precision@1 | precision@3 | exclusion-leaks | MRR | MAP |
 |---|---|---|---|---|---|---|
-| Blind (in-script GOLDEN, `tests/blind_eval_100.py`) | 149 | 0.933 | 0.993 | 0 | — | — |
-| Live probe (`tests/live_probe.py`) | 16 | 0.938 | 0.812 | 3 | — | — |
-| Blind second set, stranger-style (`tests/blind_eval_second.py`) | 315 | 0.886 | 0.962 | 0 | 0.927 | 0.912 |
+| Blind (in-script GOLDEN, `tests/blind_eval_100.py`) | 149 | 0.799 | 0.960 | 0 | — | — |
+| Live probe (`tests/live_probe.py`) | 16 | 0.875 | 0.812 | 2 | — | — |
+| Blind second set, stranger-style (`tests/blind_eval_second.py`) | 315 | 0.886 | 0.959 | 0 | 0.926 | 0.903 |
 
-Re-run any time: `python3 tests/blind_eval_100.py`, `python3 tests/live_probe.py`, `python3 tests/blind_eval_second.py`.
+Re-run any time: `python3 tests/benchmark.py --live` (all three sets).
+
+### Reproducible golden benchmark
+
+`--live` measures against whatever is installed on your machine today.
+`--golden` measures against a frozen snapshot so numbers stay comparable
+across commits and machines:
+
+```bash
+python3 tests/benchmark.py --golden   # frozen 1265-skill snapshot (benchmarks/golden-1265/)
+python3 tests/benchmark.py --check    # README claims match the snapshot metadata
+```
+
+`--check` fails if the README table drifts from `benchmarks/golden-1265/metadata.json`
+(the class of error that once shipped 366-skill measurements under a 1265-skill header).
+
+### Historical results
+
+| Date | Index | blind149 P@1 / P@3 | Notes |
+|---|---|---|---|
+| 2026-09-20 | 366 skills | 0.933 / 0.993 | Pre-expansion index; embed rerank on. Smaller index, fewer distractors. |
+| 2026-09-23 | 1265 skills | 0.799 / 0.960 | Current. Index grew 3.5×; same router beats the old one 0.799 vs 0.577 on this index. |
 
 ## Multi-harness support
 
