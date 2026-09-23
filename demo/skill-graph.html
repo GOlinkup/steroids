@@ -51,7 +51,7 @@ footer{font-size:11px;padding:5px 12px}
 <canvas id="mascot"></canvas>
 <div id="wrap"><canvas id="canvas"></canvas><aside id="details"><p class="dim">Click a node for details.</p></aside></div>
 <div id="zoom"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button></div>
-<footer>drag node to move · scroll or +/− to zoom · drag background to pan · double-click to reset view</footer>
+<footer>drag node to move · scroll or +/− to zoom · drag background to pan · double-click to reset view · drop text to ripple-match</footer>
 <script>
 var SAMPLE={nodes:[
 {id:"frontend-patterns",keywords:["ui","layout","theme","component","react"],degree:3},
@@ -159,6 +159,24 @@ cv.addEventListener("wheel",function(e){e.preventDefault();
   var m=pos(e),w0=s2w(m);view.k=Math.min(2,Math.max(0.3,view.k*(e.deltaY<0?1.1:0.9)));
   view.x=w0[0]-(m[0]-W/2)/view.k;view.y=w0[1]-(m[1]-H/2)/view.k;draw();},{passive:false});
 cv.addEventListener("dblclick",function(){view.x=0;view.y=0;fitView();draw();});
+// ponytail: F53 drag-a-prompt — drop text, top-5 keyword matches ripple.
+function dropScore(text){var seen={},toks=(text||"").toLowerCase().match(/[a-z0-9+#]{3,}/g)||[];
+  toks.forEach(function(t){seen[t]=1;});
+  return nodes.map(function(n){var s=0;n.kw.forEach(function(k){if(seen[k])s++;});return {n:n,s:s};})
+    .filter(function(r){return r.s>0;}).sort(function(a,b){return b.s-a.s;}).slice(0,5);}
+var ripples=[];
+function ripple(rows){var t0=performance.now();
+  ripples=rows.map(function(r){return {n:r.n,t0:t0};});
+  sel=rows.length?rows[0].n:null;if(sel)show(sel);
+  (function frame(){var now=performance.now(),live=false;draw();
+    ripples.forEach(function(r){var pr=(now-r.t0)/1200;if(pr>=1)return;live=true;
+      var q=w2s([r.n.x,r.n.y]);ctx.globalAlpha=1-pr;ctx.strokeStyle="#7ee787";ctx.lineWidth=2;
+      ctx.beginPath();ctx.arc(q[0],q[1],8+pr*46,0,6.283);ctx.stroke();ctx.globalAlpha=1;});
+    if(live)requestAnimationFrame(frame);else{ripples=[];draw();}})();}
+cv.addEventListener("dragover",function(e){e.preventDefault();});
+cv.addEventListener("drop",function(e){e.preventDefault();
+  var t=e.dataTransfer?e.dataTransfer.getData("text/plain"):"";if(!t)return;
+  var rows=dropScore(t);if(rows.length)ripple(rows);});
 function zoomStep(f){var m=[W/2,H/2],w0=s2w(m);
   view.k=Math.min(2,Math.max(0.3,view.k*f));
   view.x=w0[0]-(m[0]-W/2)/view.k;view.y=w0[1]-(m[1]-H/2)/view.k;draw();}
