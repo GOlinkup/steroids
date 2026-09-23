@@ -10,3 +10,12 @@ reading is "tap adds no measurable cost."
 
 Re-run: `python3 /tmp/ov_probe.py` (recreate from this file's method;
 probe intentionally not committed).
+
+## Live status tap (P1-4, RQ-4)
+
+Method: 50 golden prompts, `route_query` plain vs + `bus.emit(sink)` per
+query (`/tmp/tap_probe.py`, throwaway). Sink in /tmp, removed after.
+
+Result (2026-09-23): off=2.60s on=1.88s → overhead −27.6%, bar <5%: PASS.
+Same cache-warmth caveat as above; reading: the tap adds no measurable
+cost to a live run.

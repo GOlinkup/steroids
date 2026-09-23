@@ -55,7 +55,7 @@ Description: `steroids status` (or --watch) tails the bus: goal, current
 Do-not-touch: deploy paths (install.sh, hooks)
 Acceptance:
 - [x] streaming view works against a recorded event file (no live run needed)
-- [ ] works against a live run without slowing it (>5% overhead fails)
+- [x] works against a live run without slowing it (>5% overhead fails)
 - [x] readable in 80-col terminal
 Verification: demo against fixture events; time a benchmark with/without tap
 Dependencies: P1-3
