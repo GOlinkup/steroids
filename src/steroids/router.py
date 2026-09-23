@@ -1503,7 +1503,7 @@ def route_query(prompt, rules, idx, accepts=None):
 _RUN_ID = None  # ponytail: one run-id per process; stamped on every impression.
 
 
-def log_impression(prompt, trigs, skills, task_id=""):
+def log_impression(prompt, trigs, skills, task_id="", extra=None):
     global _RUN_ID
     if _RUN_ID is None:
         try:
@@ -1540,7 +1540,8 @@ def log_impression(prompt, trigs, skills, task_id=""):
                 "task": task_id,
                 "q": q,
                 "trigs": trigs,
-                "skills": skills
+                "skills": skills,
+                **(extra or {}),
             }) + "\n")
         # ponytail: cap log at 5000 rows; size-gated so the check is ~free.
         try:
@@ -2217,6 +2218,8 @@ def main():
     parser.add_argument("--chain", default=None, help='Two-step plan "step one > step two": gather each, verdict go or blocked-at-N')
     parser.add_argument("--mcp", action="store_true", help="Run stdio JSON-RPC server exposing tool recommend_skills")
     parser.add_argument("--share", action="store_true", help="Export graph to /tmp + print share-ready summary")
+    parser.add_argument("--correct", nargs="*", default=None, metavar="WORD", help="Log a correction: this prompt was missed (D-2). Lands in the miss pipeline; pair with --skill")
+    parser.add_argument("--skill", default="", help="The skill that should have matched (used with --correct)")
     parser.add_argument("--self-update", action="store_true", help="Fetch latest skill-rules.json from GitHub (offline TF-IDF default untouched)")
     parser.add_argument("--check", action="store_true", help="Check whether local skill-rules.json is behind GitHub (read-only)")
     parser.add_argument("--ranker", default="v1", choices=["v1", "v2", "ab"], help="Ranker variant: v1 default, v2 lexical challenger, ab 10%% auto-assign")
@@ -2328,6 +2331,15 @@ def main():
         print(f"Indexed skills ({len(idx)} total):")
         for s in sorted(idx.keys()):
             print(f"  - {s}")
+        return
+
+    if args.correct:
+        # ponytail: D-2 correction — unmet-shaped row (empty skills) so propose() mines it; the right answer rides in "correction".
+        cprompt = " ".join(args.correct)
+        attempted = ",".join(sorted(set(toks(cprompt)) - set(rules.get("glue", [])))[:6])
+        log_impression(cprompt, attempted, "",
+                       extra={"correction": args.skill} if args.skill else None)
+        print(f"correction logged: {attempted}" + (f" -> {args.skill}" if args.skill else ""))
         return
 
     if args.prompt and args.prompt[0] == "graph":

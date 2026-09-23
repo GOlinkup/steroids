@@ -67,6 +67,10 @@ python3 tests/benchmark.py --check    # README claims match the snapshot metadat
 - **Name bonus** for direct skill-name mentions in the prompt.
 - **Closed-loop memory + log** records which suggestions were useful and biases future routing.
 
+## Privacy
+
+Steroids runs fully offline on your machine. Routine routing sends nothing anywhere: the served log (`served.jsonl`) stores only a hash of your prompt plus the trigger words it attempted — never the prompt text — and misses are mined locally into draft skill proposals a human must approve. If the router misses, one command files a correction straight into that miss pipeline: `steroids --correct what you asked --skill the-right-skill`. Sharing with a team pool is explicitly opt-in: nothing leaves your machine unless you pass `--team <pool.json>`.
+
 ## Limitations
 
 - Keyword overlap, not semantic search — paraphrased prompts may miss.
