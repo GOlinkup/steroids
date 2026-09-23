@@ -116,5 +116,13 @@ class TestI88Reindex(unittest.TestCase):
         self.assertEqual(set(slot["idx"]), set(IDX))
 
 
+class TestI89Digest(unittest.TestCase):
+    def test_new_since_snapshot(self):
+        import weekly_digest, tempfile
+        p = os.path.join(tempfile.mkdtemp(), "snap.json")
+        open(p, "w").write('{"a": ["x"]}')
+        self.assertEqual(weekly_digest.new_since_snapshot(["a", "b"], p), ["b"])
+
+
 if __name__ == "__main__":
     unittest.main()
