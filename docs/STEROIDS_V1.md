@@ -264,6 +264,26 @@ Never "AI that never hallucinates." The dependency to create: developers feel
 the difference immediately when Steroids is removed — real usefulness, not
 lock-in.
 
+### Comparison (D-3 — where Steroids wins, and one row it loses)
+
+| Context | Steroids | Alternative | Evidence |
+|---|---|---|---|
+| Skill discovery, exact/near vocabulary | blind149 P@1 0.799, P@3 0.960 | Grep over skill dirs: no ranking, no typo-fix | `tests/blind_eval_100.py --golden` |
+| Cold machine, zero install | Routes from a clean checkout (3.3s cold) | Harness plugins that require install + warm-up | D-1 demo (`demo/edge-states.md`) |
+| Thousands of skills | 3915 indexed in ~4s, queries sub-second; p50 ~18ms @5000 | Full skill docs in context: blows the window | LCH-6 scale record; D-1 scale mock |
+| Miss recovery loop | D-2 `--correct` door; correction rate queryable (0.0 today) | No-loop routers: misses evaporate | `scripts/correction_rate.py` over served log |
+| **Paraphrased / vocabulary-mismatch queries — STEROIDS LOSES** | Lexical-only without the embed model; overlap miss → abstain | Embedding retrieval (or the model itself) bridges paraphrase | README Limitations; abstain path (`route_query` trigram-noise test) |
+
+### Metrics (D-3 — every number carries its collection method)
+
+- blind149 P@1 0.799 / P@3 0.960 — `python3 tests/blind_eval_100.py --golden` (frozen 1265-skill snapshot; comparable across commits).
+- second315 P@1 0.886 / P@3 0.959 — `python3 tests/blind_eval_second.py` (stranger-style set).
+- live16 P@1 0.875 / P@3 0.812, 2 exclusion-leaks — `python3 tests/live_probe.py` (today's machine; leaks tracked, not hidden).
+- Route latency p50 ~18ms, p99 34–56ms @5000 skills — LCH-6 scale record.
+- correction_rate 0.0 (0/1670) — `python3 scripts/correction_rate.py` over `~/.config/steroids/served.jsonl`; the D-2 door is proven (correction filed on a throwaway HOME counts 1/1672) but unused live so far.
+- abstention_rate 0.0138 (23/1670) — same query; pure-noise abstains, near-miss noise routes by design.
+- Index size 1265 — `steroids --count` on the dev machine (README header; per-machine counts differ — re-run, don't trust docs).
+
 ---
 
 ## 23. Prior art & evidence (grounded 2026-09-23)
