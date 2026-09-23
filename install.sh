@@ -20,6 +20,8 @@ cp "$REPO/src/steroids/embed.py" "$HOME/.local/bin/embed.py"
 cp "$REPO/src/steroids/hook.sh" "$LIVE_DATA/hook.sh"
 cp "$REPO/skill-rules.json" "$LIVE_DATA/skill-rules.json"
 cp "$REPO/plugins/opencode/steroids-plugin.ts" "$HOME/.config/opencode/plugins/steroids-plugin.ts"
+mkdir -p "$HOME/.config/steroids"
+cp "$REPO/src/steroids/steroids2d.py" "$HOME/.config/steroids/steroids2d.py"
 echo "Installed: $BIN + plugin. Index at $LIVE_DATA/skill-index.json"
 "$BIN" --reindex --count
 bash "$REPO/scripts/verify-hooks.sh"

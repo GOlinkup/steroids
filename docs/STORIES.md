@@ -89,7 +89,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] E50 Fallback chains — A fails → B with error attached; close: golden. (Kevin 2026-09-23, r343)
 
 ## F. Canvas & UX — make it visible
-- [ ] F51 Live fire display — blobs ignite on route; close: demo gif.
+- [x] F51 Live fire display — blobs ignite on route; close: demo gif. (Jim 2026-09-23, r335+r357 — canvas vendored, gif recorded)
 - [x] F52 Click-to-inject — click blob loads skill; close: works against live index. (Kevin 2026-09-23, r344)
 - [x] F53 Drag-a-prompt — drop text, watch ripple; close: demo. (Kevin 2026-09-23, r344)
 - [x] F54 Graph explorer — 1265 nodes zoom/pan/search; close: loads <2s. (Kevin 2026-09-23, r344)
