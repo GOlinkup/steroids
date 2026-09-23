@@ -122,7 +122,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] H77 Incident packs — outage bundle; close: 1 pack defined + drill. (Kevin 2026-09-23, r346)
 - [x] H78 Leaver continuity — custom skills retained; close: policy doc. (Kevin 2026-09-23, r346)
 - [x] H79 Federated indexes — N repos, one brain; close: 2-repo demo. (Kevin 2026-09-23, r346)
-- [ ] H80 Air-gap mode — full offline box; close: offline install test.
+- [x] H80 Air-gap mode — full offline box; close: offline install test. (Kevin 2026-09-23, r346)
 
 ## I. Proactive & ambient — skills before you ask
 - [ ] I81 Watch mode — file events surface skills; close: Dockerfile demo.

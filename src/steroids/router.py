@@ -762,6 +762,25 @@ def federated_route(prompt, rules, repos, accepts=None):
     return sorted(merged.values(), key=lambda r: (-r["score"], r["skill"]))[:rules.get("max_recommendations", 3)]
 
 
+def offline_guard():
+    # ponytail: H80 — context manager killing all socket creation, proving
+    # the hot path is network-free (air-gap box). Test-only helper.
+    import socket as _socket
+    import contextlib as _ctx
+
+    @_ctx.contextmanager
+    def _guard():
+        real = _socket.socket
+        def dead(*a, **k):
+            raise OSError("air-gap: network disabled")
+        _socket.socket = dead
+        try:
+            yield
+        finally:
+            _socket.socket = real
+    return _guard()
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

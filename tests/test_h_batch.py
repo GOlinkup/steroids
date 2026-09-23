@@ -131,5 +131,20 @@ class TestH79Federated(unittest.TestCase):
         self.assertTrue(all(set(r) == {"skill", "score", "hits", "repo"} for r in out))
 
 
+class TestH80Airgap(unittest.TestCase):
+    QUERIES = ("review my PR", "fix merge conflict", "write pytest tests")
+
+    def test_offline_matches_online(self):
+        import test_eval
+        online_tops = [router.route_query(q, RULES, IDX) for q in self.QUERIES]
+        online_rows = test_eval.evaluate()
+        with router.offline_guard():
+            off_tops = [router.route_query(q, RULES, IDX) for q in self.QUERIES]
+            off_rows = test_eval.evaluate()
+        self.assertTrue(all(online_tops))
+        self.assertEqual(off_tops, online_tops)
+        self.assertEqual(off_rows, online_rows)
+
+
 if __name__ == "__main__":
     unittest.main()
