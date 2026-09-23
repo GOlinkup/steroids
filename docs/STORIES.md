@@ -5,12 +5,12 @@ Shipped already: abstention gate, short tokens, 12 synonyms, ed1 typo fix, de-hi
 
 ## P00. Grounded execution loop (build FIRST — unlocks the 100)
 End-to-end: skill declares `needs:` → Steroids fetches evidence (MCP-first, browser-fallback) → agent builds from real data → per-step proof gates. Kills hallucination + shortcut-taking at the seam where skills load.
-- [x] P00a `needs:` declarations — parse from SKILL.md frontmatter into index; close: annotated skills (pdf, notion-spec-to-implementation, deep-research, exa-search), unit test.
-- [x] P00b URL fetch + attach — extract URLs from prompt, fetch (timeout + size cap, stdlib), attach text; close: `steroids --gather` demo, no-network graceful fallback.
-- [x] P00c MCP-first routing — need matched to MCP server when available; close: 1 real MCP need resolved end-to-end.
-- [x] P00d Browser fallback — no MCP? headless fetch of JS/logged-out pages; close: 1 catalog-style page fetched.
-- [x] P00e Proof gates — skill declares `proof:`; chain blocks on red; close: 1 two-step chain golden.
-- [x] P00g `propose` — abstentions logged (attempted trigs, hash-only); clusters ≥2 into draft skill proposals for humans; close: unit + live abstain row. (Generation itself stays human — G61.)
+- [x] P00a `needs:` declarations — parse from SKILL.md frontmatter into index; close: annotated skills (pdf, notion-spec-to-implementation, deep-research, exa-search), unit test. (Kevin 2026-09-23, r354)
+- [x] P00b URL fetch + attach — extract URLs from prompt, fetch (timeout + size cap, stdlib), attach text; close: `steroids --gather` demo, no-network graceful fallback. (Kevin 2026-09-23, r354)
+- [x] P00c MCP-first routing — need matched to MCP server when available; close: 1 real MCP need resolved end-to-end. (Kevin 2026-09-23, r354)
+- [x] P00d Browser fallback — no MCP? headless fetch of JS/logged-out pages; close: 1 catalog-style page fetched. (Kevin 2026-09-23, r354)
+- [x] P00e Proof gates — skill declares `proof:`; chain blocks on red; close: 1 two-step chain golden. (Kevin 2026-09-23, r354)
+- [x] P00g `propose` — abstentions logged (attempted trigs, hash-only); clusters ≥2 into draft skill proposals for humans; close: unit + live abstain row. (Generation itself stays human — G61.) (Kevin 2026-09-23, r354)
 - [ ] P00f Full loop demo — "build X" goes research→build→verify unassisted; close: recorded demo.
 
 ## How to close a story
@@ -101,7 +101,7 @@ Status legend: `[ ]` open · `[~]` in progress · `[x]` done. Owner + date on cl
 - [x] F60 Stack tour — new-user top-skills brief; close: 2 stacks demoed. (Kevin 2026-09-23, r344)
 
 ## G. Authoring & ecosystem
-- [x] G61 Skill generator — task description → SKILL.md + goldens; close: 1 generated skill passes D31. (`draft` writes template + nearby refs to drafts/ (never indexed); goldens per generated skill still open.)
+- [x] G61 Skill generator — task description → SKILL.md + goldens; close: 1 generated skill passes D31. (`draft` writes template + nearby refs to drafts/ (never indexed); goldens per generated skill still open.) (Kevin 2026-09-23, r354)
 - [x] G62 Skill linter — frontmatter/freshness/collisions; close: lints all 1265, report committed. (Kevin 2026-09-23, r334)
 - [x] G63 Skill doctor — "why won't mine fire?" analyzer; close: 3 diagnosed cases. (Kevin 2026-09-23, r345)
 - [x] G64 Duplicate detector — overlap → merge proposal; close: top-10 dup pairs listed. (Kevin 2026-09-23, r345)
