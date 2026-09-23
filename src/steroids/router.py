@@ -630,6 +630,17 @@ def diagnose_fire(skill, query, rules, idx, accepts=None):
             "detail": f"hits {hits} but below top-3"}
 
 
+def resolve_pins(cwd, rules):
+    # ponytail: G65 — per-project skill pins; longest dir-prefix wins, else [].
+    pins = rules.get("pins") or {}
+    best, best_len = [], -1
+    for prefix, skills in pins.items():
+        if cwd == prefix or cwd.startswith(prefix.rstrip("/") + "/"):
+            if len(prefix) > best_len:
+                best, best_len = list(skills), len(prefix)
+    return best
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}

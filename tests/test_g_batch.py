@@ -38,5 +38,17 @@ class TestG64Dup(unittest.TestCase):
         self.assertAlmostEqual(top[0][0], 1.0)
 
 
+class TestG65Pins(unittest.TestCase):
+    RULES = {"pins": {"/repo": ["a"], "/repo/sub": ["b", "c"]}}
+
+    def test_longest_prefix_wins(self):
+        self.assertEqual(router.resolve_pins("/repo/sub/deep", self.RULES), ["b", "c"])
+        self.assertEqual(router.resolve_pins("/repo/other", self.RULES), ["a"])
+
+    def test_no_match_empty(self):
+        self.assertEqual(router.resolve_pins("/elsewhere", self.RULES), [])
+        self.assertEqual(router.resolve_pins("/repo-evil", self.RULES), [])
+
+
 if __name__ == "__main__":
     unittest.main()
