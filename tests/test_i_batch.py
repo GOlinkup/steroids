@@ -104,5 +104,17 @@ class TestI87Equip(unittest.TestCase):
         self.assertTrue(any("docker" in s for s in r["skills"][:2]))
 
 
+class TestI88Reindex(unittest.TestCase):
+    def test_never_blocks(self):
+        done = []
+        t, slot = router.reindex_async(RULES, on_done=lambda idx: done.append(True))
+        main_work = router.route_query("review my PR", RULES, IDX)
+        self.assertTrue(main_work)
+        t.join(timeout=600)
+        self.assertFalse(t.is_alive())
+        self.assertTrue(done)
+        self.assertEqual(set(slot["idx"]), set(IDX))
+
+
 if __name__ == "__main__":
     unittest.main()

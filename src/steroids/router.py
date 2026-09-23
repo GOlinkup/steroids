@@ -880,6 +880,29 @@ def equip_repo(file_list, rules, idx, accepts=None):
     return {"skills": out, "elapsed": round(_time.time() - t0, 2)}
 
 
+def reindex_async(rules, on_done=None):
+    # ponytail: I88 — background refresh in a daemon thread; returns
+    # (thread, slot). Main thread never blocks; slot["idx"] lands on done.
+    import threading
+    slot = {}
+
+    def _build():
+        try:
+            files = skill_files(rules.get("index_dirs", []))
+            idx, _ = build_index(files)
+            slot["idx"] = idx
+        finally:
+            if on_done is not None:
+                try:
+                    on_done(slot.get("idx"))
+                except Exception:
+                    pass
+
+    t = threading.Thread(target=_build, daemon=True)
+    t.start()
+    return t, slot
+
+
 def route_query(prompt, rules, idx, accepts=None):
     if accepts is None:
         accepts = {}
