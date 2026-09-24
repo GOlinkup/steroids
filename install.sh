@@ -9,7 +9,7 @@ BIN="$HOME/.local/bin/steroids"
 
 if [ "${1:-}" = "--uninstall" ]; then
   # Removes exactly what install copies. Settings registrations untouched.
-  rm -f "$BIN" "$HOME/.local/bin/net.py" "$HOME/.local/bin/embed.py" \
+  rm -f "$BIN" "$HOME/.local/bin/net.py" "$HOME/.local/bin/embed.py" "$HOME/.local/bin/ids.py" \
     "$LIVE_DATA/hook.sh" "$LIVE_DATA/skill-rules.json" "$LIVE_DATA/skill-index.json" \
     "$LIVE_DATA/skill-needs.json" "$LIVE_DATA/skill-proof.json" \
     "$HOME/.config/opencode/plugins/steroids-plugin.ts" \
@@ -37,6 +37,7 @@ bash "$REPO/scripts/eval_gate.sh" || { echo "EVAL GATE FAILED — deploy refused
 mkdir -p "$LIVE_DATA" "$HOME/.local/bin"
 cp "$REPO/src/steroids/router.py" "$BIN"
 chmod +x "$BIN"
+cp "$REPO/src/steroids/ids.py" "$HOME/.local/bin/ids.py"  # B-13: log_impression loads ids.py next to __file__
 cp "$REPO/src/steroids/net.py" "$HOME/.local/bin/net.py"
 cp "$REPO/src/steroids/embed.py" "$HOME/.local/bin/embed.py"
 cp "$REPO/src/steroids/hook.sh" "$LIVE_DATA/hook.sh"

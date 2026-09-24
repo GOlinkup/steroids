@@ -1,4 +1,4 @@
-# P0-3 task bank (M3, RQ-2) — 12/20 collected
+# P0-3 task bank (M3, RQ-2) — 13/20 collected
 
 Rule: real failures/sessions only, never synthetic. Each entry needs a
 reference solution or deterministic grader + type label, else CP-0 rejects it.
@@ -145,4 +145,18 @@ Expected: triage the miss (is csharp-pro the better answer? narrow golden to
   grader: bash install.sh on live HOME passes gate, verify-hooks green
 ```
 
-_slots B-13..B-20 open — paste failures as they happen._
+_slots B-14..B-20 open — paste failures as they happen._
+
+```text
+Task B-13: deployed binary crashes on every query — ids.py not deployed
+Type: bugfix
+Session: 2026-09-24 town-task testing (this repo, live install b641728+)
+Observed: steroids "any query" via ~/.local/bin/steroids → FileNotFoundError
+  '/home/TWIG/.local/bin/ids.py'. log_impression falls back to loading ids.py
+  next to __file__, but install.sh deploys router.py alone. Pre-existing at
+  HEAD (reproduced with git-show HEAD copy); --count/--reindex paths never
+  hit log_impression so gate stayed green. Every live query broken.
+Expected: install.sh deploys ids.py next to the binary (and uninstall removes
+  it) +
+  grader: fresh-shell steroids "fluentassertions arrange moq" exits 0, prints hint
+```
