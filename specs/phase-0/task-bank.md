@@ -1,4 +1,4 @@
-# P0-3 task bank (M3, RQ-2) — 10/20 collected
+# P0-3 task bank (M3, RQ-2) — 11/20 collected
 
 Rule: real failures/sessions only, never synthetic. Each entry needs a
 reference solution or deterministic grader + type label, else CP-0 rejects it.
@@ -61,7 +61,20 @@ Expected: fix = wider rand in ids.py + 200-run clean hunt (open) +
   grader: looped unittest runs, zero failures
 ```
 
-_slots B-11..B-20 open — paste failures as they happen._
+```text
+Task B-11: fresh-HOME install refused by live-index-calibrated gate
+Type: bugfix
+Session: 2026-09-24 R-1 live-verify (this repo, HOME=/tmp/fakehome seeded with 1 demo skill)
+Observed: install.sh gate ran goldens_per_skill against the throwaway-HOME
+  live index (1 skill) → 18 MISSING FROM INDEX → EVAL GATE FAILED, deploy
+  refused. R-1 demands install green from clean state, but the gate is
+  calibrated to the dev machine's exact index — clean state can never pass.
+  Refusal itself was clean (no bin dir created, live files untouched).
+Expected: eval_gate skips the live-index-only per-skill goldens when the
+  failure is thin-index absence (MISSING FROM INDEX), with frozen golden
+  still enforcing precision; genuine routing misses still refuse deploy +
+  grader: seed 1-skill HOME=/tmp/fakehome, run install.sh, verify-hooks green
+```
 
 ```text
 Task B-07: pilot bank run skipped the B-05 grader (not allowlisted)
