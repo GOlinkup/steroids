@@ -1,4 +1,4 @@
-# P0-3 task bank (M3, RQ-2) — 11/20 collected
+# P0-3 task bank (M3, RQ-2) — 12/20 collected
 
 Rule: real failures/sessions only, never synthetic. Each entry needs a
 reference solution or deterministic grader + type label, else CP-0 rejects it.
@@ -130,3 +130,19 @@ Expected: git show 14f6b12 -- install.sh (symlink + sidecar cleanup) +
   grader: HOME=/tmp/fakehome style install, verify-hooks green, uninstall
   leaves zero traces
 ```
+
+```text
+Task B-12: live install refused by genuine per-skill golden miss after index drift
+Type: test
+Session: 2026-09-24 live install (this repo, real HOME, 1774 skills vs 1265 golden snapshot)
+Observed: eval gate red at goldens_per_skill — MISS exp=csharp-testing
+  got=csharp-pro/csharp-testing/dotnet-backend on "fluentassertions should".
+  No code changed since green 2026-09-23; live index grew 1265→1774 and new
+  distractor csharp-pro steals top-1. Thin-index skip correctly did NOT fire
+  (genuine miss, not absence). Live files untouched by refusal.
+Expected: triage the miss (is csharp-pro the better answer? narrow golden to
+  drift-stable skills, or retune) until gate green +
+  grader: bash install.sh on live HOME passes gate, verify-hooks green
+```
+
+_slots B-13..B-20 open — paste failures as they happen._
