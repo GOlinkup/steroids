@@ -27,6 +27,10 @@ fi
 # r356 preflight: HOME-without-skills refuses before anything runs.
 python3 "$REPO/scripts/preflight_check.py" || { echo "PREFLIGHT FAILED — refusing install under this HOME"; exit 1; }
 
+# ponytail: onnxruntime lives in HOME-dependent user site — fresh machines
+# hit silent lexical fallback without it. Warn loudly, install never fails here.
+python3 -c "import onnxruntime" 2>/dev/null || echo "WARN: onnxruntime missing — routing runs lexical-only until: pip install --user onnxruntime numpy"
+
 # D32 gate: eval regression refuses deploy (nothing copied yet at this point).
 bash "$REPO/scripts/eval_gate.sh" || { echo "EVAL GATE FAILED — deploy refused, live files untouched"; exit 1; }
 
