@@ -197,6 +197,54 @@ class TestSyncSharedRules(unittest.TestCase):
         self.assertEqual(share.sync_shared_rules(self.d)["ok"], False)
 
 
+class TestSharedExpiry(unittest.TestCase):
+    def setUp(self):
+        self._url = share.STATIC_URL
+        share.STATIC_URL = "http://127.0.0.1:1/none.json"
+        self.d = _tmpdir()
+
+    def tearDown(self):
+        share.STATIC_URL = self._url
+
+    def _sync(self, hub_rules):
+        orig = getattr(share, "global_counts", None)
+        share.global_counts = lambda url, timeout=6: {
+            "generated_at": "t", "shared_rules": hub_rules}
+        try:
+            return share.sync_shared_rules(self.d)
+        finally:
+            if orig is None:
+                try:
+                    del share.global_counts
+                except AttributeError:
+                    pass
+            else:
+                share.global_counts = orig
+
+    def test_stale_absent_skill_pruned(self):
+        old = {"skills": {"zz-old": ["aaa"], "zz-fresh": ["bbb"]},
+               "_seen": {"zz-old": 1.0, "zz-fresh": time.time()}}
+        with open(os.path.join(self.d, "shared-rules.json"), "w") as f:
+            json.dump(old, f)
+        out = self._sync([{"trigs": ["bbb"], "skill": "zz-fresh", "weight": 3}])
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["pruned"], 1)
+        with open(os.path.join(self.d, "shared-rules.json")) as f:
+            skills = json.load(f)["skills"]
+        self.assertEqual(list(skills), ["zz-fresh"])
+
+    def test_legacy_entry_without_seen_grandfathered(self):
+        old = {"skills": {"zz-legacy": ["aaa"]}}
+        with open(os.path.join(self.d, "shared-rules.json"), "w") as f:
+            json.dump(old, f)
+        out = self._sync([])
+        self.assertTrue(out["ok"])
+        self.assertEqual(out["pruned"], 0)
+        with open(os.path.join(self.d, "shared-rules.json")) as f:
+            d = json.load(f)
+        self.assertIn("zz-legacy", d["skills"])
+        self.assertIn("zz-legacy", d["_seen"])
+
 class TestRouterSharedMerge(unittest.TestCase):
     def setUp(self):
         self.d = _tmpdir()

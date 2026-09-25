@@ -261,22 +261,32 @@ def sync_shared_rules(base_dir=None, url=HUB_URL, timeout=6, now=None):
     if not isinstance(rules_out, list):
         return {"ok": False, "error": "no shared_rules in hub response"}
 
+    EXPIRY = 30 * 86400  # fail-closed: hub-absent 30d -> rule quarantined
+    now_ts = now or time.time()
     path = shared_rules_path(base_dir)
     merged = {}
+    seen = {}
     try:
         with open(path, encoding="utf-8") as f:
             old = json.load(f)
         if isinstance(old, dict):
             merged = old.get("skills", {}) if isinstance(old.get("skills"), dict) else {}
+            raw_seen = old.get("_seen", {})
+            if isinstance(raw_seen, dict):
+                seen = {str(k): float(v) for k, v in raw_seen.items()
+                        if isinstance(v, (int, float))}
     except Exception:
         pass
 
     added = 0
+    hub_skills = set()
     for r in rules_out:
         skill = str(r.get("skill") or "").strip().lower()
         trigs = [str(t).strip().lower() for t in (r.get("trigs") or []) if str(t).strip()]
         if not SLUG_RE.match(skill) or not trigs:
             continue
+        hub_skills.add(skill)
+        seen[skill] = now_ts
         cur = merged.get(skill)
         if cur is None:
             merged[skill] = trigs
@@ -284,8 +294,21 @@ def sync_shared_rules(base_dir=None, url=HUB_URL, timeout=6, now=None):
         else:
             merged[skill] = list(cur)  # never overwrite an existing local list
 
+    # Quarantine: a skill the hub stopped emitting hasn't earned a correction
+    # in 30d — drop it so stale rules can't steer routing. Legacy entries
+    # without _seen are grandfathered (stamped now, expire on their own).
+    pruned = 0
+    for skill in list(merged):
+        if skill not in seen:
+            seen[skill] = now_ts
+        elif now_ts - seen[skill] > EXPIRY and skill not in hub_skills:
+            del merged[skill]
+            del seen[skill]
+            pruned += 1
+
     out = {"skills": merged,
-           "shared_rules_ts": (now or time.time()),
+           "shared_rules_ts": now_ts,
+           "_seen": seen,
            "hub_generated_at": data.get("generated_at", "")}
     try:
         os.makedirs(base_dir, exist_ok=True)
@@ -293,7 +316,8 @@ def sync_shared_rules(base_dir=None, url=HUB_URL, timeout=6, now=None):
             json.dump(out, f)
     except OSError as e:
         return {"ok": False, "error": str(e)}
-    return {"ok": True, "added": added, "total": len(merged)}
+    return {"ok": True, "added": added, "pruned": pruned,
+            "total": len(merged)}
 
 
 def global_counts(url=HUB_URL, timeout=6):
