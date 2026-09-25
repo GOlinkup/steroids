@@ -13,6 +13,10 @@ run() { # $1 step name, $@ command
 }
 run nightly "$PYBIN" "$REPO/scripts/nightly_report.py"
 run misses "$PYBIN" "$REPO/scripts/mine_misses.py"
+# sync is best-effort (hub/network blip must not red-flag the night):
+# yesterday's shared-rules copy stays valid, next night retries.
+"$PYBIN" "$REPO/src/steroids/router.py" --sync-shared >>"$LOG" 2>&1 \
+  || echo "WARN sync failed (exit $?) — shared rules keep yesterday's copy" >>"$LOG"
 run trust "$PYBIN" "$REPO/scripts/trust_report.py"
 if [ "$fail" -ne 0 ]; then
   echo "# Nightly ERROR $DATE — see cron-$DATE.log" > "$REPO/reports/nightly-$DATE-ERROR.md"

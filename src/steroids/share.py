@@ -205,8 +205,8 @@ def sync_shared_rules(base_dir=None, url=HUB_URL, timeout=6, now=None):
     if base_dir is None:
         base_dir = os.path.expanduser(
             os.environ.get("STEROIDS_BASE_DIR", "~/.config/steroids"))
-    if _opted_out():
-        return {"ok": True, "skipped": True, "reason": "opted out (STEROIDS_NO_SHARE)"}
+    # ponytail: opt-out governs SENDING (ping) only. Receiving is an
+    # anonymous aggregate read with zero privacy cost — everyone syncs.
     data = global_counts(url, timeout=timeout)
     rules_out = data.get("shared_rules") if isinstance(data, dict) else None
     if not isinstance(rules_out, list):
