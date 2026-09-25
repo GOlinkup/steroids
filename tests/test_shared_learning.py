@@ -96,10 +96,30 @@ class TestPayloadAssembly(unittest.TestCase):
 class TestSyncSharedRules(unittest.TestCase):
     def setUp(self):
         self._orig = share.global_counts
+        self._url = share.STATIC_URL
+        # hermetic: static snapshot unreachable -> exercises function fallback
+        share.STATIC_URL = "http://127.0.0.1:1/none.json"
         self.d = _tmpdir()
 
     def tearDown(self):
         share.global_counts = self._orig
+        share.STATIC_URL = self._url
+
+    def test_static_first_skips_function(self):
+        import urllib.request
+        static = {"generated_at": "t", "shared_rules": [
+            {"trigs": ["aaa", "bbb"], "skill": "zz-static", "weight": 9}]}
+        fp = os.path.join(self.d, "shared.json")
+        with open(fp, "w", encoding="utf-8") as f:
+            json.dump(static, f)
+        share.STATIC_URL = "file://" + fp
+        def boom(url, timeout=6):
+            raise AssertionError("function GET must not fire when static serves")
+        share.global_counts = boom
+        out = share.sync_shared_rules(self.d)
+        self.assertTrue(out["ok"])
+        with open(os.path.join(self.d, "shared-rules.json"), encoding="utf-8") as f:
+            self.assertEqual(json.load(f)["skills"]["zz-static"], ["aaa", "bbb"])
 
     def _hub(self, rules):
         share.global_counts = lambda url, timeout=6: {

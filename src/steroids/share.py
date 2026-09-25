@@ -20,6 +20,13 @@ HUB_URL = os.environ.get(
     "STEROIDS_HUB_URL",
     "https://jqvpuyzawidrcwgnphqu.supabase.co/functions/v1/steroids-ping",
 )
+
+# $0 reads: static snapshot first (CDN-cached, ~zero function invocations
+# at any user count). Refreshed server-side on every hub GET MISS.
+STATIC_URL = (
+    "https://jqvpuyzawidrcwgnphqu.supabase.co"
+    "/storage/v1/object/public/steroids-public/shared.json"
+)
 ANON_KEY = os.environ.get(
     "STEROIDS_HUB_ANON_KEY", ""
 )  # set in the environment if the hub enforces apikey
@@ -207,7 +214,16 @@ def sync_shared_rules(base_dir=None, url=HUB_URL, timeout=6, now=None):
             os.environ.get("STEROIDS_BASE_DIR", "~/.config/steroids"))
     # ponytail: opt-out governs SENDING (ping) only. Receiving is an
     # anonymous aggregate read with zero privacy cost — everyone syncs.
-    data = global_counts(url, timeout=timeout)
+    try:
+        req = urllib.request.Request(
+            STATIC_URL, headers={"User-Agent": "Steroids-share/1.0"})
+        with urllib.request.urlopen(req, timeout=timeout) as res:
+            data = json.loads(res.read().decode("utf-8"))
+        if not isinstance(data, dict) or not isinstance(
+                data.get("shared_rules"), list):
+            raise ValueError("bad static shape")
+    except Exception:
+        data = global_counts(url, timeout=timeout)
     rules_out = data.get("shared_rules") if isinstance(data, dict) else None
     if not isinstance(rules_out, list):
         return {"ok": False, "error": "no shared_rules in hub response"}
