@@ -21,6 +21,12 @@ python3 tests/goldens_per_skill.py >> /tmp/gate_units.log 2>&1 || {
     exit 1
   fi
 }
+echo "[gate] live-rules freshness..."
+REPO_SHA="$(sha256sum "$REPO/skill-rules.json" | cut -c1-8)"
+LIVE_SHA="$(sha256sum "$HOME/.config/steroids/skill-rules.json" 2>/dev/null | cut -c1-8 || echo missing)"
+if [ "$REPO_SHA" != "$LIVE_SHA" ]; then
+  echo "[gate] WARN repo skill-rules.json ($REPO_SHA) != live ($LIVE_SHA) — routing reads LIVE; bench below tests live rules, not repo"
+fi
 echo "[gate] bench precision vs baseline..."
 python3 scripts/bench.py > /tmp/gate_bench.log 2>&1 || {
   # ponytail (B-11, symmetric): live bench needs the dev-calibrated index —
