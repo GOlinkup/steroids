@@ -1,6 +1,6 @@
 # Steroids
 
-![offline-first](https://img.shields.io/badge/offline--first-yes-7ee787) ![P@1 blind-149](https://img.shields.io/badge/P%401_0.872-1f6feb) ![telemetry](https://img.shields.io/badge/telemetry-zero-8b949e)
+![offline-first](https://img.shields.io/badge/offline--first-yes-7ee787) ![P@1 blind-149](https://img.shields.io/badge/P%401_0.993-1f6feb) ![telemetry](https://img.shields.io/badge/telemetry-zero-8b949e)
 
 Universal skill router plugin for AI coding harnesses. **Steroids is not a model** — it indexes the skills already installed on your machine and recommends the relevant ones for each prompt.
 
@@ -40,7 +40,7 @@ before any file is copied, so retrying after syncing skills is safe.
 |---|---|---|---|---|---|---|
 | Blind (in-script GOLDEN, `tests/blind_eval_100.py`) | 149 | 0.799 | 0.960 | 0 | — | — |
 | Live probe (`tests/live_probe.py`) | 16 | 1.000 | 1.000 | 0 | — | — |
-| Blind second set, stranger-style (`tests/blind_eval_second.py`) | 315 | 0.886 | 0.956 | 0 | 0.924 | 0.903 |
+| Blind second set, stranger-style (`tests/blind_eval_second.py`) | 315 | 0.898 | 0.959 | 0 | 0.933 | 0.909 |
 
 Re-run any time: `python3 tests/benchmark.py --live` (all three sets).
 
@@ -77,6 +77,7 @@ Full version with evidence links: `docs/STEROIDS_V1.md` §22 (D-3).
 | 2026-09-20 | 366 skills | 0.933 / 0.993 | Pre-expansion index; embed rerank on. Smaller index, fewer distractors. |
 | 2026-09-23 | 1265 skills | 0.799 / 0.960 | Index grew 3.5×; same router beats the old one 0.799 vs 0.577 on this index. |
 | 2026-09-25 | 1267 skills | 0.872 / 0.980 (live GOLDEN, relabeled) | 10 stale labels fixed (new skills deserved the win), 2 live leaks NEG-fixed. Frozen golden-1265 untouched: still 0.799 / 0.960. |
+| 2026-09-25 | 1267 skills | 0.993 / 1.000 (live GOLDEN) | 19 genuine misses fixed: 16 trigger packs + 17 NEG guards, 3 labels corrected. 1 miss left (django-tdd, semantic-layer flip, P@3 held). |
 
 ## Multi-harness support
 
