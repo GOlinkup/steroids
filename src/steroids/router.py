@@ -1637,16 +1637,31 @@ def log_impression(prompt, trigs, skills, task_id="", extra=None):
                 **(extra or {}),
             }) + "\n")
         _maybe_daily_ping()
-        # ponytail: cap log at 50000 rows (~10MB); size-gated so the check is ~free.
-        # 50K ≈ months of history even for 20hr/day users — feeds miss-mining.
+        # ponytail: age-trim, not count-cap. Heavy users keep full history
+        # (their disk, our $0); mining only ever reads recent rows anyway.
+        # Keep 90 days, floor 5000 rows so light users lose nothing.
         try:
             if os.path.getsize(LOG_PATH) > 10485760:
+                import time as _t
+                import json as _j
+                cutoff = _t.time() - 90 * 86400
                 with open(LOG_PATH, encoding="utf-8") as f:
                     rows = f.readlines()
-                if len(rows) > 50000:
+                kept = []
+                for r in rows:
+                    try:
+                        o = _j.loads(r)
+                        keep = not isinstance(o, dict) or o.get("t", 0) >= cutoff
+                    except ValueError:
+                        keep = True  # corrupt line: keep, never destroy data
+                    if keep:
+                        kept.append(r)
+                if len(kept) < 5000:
+                    kept = rows[-5000:]
+                if len(kept) < len(rows):
                     with open(LOG_PATH, "w", encoding="utf-8") as f:
-                        f.writelines(rows[-50000:])
-        except OSError:
+                        f.writelines(kept)
+        except (OSError, ValueError):
             pass
     except Exception:
         pass

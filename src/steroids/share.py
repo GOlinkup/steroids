@@ -30,7 +30,9 @@ STATIC_URL = (
 ANON_KEY = os.environ.get(
     "STEROIDS_HUB_ANON_KEY", ""
 )  # set in the environment if the hub enforces apikey
-PING_EVERY = 86400  # one POST per local day
+PING_EVERY = 86400  # one POST per local day (valuable data)
+SERVES_EVERY = 7 * 86400  # serves-only days POST weekly: bulk counts
+                          # are low-signal, corrections/accepts go daily
 
 SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,79}$")
 TRIG_KEY_RE = re.compile(r"^[a-z0-9][a-z0-9_,+-]{0,159}$")
@@ -143,6 +145,27 @@ def _mark_pinged(base_dir, now=None):
         pass
 
 
+def _serves_marker_path(base_dir):
+    return os.path.join(base_dir, ".last_serves_post")
+
+
+def _serves_due(base_dir, now=None):
+    """True when the last serves-including POST is 7+ days old (or never)."""
+    try:
+        with open(_serves_marker_path(base_dir), encoding="utf-8") as f:
+            return (now or time.time()) - float(f.read().strip() or 0) >= SERVES_EVERY
+    except (OSError, ValueError):
+        return True
+
+
+def _mark_served(base_dir, now=None):
+    try:
+        with open(_serves_marker_path(base_dir), "w", encoding="utf-8") as f:
+            f.write(str(now or time.time()))
+    except OSError:
+        pass
+
+
 def ping(base_dir=..., log_path=None, mem_path=None, force=False, timeout=8):
     """Rollup today's counters and POST them to the hub. Fire-and-forget:
     any failure returns {'ok': False, ...} and never raises."""
@@ -170,6 +193,15 @@ def ping(base_dir=..., log_path=None, mem_path=None, force=False, timeout=8):
         _mark_pinged(base_dir)
         return {"ok": True, "skipped": True, "reason": "no counters today"}
 
+    valuable = bool(corrections) or any(
+        s.get("accepts", 0) > 0 or s.get("misses", 0) > 0 for s in skills)
+    if not valuable and not force and not _serves_due(base_dir):
+        # serves-only day and bulk counts went out <7d ago: skip the POST.
+        # Corrections/accepts/misses always go daily; serves ride weekly.
+        _mark_pinged(base_dir)
+        return {"ok": True, "skipped": True,
+                "reason": "serves-only, weekly cadence"}
+
     body = json.dumps(_build_payload(day, skills, corrections)).encode()
     req = urllib.request.Request(
         HUB_URL, data=body, method="POST",
@@ -184,6 +216,7 @@ def ping(base_dir=..., log_path=None, mem_path=None, force=False, timeout=8):
             res.read()
         if ok:
             _mark_pinged(base_dir)
+            _mark_served(base_dir)
             # Phase 2: pull learned clusters back down (3+ distinct days only).
             # Best-effort — a sync failure never fails the ping.
             try:

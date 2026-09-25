@@ -93,6 +93,45 @@ class TestPayloadAssembly(unittest.TestCase):
         self.assertNotIn("corrections", p)
 
 
+class TestDeltaPing(unittest.TestCase):
+    # No network: HUB_URL points at a dead port. An attempted POST shows
+    # up as {"ok": False, "error": ...}; a skip shows up as skipped.
+    def setUp(self):
+        self._hub = share.HUB_URL
+        share.HUB_URL = "http://127.0.0.1:1/dead"
+        self._url = share.STATIC_URL
+        share.STATIC_URL = "http://127.0.0.1:1/none.json"
+        self.d = _tmpdir()
+        now = time.time()
+        with open(os.path.join(self.d, "served.jsonl"), "w") as f:
+            f.write(json.dumps({"t": now, "skills": "zz-probe"}) + "\n")
+        with open(os.path.join(self.d, "memory.json"), "w") as f:
+            json.dump({"seen": {}}, f)
+
+    def tearDown(self):
+        share.HUB_URL = self._hub
+        share.STATIC_URL = self._url
+
+    def test_serves_only_skipped_when_recent(self):
+        open(os.path.join(self.d, ".last_serves_post"), "w").write(str(time.time()))
+        r = share.ping(base_dir=self.d, timeout=2)
+        self.assertTrue(r.get("skipped"))
+        self.assertIn("weekly", r.get("reason", ""))
+
+    def test_serves_only_attempted_when_stale(self):
+        r = share.ping(base_dir=self.d, timeout=2)
+        self.assertFalse(r.get("ok"))
+        self.assertIn("error", r)
+
+    def test_valuable_day_attempted_despite_recent_serves(self):
+        now = time.time()
+        with open(os.path.join(self.d, "memory.json"), "w") as f:
+            json.dump({"seen": {"zz-probe": now}}, f)
+        open(os.path.join(self.d, ".last_serves_post"), "w").write(str(now))
+        r = share.ping(base_dir=self.d, timeout=2)
+        self.assertFalse(r.get("ok"))
+        self.assertIn("error", r)
+
 class TestSyncSharedRules(unittest.TestCase):
     def setUp(self):
         self._orig = share.global_counts
