@@ -1,0 +1,33 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Lighthouse Real — WITHOUT steroids</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#060a12;color:#fff;font:14px sans-serif}
+#tag{position:fixed;top:10px;left:12px;background:#000a;padding:8px 12px;border-radius:8px;z-index:9}</style>
+</head><body>
+<div id="tag">WITHOUT steroids — PROMPT: realistic lighthouse at night, smooth tower, lantern room, rotating beam, moonlit animated waves with foam, stars</div>
+<script>
+// WITHOUT: unaided realistic attempt — smooth shapes, spotlight, flat water.
+var scene=new THREE.Scene();scene.background=new THREE.Color(0x060a12);
+var camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.1,600);
+var renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);document.body.appendChild(renderer.domElement);
+scene.add(new THREE.AmbientLight(0xffffff,0.5));
+var moon=new THREE.DirectionalLight(0xffffff,0.7);moon.position.set(40,60,20);scene.add(moon);
+var tower=new THREE.Mesh(new THREE.CylinderGeometry(3,4,26,24),
+ new THREE.MeshStandardMaterial({color:0xb03a2e,roughness:0.8}));
+tower.position.y=15;scene.add(tower);
+var lamp=new THREE.Mesh(new THREE.CylinderGeometry(2,2,2.6,16),
+ new THREE.MeshBasicMaterial({color:0xfff2c0}));lamp.position.y=29.5;scene.add(lamp);
+var roof=new THREE.Mesh(new THREE.ConeGeometry(2.8,2.4,16),
+ new THREE.MeshStandardMaterial({color:0x22262c}));roof.position.y=32;scene.add(roof);
+var rock=new THREE.Mesh(new THREE.CylinderGeometry(9,12,4,12),
+ new THREE.MeshStandardMaterial({color:0x3a4356}));rock.position.y=2;scene.add(rock);
+var water=new THREE.Mesh(new THREE.PlaneGeometry(400,400),
+ new THREE.MeshStandardMaterial({color:0x10233a}));water.rotation.x=-Math.PI/2;scene.add(water);
+var spot=new THREE.SpotLight(0xfff2c0,2,120,0.35,0.5);spot.position.set(0,29.5,0);
+scene.add(spot);scene.add(spot.target);
+var t=0;
+(function loop(){t+=0.01;spot.target.position.set(Math.sin(t)*50,12,Math.cos(t)*50);
+ camera.position.set(Math.sin(t*0.25)*46,24,Math.cos(t*0.25)*46);
+ camera.lookAt(0,15,0);renderer.render(scene,camera);requestAnimationFrame(loop);})();
+</script></body></html>

@@ -1,0 +1,71 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><title>Lighthouse Real — WITH steroids</title>
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<style>html,body{margin:0;height:100%;overflow:hidden;background:#060a12;color:#fff;font:14px sans-serif}
+#tag{position:fixed;top:10px;left:12px;background:#000a;padding:8px 12px;border-radius:8px;z-index:9}</style>
+</head><body>
+<div id="tag">WITH steroids (3d-games/3d-web-experience + research) — PROMPT: realistic lighthouse at night, smooth tower, lantern room, rotating beam, moonlit animated waves with foam, stars</div>
+<script>
+// WITH: research-guided — canvas stone texture, gallery rail, emissive lantern
+// + PointLight, additive rotating cone shaft, sine-stack displaced water with
+// foam-by-height vertex colors + moon glitter, stars, fog, ACES.
+var scene=new THREE.Scene();scene.background=new THREE.Color(0x060a12);
+scene.fog=new THREE.FogExp2(0x060a12,0.004);
+var camera=new THREE.PerspectiveCamera(45,innerWidth/innerHeight,0.1,600);
+var renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;renderer.toneMapping=THREE.ACESFilmicToneMapping;
+document.body.appendChild(renderer.domElement);
+scene.add(new THREE.AmbientLight(0x1a2444,0.7));
+var moon=new THREE.DirectionalLight(0x9fb4ff,0.5);moon.position.set(40,60,20);
+moon.castShadow=true;scene.add(moon);
+var sc=document.createElement('canvas');sc.width=64;sc.height=128;
+var g=sc.getContext('2d');
+for(var yy=0;yy<128;yy+=16){g.fillStyle=(yy/16)%2?'#a93226':'#e8e2d6';g.fillRect(0,yy,64,16);
+ for(var n=0;n<40;n++){g.fillStyle='rgba(0,0,0,0.12)';
+  g.fillRect(Math.random()*64,yy+Math.random()*16,2,2);}}
+var stoneTex=new THREE.CanvasTexture(sc);
+var tower=new THREE.Mesh(new THREE.CylinderGeometry(3,4,26,24),
+ new THREE.MeshStandardMaterial({map:stoneTex,roughness:0.85}));
+tower.position.y=15;tower.castShadow=true;scene.add(tower);
+var gal=new THREE.Mesh(new THREE.TorusGeometry(2.6,0.12,8,24),
+ new THREE.MeshStandardMaterial({color:0x22262c}));
+gal.rotation.x=Math.PI/2;gal.position.y=28.2;scene.add(gal);
+var lamp=new THREE.Mesh(new THREE.CylinderGeometry(2,2,2.6,16),
+ new THREE.MeshBasicMaterial({color:0xfff2c0}));lamp.position.y=29.5;scene.add(lamp);
+var roof=new THREE.Mesh(new THREE.ConeGeometry(2.8,2.4,16),
+ new THREE.MeshStandardMaterial({color:0x22262c}));roof.position.y=32;scene.add(roof);
+var lampLight=new THREE.PointLight(0xffd9a6,2.5,30,2);lampLight.position.set(0,29.5,0);scene.add(lampLight);
+var rock=new THREE.Mesh(new THREE.CylinderGeometry(9,12,4,12),
+ new THREE.MeshStandardMaterial({color:0x3a4356,roughness:1}));
+rock.position.y=2;rock.receiveShadow=true;scene.add(rock);
+var WSEG=56,wgeo=new THREE.PlaneGeometry(400,400,WSEG,WSEG);
+var wmat=new THREE.MeshPhongMaterial({color:0x10233a,specular:0x8fb4ff,shininess:90,vertexColors:true});
+var water=new THREE.Mesh(wgeo,wmat);water.rotation.x=-Math.PI/2;scene.add(water);
+var base=wgeo.attributes.position.array.slice(),cols=[];
+for(var vi=0;vi<wgeo.attributes.position.count;vi++)cols.push(0.06,0.14,0.23);
+wgeo.setAttribute('color',new THREE.Float32BufferAttribute(cols,3));
+var spos=wgeo.attributes.position,col=wgeo.attributes.color;
+var rig=new THREE.Group();rig.position.set(0,29.5,0);scene.add(rig);
+var spot=new THREE.SpotLight(0xfff2c0,3,140,0.3,0.45,1.2);rig.add(spot);rig.add(spot.target);
+spot.target.position.set(55,0,0);spot.castShadow=true;
+var cone=new THREE.Mesh(new THREE.ConeGeometry(8,58,24,1,true),
+ new THREE.MeshBasicMaterial({color:0xc5dbff,transparent:true,opacity:0.13,
+  blending:THREE.AdditiveBlending,depthWrite:false,side:THREE.DoubleSide}));
+cone.rotation.z=Math.PI/2;cone.position.set(29,0,0);rig.add(cone);
+var sp=[],spg=new THREE.BufferGeometry();
+for(var si=0;si<400;si++){var a=Math.random()*Math.PI*2,e=Math.random()*0.9+0.08,r=380;
+ sp.push(Math.cos(a)*Math.cos(e)*r,Math.sin(e)*r,Math.sin(a)*Math.cos(e)*r);}
+spg.setAttribute('position',new THREE.Float32BufferAttribute(sp,3));
+scene.add(new THREE.Points(spg,new THREE.PointsMaterial({color:0xffffff,size:1.4,sizeAttenuation:false})));
+var t=0;
+function wave(x,z){return Math.sin(x*0.11+t*1.1)*0.55+Math.sin((x+z)*0.23-t*0.7)*0.3+Math.sin(z*0.31+t*1.6)*0.2;}
+(function loop(){t+=0.016;rig.rotation.y=t*0.7;
+ for(var i=0;i<spos.count;i++){var px=base[i*3],py=base[i*3+1];
+  var h=wave(px,py);spos.setZ(i,h);
+  var f=h>0.75?1:0;col.setXYZ(i,0.06+0.85*f,0.14+0.75*f,0.23+0.7*f);}
+ spos.needsUpdate=true;col.needsUpdate=true;
+ lampLight.intensity=2.5+Math.sin(t*3)*0.4;
+ camera.position.set(Math.sin(t*0.25)*46,24,Math.cos(t*0.25)*46);
+ camera.lookAt(0,15,0);renderer.render(scene,camera);requestAnimationFrame(loop);})();
+</script></body></html>

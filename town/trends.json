@@ -1,0 +1,129 @@
+{
+ "generated_at": "2026-09-24",
+ "days": [
+  "2026-09-20",
+  "2026-09-21",
+  "2026-09-22",
+  "2026-09-23"
+ ],
+ "usage": "daily[i] = routed-skill rows for that domain on days[i]; feeds the card sparkline via town-data.js.",
+ "domains": [
+  {
+   "name": "frontend",
+   "daily": [
+    9,
+    1,
+    10,
+    7
+   ]
+  },
+  {
+   "name": "mobile",
+   "daily": [
+    32,
+    32,
+    8,
+    8
+   ]
+  },
+  {
+   "name": "backend",
+   "daily": [
+    132,
+    23,
+    145,
+    13
+   ]
+  },
+  {
+   "name": "data",
+   "daily": [
+    23,
+    12,
+    26,
+    9
+   ]
+  },
+  {
+   "name": "ai-ml",
+   "daily": [
+    74,
+    30,
+    37,
+    58
+   ]
+  },
+  {
+   "name": "devops",
+   "daily": [
+    33,
+    11,
+    10,
+    27
+   ]
+  },
+  {
+   "name": "security",
+   "daily": [
+    4,
+    3,
+    3,
+    2
+   ]
+  },
+  {
+   "name": "testing",
+   "daily": [
+    5,
+    2,
+    2,
+    9
+   ]
+  },
+  {
+   "name": "design-media",
+   "daily": [
+    20,
+    18,
+    8,
+    17
+   ]
+  },
+  {
+   "name": "business",
+   "daily": [
+    19,
+    5,
+    57,
+    246
+   ]
+  },
+  {
+   "name": "docs-writing",
+   "daily": [
+    20,
+    14,
+    16,
+    10
+   ]
+  },
+  {
+   "name": "science",
+   "daily": [
+    0,
+    0,
+    0,
+    0
+   ]
+  },
+  {
+   "name": "general",
+   "daily": [
+    143,
+    63,
+    55,
+    136
+   ]
+  }
+ ]
+}
