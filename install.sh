@@ -10,6 +10,7 @@ BIN="$HOME/.local/bin/steroids"
 if [ "${1:-}" = "--uninstall" ]; then
   # Removes exactly what install copies. Settings registrations untouched.
   rm -f "$BIN" "$HOME/.local/bin/net.py" "$HOME/.local/bin/embed.py" "$HOME/.local/bin/ids.py" \
+    "$HOME/.local/bin/share.py" \
     "$LIVE_DATA/hook.sh" "$LIVE_DATA/skill-rules.json" "$LIVE_DATA/skill-index.json" \
     "$LIVE_DATA/skill-needs.json" "$LIVE_DATA/skill-proof.json" \
     "$HOME/.config/opencode/plugins/steroids-plugin.ts" \
@@ -39,6 +40,7 @@ cp "$REPO/src/steroids/router.py" "$BIN"
 chmod +x "$BIN"
 cp "$REPO/src/steroids/ids.py" "$HOME/.local/bin/ids.py"  # B-13: log_impression loads ids.py next to __file__
 cp "$REPO/src/steroids/net.py" "$HOME/.local/bin/net.py"
+cp "$REPO/src/steroids/share.py" "$HOME/.local/bin/share.py"  # shared learning: daily counters ping
 cp "$REPO/src/steroids/embed.py" "$HOME/.local/bin/embed.py"
 cp "$REPO/src/steroids/hook.sh" "$LIVE_DATA/hook.sh"
 cp "$REPO/skill-rules.json" "$LIVE_DATA/skill-rules.json"
