@@ -465,6 +465,53 @@ def learn(transcript_path, now=None):
             pass
     return accepts
 
+
+def harvest_opencode(session=None):
+    """Accepts harvest from opencode.db skill calls (read-only). Incremental
+    per session via memory.json opencode_offsets (max time_created seen).
+    Returns (new_skills, total_accepts). Stdlib sqlite3 only; never writes
+    the database. Missing/corrupt db = ([], total)."""
+    try:
+        mem = json.load(open(MEM_PATH, encoding="utf-8"))
+    except Exception:
+        mem = {}
+    accepts = mem.get("accepts", {})
+    seen = mem.get("seen", {})
+    if not isinstance(seen, dict):
+        seen = {}
+    offsets = mem.get("opencode_offsets", {})
+    new = []
+    try:
+        import sqlite3
+        db = sqlite3.connect("file://" + os.path.expanduser(
+            "~/.local/share/opencode/opencode.db") + "?mode=ro", uri=True)
+        q = ("SELECT session_id, time_created, "
+             "json_extract(data,'$.state.input.name') FROM part "
+             "WHERE json_extract(data,'$.tool')='skill'")
+        params = ()
+        if session:
+            q += " AND session_id=?"
+            params = (session,)
+        for sess, ts, name in db.execute(q, params):
+            if not name or not isinstance(name, str):
+                continue
+            if ts <= offsets.get(sess, 0):
+                continue
+            offsets[sess] = max(offsets.get(sess, 0), ts)
+            accepts[name] = accepts.get(name, 0) + 1
+            seen[name] = time.time()
+            new.append(name)
+        db.close()
+    except Exception:
+        pass
+    try:
+        mem["accepts"], mem["seen"], mem["opencode_offsets"] = accepts, seen, offsets
+        with open(MEM_PATH, "w", encoding="utf-8") as f:
+            json.dump(mem, f)
+    except OSError:
+        pass
+    return new, sum(accepts.values())
+
 def load_outcomes(mem_path=MEM_PATH):
     # ponytail: C22 — {skill: [ok, bad]}; missing file = no outcomes.
     try:
@@ -1686,6 +1733,12 @@ def resolve_mcp(need, rules):
     entry = (rules.get("mcp_needs") or {}).get(need)
     if isinstance(entry, dict) and entry.get("server"):
         return {"kind": "mcp", "server": entry["server"], "tool": entry.get("tool", "")}
+    # ponytail: any url/link-ish need falls back to the query-or-url search entry; else ask.
+    n = (need or "").lower()
+    if any(t in n for t in ("url", "link", "ref", "brief", "catalog", "asset", "source", "site", "repo", "doc")):
+        fb = (rules.get("mcp_needs") or {}).get("query-or-url")
+        if isinstance(fb, dict) and fb.get("server"):
+            return {"kind": "mcp", "server": fb["server"], "tool": fb.get("tool", "")}
     return None
 
 def verify_proof(item):
@@ -2268,6 +2321,8 @@ def main():
     parser.add_argument("--share", action="store_true", help="Export graph to /tmp + print share-ready summary")
     parser.add_argument("--correct", nargs="*", default=None, metavar="WORD", help="Log a correction: this prompt was missed (D-2). Lands in the miss pipeline; pair with --skill")
     parser.add_argument("--skill", default="", help="The skill that should have matched (used with --correct)")
+    parser.add_argument("--learn", default="", metavar="PATH", help="Harvest accepts from a transcript file (same scan as per-prompt learning, on demand)")
+    parser.add_argument("--learn-opencode", nargs="?", const="ALL", default=None, metavar="SESSION", help="Harvest accepts from opencode.db skill calls (optional session id; default all new)")
     parser.add_argument("--self-update", action="store_true", help="Fetch latest skill-rules.json from GitHub (offline TF-IDF default untouched)")
     parser.add_argument("--check", action="store_true", help="Check whether local skill-rules.json is behind GitHub (read-only)")
     parser.add_argument("--ranker", default="v1", choices=["v1", "v2", "ab"], help="Ranker variant: v1 default, v2 lexical challenger, ab 10%% auto-assign")
@@ -2318,6 +2373,10 @@ def main():
 
     rules = load_rules()
     idx = get_index(rules, force_rebuild=args.reindex)
+    if args.reindex:
+        # ponytail: needs/proof derive from skill dirs too; stale cache hides new skills' gates.
+        get_needs(rules, force_rebuild=True)
+        get_proof(rules, force_rebuild=True)
 
     if args.dry_run:
         # ponytail: A10 — preview only; returns before any logging/inject.
@@ -2415,6 +2474,20 @@ def main():
         log_impression(cprompt, attempted, "",
                        extra={"correction": args.skill} if args.skill else None)
         print(f"correction logged: {attempted}" + (f" -> {args.skill}" if args.skill else ""))
+        return
+
+    if args.learn:
+        before = dict(learn(""))
+        learn(args.learn)
+        after = learn("")
+        print(json.dumps({"ok": True, "accepts_total": sum(after.values()),
+                          "new": sum(after.values()) - sum(before.values())}))
+        return
+    if args.learn_opencode:
+        sess = None if args.learn_opencode == "ALL" else args.learn_opencode
+        new, total = harvest_opencode(sess)
+        print(json.dumps({"ok": True, "session": sess or "ALL",
+                          "new": new, "accepts_total": total}))
         return
 
     if args.prompt and args.prompt[0] == "graph":
