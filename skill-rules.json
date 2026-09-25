@@ -5,7 +5,9 @@
   "semantic_weight": 2.0,
   "mcp_needs": {    "query-or-url": {"server": "exa-web-search", "tool": "web_search"},
     "topic-or-url": {"server": "exa-web-search", "tool": "web_search"},
-    "source-file-or-url": {"server": "firecrawl", "tool": "scrape"}
+    "source-file-or-url": {"server": "firecrawl", "tool": "scrape"},
+    "motion-catalog-url": {"server": "exa-web-search", "tool": "web_search"},
+    "reference-url-or-brief": {"server": "exa-web-search", "tool": "web_search"}
   },
   "browser_fallback": {"server": "playwright"},
   "needs_overlay": {
@@ -298,6 +300,48 @@
     "javascript-testing-patterns": [
       "vitest",
       "jest"
+    ],
+    "3d-web-experience": [
+      "three",
+      "webgl",
+      "blender-look",
+      "filmic",
+      "cinematic",
+      "aces",
+      "ibl",
+      "hdri",
+      "turntable",
+      "pbr",
+      "soft-shadows",
+      "photorealistic",
+      "product-viewer",
+      "car",
+      "wheel-spin",
+      "rolling",
+      "axle",
+      "rotation",
+      "rim",
+      "headless",
+      "eevee",
+      "cycles",
+      "slipping",
+      "spinning",
+      "tire"
+    ],
+    "asset-fetch": [
+      "glb",
+      "gltf",
+      "fbx",
+      "poly-pizza",
+      "quaternius",
+      "mixamo",
+      "sketchfab",
+      "asset-file",
+      "mocap",
+      "rigged",
+      "bvh",
+      "animated",
+      "character"
     ]
   },
   "neg": {
@@ -998,6 +1042,74 @@
         "order",
         "delivery",
         "restaurant"
+      ]
+    ],
+    "3d-web-experience": [
+      [
+      "car",
+      "cinematic",
+      "photorealistic",
+      "product",
+      "render",
+      "roll",
+      "rotation",
+      "spin"
+      ],
+      [
+      "3d",
+      "aces",
+      "axle",
+      "blender",
+      "cycle",
+      "drift",
+      "eevee",
+      "filmic",
+      "game",
+      "hdri",
+      "ibl",
+      "pbr",
+      "rim",
+      "roll",
+      "scene",
+      "skid",
+      "slipp",
+      "spinn",
+      "three",
+      "tire",
+      "turntable",
+      "webgl",
+      "wheel"
+      ]
+    ],
+    "asset-fetch": [
+      [
+      "download",
+      "free",
+      "model",
+      "character",
+      "animation",
+      "video"
+      ],
+      [
+      "asset",
+      "blend",
+      "blender",
+      "bvh",
+      "downloadable",
+      "fbx",
+      "game",
+      "glb",
+      "gltf",
+      "kenney",
+      "mixamo",
+      "mocap",
+      "pizza",
+      "poly",
+      "poly-pizza",
+      "quaternius",
+      "rig",
+      "rigg",
+      "sketchfab"
       ]
     ]
   },
