@@ -1,13 +1,13 @@
 #!/usr/bin/env python3
-"""P0-4 paired harness skeleton (RQ-2). Stdlib only.
+"""P0-4 bank grader recorder (RQ-2). Stdlib only.
 
-Runs identical bank tasks in two arms (MODEL-only vs MODEL+STEROIDS),
-isolated trials, per-task metrics CSV. Skeleton mode: --dry-run performs
-NO model calls; it runs read-only graders + isolation checks so the
-harness shape is proven end-to-end on 2 sample tasks before the bank
-is complete (P0-3 5/20) and before any spend.
+Steroids is a plugin: it never calls a model, holds no keys, spends
+nothing. The host CLI owns its brain and its bill. This script runs
+deterministic bank graders + isolation checks and records one CSV row
+per task per trial under a human-supplied --arm label (e.g. host-only
+vs host+steroids, executed by the operator in their own CLI).
 
-  python3 scripts/phase0_harness.py --tasks B-02,B-03 --trials 1 --dry-run --out /tmp/p04.csv
+  python3 scripts/phase0_harness.py --tasks B-02,B-03 --trials 1 --arm host+steroids --out /tmp/p04.csv
   python3 scripts/phase0_harness.py --help   # shows grader policy (P0-6)
 
 Do-not-touch: benchmarks/golden-1265/* (frozen), src/steroids/router.py scoring.
@@ -29,7 +29,8 @@ _FROZEN = os.path.join(_ROOT, "benchmarks", "golden-1265")
 _CSV_COLS = ["task_id", "arm", "trial", "tokens_in", "tokens_out",
              "cost_usd", "wall_s", "interventions", "rework",
              "grader_pass", "grader_score", "notes"]
-_ARMS = ["model-only", "model+steroids"]
+# ponytail: single recorded arm per run; the human supplies the label for
+# the host-side condition they executed (host-only vs host+steroids).
 # ponytail: allowlist keeps skeleton from executing arbitrary bank text.
 _SAFE_PREFIXES = ("python3 -m unittest ", "python3 src/steroids/",
                   "python3 -c ", "git diff --quiet ", "git show ", "git checkout -- ")
@@ -110,13 +111,14 @@ def run_grader(grader, timeout=120):
 
 
 def main():
-    ap = argparse.ArgumentParser(description="P0-4 paired harness skeleton",
+    ap = argparse.ArgumentParser(description="P0-4 bank grader recorder",
                                  epilog=GRADER_POLICY)
     ap.add_argument("--tasks", default="B-02,B-03",
                     help="comma list of bank ids, or 'all'")
     ap.add_argument("--trials", type=int, default=1)
-    ap.add_argument("--dry-run", action="store_true",
-                    help="no model calls; graders + isolation checks only")
+    ap.add_argument("--arm", default="host+steroids",
+                    help="host-side condition label for these rows "
+                         "(e.g. host-only vs host+steroids)")
     ap.add_argument("--out", default=os.path.join(_ROOT, "specs", "phase-0", "results.csv"))
     a = ap.parse_args()
 
@@ -133,18 +135,12 @@ def main():
     rows = []
     for tid in ids:
         t = bank[tid]
-        for arm in _ARMS:
-            for trial in range(1, max(1, a.trials) + 1):
-                if a.dry_run:
-                    ok, score, wall, note = run_grader(t["grader"])
-                    note = (note + "; " if note else "") + "dry-run: no model calls; grader-only"
-                    rows.append([tid, arm, trial, "", "", "", wall, 0, 0,
-                                 "" if ok is None else int(ok),
-                                 "" if score is None else score, note])
-                else:
-                    print("live model arms need keys + spend cap — refusing (free-tier rule)",
-                          file=sys.stderr)
-                    return 1
+        for trial in range(1, max(1, a.trials) + 1):
+            ok, score, wall, note = run_grader(t["grader"])
+            note = (note + "; " if note else "") + "grader-only; no model calls (host brain does the work)"
+            rows.append([tid, a.arm, trial, "", "", "", wall, 0, 0,
+                         "" if ok is None else int(ok),
+                         "" if score is None else score, note])
         if not frozen_clean():  # ponytail: probe must never dirty frozen record (B-04)
             print("REFUSE: probe dirtied frozen golden record — reverting run", file=sys.stderr)
             subprocess.run(["git", "checkout", "--", "benchmarks/golden-1265"],

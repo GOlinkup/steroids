@@ -13,10 +13,12 @@ uncertainty and failures, recovering from mistakes, and verifying completed work
 > plan, the right evidence, and the actual state of the world until the user's
 > objective is truly complete.
 
-**Product promise:** the same AI model performs better with Steroids, because
-Steroids gives it the right information, structure, feedback and verification at
-the right time. Steroids is NOT another model, NOT another coding assistant, NOT
-just a skill manager. Model = intelligence; Steroids = discipline.
+**Product promise:** the host CLI's own brain performs better with Steroids,
+because Steroids gives it the right information, structure, feedback and
+verification at the right time. Steroids is NOT another model, NOT another
+coding assistant, NOT just a skill manager. The host brain = intelligence;
+Steroids = discipline. No model calls, no keys, no inference spend in-repo —
+ever.
 
 **Core rule for every feature:** does this measurably improve the agent's ability
 to complete tasks correctly, efficiently, or reliably? If no, don't build it yet.
@@ -102,7 +104,7 @@ learns (e.g. discovering a missing persistence layer mid-task).
 
 ## 8. Uncertainty mechanism
 
-When the model lacks information to act safely, don't let it fill the hole with
+When the host agent lacks information to act safely, don't let it fill the hole with
 an assumption. "I'll use API X / because I think it's available / evidence? none"
 must trigger: retrieve documentation → inspect project → verify. Goal: don't
 turn uncertainty into an unverified fact.
@@ -133,7 +135,7 @@ forgetting/conflict resolution. Test retention AND forgetting.
 ## 12. Project facts vs opinions + trust levels
 
 "Probably uses PostgreSQL" is banned; "PostgreSQL — evidence: schema.prisma" is
-required. Trust: official docs / source / tests / user intent = HIGH; model
+required. Trust: official docs / source / tests / user intent = HIGH; host
 inference / unverified memory = LOW. Every context selection explainable ("why
 this? why not that? confidence?"). Report "what Steroids prevented" only with
 evidence.
@@ -165,9 +167,8 @@ requirements. ⚠ HUMAN APPROVAL REQUIRED.
 Every tool: name, purpose, inputs, outputs, permissions, side effects, cost,
 risk, examples, failure modes. MCP (prompts/resources/tools) integrated, not
 reinvented: discover → select relevant → expose only useful capabilities.
-Model adapters (OpenAI/Anthropic/Gemini/DeepSeek/Qwen/GLM/local) and agent
-adapters (OpenCode/Claude Code/CLI) keep the engine model-independent — the
-claim must hold across models.
+Host adapters (OpenCode/Claude Code/CLI) keep the plugin host-independent —
+Steroids rides whatever brain the host CLI uses and never calls a model itself.
 
 ## 17. Observability: event bus first, UI later
 
@@ -182,7 +183,8 @@ failures, recoveries, verification, memory updates, time).
 
 ## 18. Evaluation (not optional)
 
-Harness early: identical real tasks, MODEL ONLY vs MODEL + STEROIDS. Metrics —
+Harness early: identical real tasks, host CLI without vs with the Steroids
+hint (host brain both sides; the repo records graders only). Metrics —
 outcome (success, requirements, tests, regressions), efficiency (tokens, cost,
 time, tool calls, context size), context quality (precision/recall, irrelevant
 %), reliability (hallucinated assumptions, repeated failures, recovery rate,
@@ -199,8 +201,8 @@ re-evaluate → keep), not by vibes.
 
 Permissions, tool sandboxing, secrets isolation, approval gates, audit logs,
 network restrictions, destructive-action detection; context must never leak
-secrets to the model. Risky work: sandbox → change → test → inspect → approve
-→ merge. Runs reproducible (model+versions, skills+versions, knowledge
+secrets to the host model. Risky work: sandbox → change → test → inspect → approve
+→ merge. Runs reproducible (host CLI version, skills+versions, knowledge
 versions, project commit, task tree, verification). Rollback for updates and
 indexes. Git integration records start/end commits, diff, tests. Offline mode
 with clear capability reporting.
@@ -250,8 +252,8 @@ giant dashboard: later, only on evaluation evidence.
 implement → deliberately failing webhook test → assumption invalidated →
 official docs retrieved → plan updated → tests pass → objective verified →
 STEROIDS REPORT (skills used/ignored, failures recovered, zero repeats).
-Under two minutes, everything reproducible. Launch claim: same model, same
-skills — the only difference is how it found them and how it recovered.
+Under two minutes, everything reproducible. Launch claim: same host brain,
+same skills — the only difference is how it found them and how it recovered.
 
 ## 22. Positioning
 
@@ -383,10 +385,12 @@ escalation), never a bare error; every task has a runtime budget.
 overhead stays under X% of task cost or the feature doesn't ship. (4, new)
 Kill criteria per phase: each phase names its falsifier (e.g. recovery must
 reduce repeat-failures on benchmark or scope cuts to routing+verification).
-(5, new) Non-goals: no model hosting, no code-execution ownership, no harness
-replacement — written boundaries, not implications. (21, ext) Eval integrity:
+(5, new) Non-goals: no model hosting, no model calls, no keys, no inference
+spend, no code-execution ownership, no harness replacement — written
+boundaries, not implications. (21, ext) Eval integrity:
 reference solutions, two-expert agreement on pass/fail, trial isolation
-(leaked state corrupts silently), model-grader calibration against humans,
+(leaked state corrupts silently), deterministic-grader calibration against
+humans (no LLM judge in-repo; graders are commands with exit 0 = pass),
 Goodhart warning; the frozen-golden + `--check` pattern is the template.
 
 **Trust.** (9, new) Skill supply chain: 1,265 third-party instruction sets in
@@ -455,14 +459,14 @@ the system, the loop failed — simplify, don't staff it.
 ## Appendix A — open questions, risks, kill criteria
 
 Open: cold-start behavior (no memory/history); concept-drift invalidation
-policy; event-bus technology; daemon vs library packaging; grader LLM choice;
+policy; event-bus technology; daemon vs library packaging;
 multi-agent threshold (what measured gain justifies 15× tokens?).
 Risks: vendors subsume routing (answer: harness-agnostic loop); longer
 contexts reduce routing value (answer: ordering + budget still matter; verify
 with ablations); benchmark gaming (answer: frozen goldens, calibrated
 graders, transcript reads); skill supply-chain incident (answer: §24 item 9).
 Kill criteria live per-phase in §20 expansions — no phase proceeds on vibes;
-Phase 0 baseline is the first gate (if MODEL vs MODEL+STEROIDS shows no
+Phase 0 baseline is the first gate (if host-with/without-plugin shows no
 separation on 20 real tasks, stop and simplify before building further).
 
 ## 26. Path to 10 — five upgrades with acceptance tests (researched 2026-09-23)
@@ -488,7 +492,7 @@ needed for fan-out agent work).
 
 **26.2 Adversarial benchmark.** AgentDojo (ETH Zurich, NeurIPS 2024):
 97 tasks, 629 security cases, formal environment-state checks (never
-LLM-judged), benign utility <66%, attack success <25% (8% with detector
+host-judged), benign utility <66%, attack success <25% (8% with detector
 defense), inverse scaling (more capable models easier to attack). Adopt its
 metric pair — Utility + Utility-Under-Attack — as a permanent eval dimension.
 Acceptance: a Steroids change raising P@1 while collapsing under injection is

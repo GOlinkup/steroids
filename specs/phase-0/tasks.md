@@ -1,6 +1,7 @@
 # Story S-00: Phase 0 baseline harness (M1–M4, RQ-1, RQ-2)
 
-Outcome: MODEL vs MODEL+STEROIDS measured on 20 real tasks with CIs, kill
+Outcome: host with/without-plugin measured on 20 real tasks with CIs, kill
+criterion evaluated, go/no-go recorded.
 criterion evaluated, go/no-go recorded. All tasks S/M size. Checkpoint CP-0
 after P0-3 (review task bank before building harness).
 
@@ -50,13 +51,16 @@ Files likely touched: specs/phase-0/task-bank.md
 RQ tag: RQ-2
 Size: M (mostly waiting on reality, not writing)
 
-Task P0-4: Paired harness MODEL vs MODEL+STEROIDS (M4, RQ-2)
-Description: run identical bank both ways, isolated trials, paired cases;
-  record tokens, cost, time, corrections, rework per task.
+Task P0-4: Bank grader recorder (M4, RQ-2)
+Description: script runs the bank's deterministic graders, isolated
+  trials, one CSV row per task per trial under a human-supplied --arm
+  label; the operator executes the host CLI with/without the plugin and
+  fills tokens/cost from their own bill. Steroids makes no model calls,
+  holds no keys, spends nothing.
 Do-not-touch: golden snapshot; router scoring code
 Acceptance:
-- [ ] harness script runs full bank both arms unattended
-- [ ] per-task metrics CSV (tokens in/out, cost, wall time, interventions)
+- [ ] harness script runs full bank unattended (grader-only)
+- [ ] per-task metrics CSV (wall time, grader pass/score; tokens/cost left for host-side runs)
 - [ ] trials isolated (clean env each run, no state leakage)
 Verification: run harness on 2 sample tasks end-to-end; inspect CSV columns
 Dependencies: Tasks 2, 3
@@ -83,9 +87,9 @@ Description: codify outputs-not-paths, partial credit, reference solutions,
   transcript reads, calibration policy into the harness + task template.
 Do-not-touch: collected task bank contents
 Acceptance:
-- [ ] docs/TASK_SYSTEM.md § grader subsection added (or linked policy file)
-- [ ] harness applies partial-credit scoring where tasks have sub-checks
-- [ ] one transcript read-through recorded as example
+- [x] docs/TASK_SYSTEM.md § grader subsection added (or linked policy file)
+- [x] harness applies partial-credit scoring where tasks have sub-checks
+- [x] one transcript read-through recorded as example
 Verification: grep grader policy file exists; run harness --help shows policy
 Dependencies: Task 4 (parallel with Task 5)
 Files likely touched: docs/TASK_SYSTEM.md, scripts/phase0_harness.py

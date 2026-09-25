@@ -114,7 +114,7 @@ Outcome: any future run reproduces today's index numbers bit-for-bit.
 
 Task 1: Record environment snapshot
 Description: write benchmarks/REFERENCE.md with index size, skill-rules
-  hash, model versions, vectors digest, commit hash.
+  hash, embed-model versions, vectors digest, commit hash.
 Do-not-touch: src/, tests/, skill-rules.json
 Acceptance:
 - [ ] benchmarks/REFERENCE.md exists with all five values

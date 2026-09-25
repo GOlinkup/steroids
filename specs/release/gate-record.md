@@ -7,21 +7,22 @@ every claim re-verifiable with the command next to it.
 
 - RQ-1 frozen golden green with trials + CIs: MET. `trial-stats.json`
   trials:3 deterministic, P@1 0.799 [0.732,0.859], P@3 0.960 [0.926,0.987];
-  `bash scripts/eval_gate.sh` PASS. Gap: CI-math unit test missing
-  (P0-2 box 3 unticked).
-- RQ-2 MODEL vs MODEL+STEROIDS separation: OPEN / BLOCKING. Bank 5/20
-  (`specs/phase-0/task-bank.md`); harness skeleton only
-  (`scripts/phase0_harness.py --dry-run`, no live arms); no P0-5 report.
+   `bash scripts/eval_gate.sh` PASS. Closed 2026-09-24: `tests/test_benchmark.py`
+   green (synthetic CI math), wired into `eval_gate.sh`.
+- RQ-2 Host with/without-plugin separation: OPEN / BLOCKING. Bank 10/20
+  (`specs/phase-0/task-bank.md`); grader recorder green
+  (`scripts/phase0_harness.py --arm host+steroids`, no model calls); no P0-5 report.
   Kill criterion cannot be evaluated before the bank fills with real
-  failures — never synthetic (P0-3 rule).
+  failures — never synthetic (P0-3 rule). Host-side runs bill to the
+  operator's own CLI account, never the repo.
 - RQ-3 kill-9 resume: MET. `python3 specs/phase-2/demo_durable.py` twice,
   same outcome, zero duplicate effects (`s1,s2,s3`, dupes none).
 - RQ-4 run renders in unmodified dashboard: MET. `demo_m7.py` → 3 spans
-  in stock Jaeger 1.62.0 via own HTTP API verdict. Gap: emission overhead
-  unmeasured (B-2 box 3 unticked).
+   in stock Jaeger 1.62.0 via own HTTP API verdict. Closed 2026-09-24:
+   `specs/builds/overhead-m7.md` PASS (tap adds no measurable cost, bar <5%).
 - RQ-5 Utility-Under-Attack: PARTIAL. Local proxy green per ADR-004
   (`adversarial_bank.py` 50/50 top-3, `test_injection.py` 12/12).
-  Full 97-task AgentDojo run pending per-cycle spend cap.
+  Full 97-task AgentDojo run deferred to V-next on the operator's bill.
 - RQ-6 install/uninstall clean on 4 harnesses: PARTIAL. Uninstall in
   `install.sh` sandbox-proven (`610482a`); gate green. Live reinstall +
   full matrix unverified (R-1 boxes unticked).
@@ -33,7 +34,7 @@ every claim re-verifiable with the command next to it.
 ## Ship-iff (planning §1) checklist
 
 - [x] frozen golden green with trials + CIs
-- [ ] MODEL vs MODEL+STEROIDS separation on 20 real tasks ← ship blocker
+- [ ] Host with/without-plugin separation on 20 real tasks ← ship blocker
 - [x] kill-9 resume demonstrated
 - [x] run renders in unmodified OTel dashboard
 - [ ] Utility-Under-Attack full run (proxy green, full capped/pending)
@@ -41,13 +42,13 @@ every claim re-verifiable with the command next to it.
 - [x] body-text decision recorded
 
 ## Deferred (evidence forward, assumptions struck)
-- Full-bank P0-4/P0-5 waits on B-06..B-20 from real sessions; skeleton
-  proves the harness shape on B-02/B-03 (4 rows, frozen clean).
-- Full AgentDojo waits on spend cap; proxy pair is the standing metric.
+- Full-bank P0-4/P0-5 waits on B-11..B-20 from real sessions; recorder
+  proves the grader shape on B-02 (1 row, frozen clean).
+- Full AgentDojo waits on a V-next operator-billed run; proxy pair is the standing metric.
 - Live reinstall waits on a maintenance window (throwaway-HOME run).
 - Paid evals SKIPPED for V1 (owner decision 2026-09-23): full 97-task
-  AgentDojo + P0-4 live model arms move to V-next. V1 ships (if it ships)
-  on proxy metrics + bank evidence, never on paid runs.
+  AgentDojo + host-side task runs move to V-next on the operator's bill.
+  V1 ships (if it ships) on proxy metrics + bank evidence, never on paid runs.
 
 ## V-next hold (user decision 2026-09-23: free-branch done, rest deferred)
 

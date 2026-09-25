@@ -21,12 +21,14 @@ the top than the bottom is not an estimate — it is a request for a spike.
   discovery, web dashboard, marketplace, federated/team learning rollout,
   model hosting, fine-tuning a router.
 - **Acceptance criteria (V1 ships iff ALL hold):** frozen golden green with
-  trials + CIs; MODEL vs MODEL+STEROIDS separation on 20 real tasks;
+  trials + CIs; host-with vs host-without-plugin separation on 20 real tasks
+  (host brain both sides — the repo makes no model calls, holds no keys);
   kill -9 resume demonstrated; run renders in unmodified OTel dashboard;
   Utility-Under-Attack reported; install/uninstall clean on all 4 harnesses.
 - **Assumptions:** solo developer; local-first (no cloud dependency in V1);
   Python stdlib preference holds; 1265-skill index as reference scale.
-- **Constraints:** no new paid infrastructure; no model fine-tuning budget;
+- **Constraints:** no new paid infrastructure; no model calls, keys, or
+  spend in-repo — the host CLI owns its brain and its bill;
   privacy rule (hash-only prompts in logs) is inviolable.
 
 ## 2. Dependency map
@@ -66,8 +68,10 @@ or it becomes the project.
 - [ ] P0-3 Collect 20 real tasks from actual failures/sessions (per
   Anthropic: 20–50 from real failures, not synthetic). (2–5d, mostly waiting
   on reality)
-- [ ] P0-4 Harness: run identical task list MODEL-only vs MODEL+STEROIDS,
-  isolated trials, paired cases, record tokens/cost/time/corrections. (3–7d)
+- [ ] P0-4 Grader recorder: deterministic bank graders run isolated per
+  task with trials; rows labeled by host-side --arm. The operator runs the
+  host CLI with/without the plugin on their own bill; the repo records
+  graders only. (3–7d)
 - [ ] P0-5 Baseline report with CIs + the honest gap analysis. Gate: if no
   separation, stop and simplify (kill criterion fires here, cheapest point).
 - [ ] P0-6 Grader rules adopted: outputs-not-paths, partial credit,
@@ -99,7 +103,7 @@ number.
 | M1 | Reference environment frozen | W0 | `benchmarks/REFERENCE.md` committed |
 | M2 | Trial-policy bench green (`--trials N` + CIs) | W1 | golden re-measured, variance known |
 | M3 | 20 real tasks collected | W1–W3 | task bank from actual failures |
-| M4 | Baseline report (MODEL vs MODEL+STEROIDS) | W3–W4 | kill criterion evaluated, go/no-go recorded |
+| M4 | Baseline report (host with/without plugin) | W3–W4 | kill criterion evaluated, go/no-go recorded |
 | M5 | Events streaming in CLI | W4–W6 | watch a run live, no new harness code |
 | M6 | Task engine minimal (goal/task/evidence objects) | W6–W9 | task tree for one real feature, verified |
 | M7 | OTel/CloudEvents emission live | W7–W10 | run renders in unmodified dashboard |
@@ -110,19 +114,14 @@ number.
 10 milestones max per standard practice; each is a stakeholder review point
 (stakeholder = you, acting as approver — see §9).
 
-## 8. Cost baseline (Sept 2026 rates, re-verify at spend time)
+## 8. Cost baseline
 
-Formula per eval cycle: `cost = Σ_tasks Σ_trials (in_MTok × in_rate +
-out_MTok × out_rate)`. Reference rates: Sonnet 4.6 $3/$15, Opus 4.5–4.8
-$5/$25, Haiku 4.5 $1/$5 per MTok; Batch API −50%; prompt-cache reads −90%
-input. Field data: SWE-bench-class tasks cost roughly $0.6–$3/task on
-Sonnet/Opus harnesses; long-horizon company tasks ~$4/task; full benchmark
-runs $100–$1,000. Budget policy (adopted from OpenHands SDK's three tiers):
-programmatic mocked tests run free on every change; LLM integration tests
-($0.5–$3, <5 min) daily + on risky changes; full benchmark cycles on-demand
-only, capped per cycle in advance, actuals recorded next to the estimate.
-Eval spend is tracked like any other budget line — a cycle that exceeds its
-cap without approval is a process failure, not a cost of doing business.
+The repo spends $0 on inference: golden evals, graders, and benchmarks run
+on stdlib + local files. Any host-side task run bills to the operator's
+own CLI account and is pre-capped by the human before the run — never the
+repo's problem. Budget policy: programmatic mocked tests run free on every
+change; host-side comparisons on-demand only, capped per run in advance,
+actuals recorded next to the estimate.
 
 ## 9. RACI + reporting cadence
 
@@ -138,7 +137,7 @@ what to stop doing — written, one page.
 | Risk | Mitigation | Trigger |
 |---|---|---|
 | Baseline shows no separation (M4) | kill/simplify per criterion; cheapest failure point by design | P0-5 numbers flat |
-| Eval costs overrun | tiered testing (§8); caps per cycle | spend > budget |
+| Eval costs overrun | repo evals are free (§8); host-side runs pre-capped by operator | spend > budget |
 | Scope creep (+50% is the industry norm) | §6 change control; any +scope re-opens kill criteria | unplanned task added |
 | Vendor subsumption mid-build | harness-agnostic posture (§24.7); adoption ladder intact | vendor ships native equivalent |
 | Grader/judge invalidates results | grader rules (outputs-not-paths, calibration, transcripts) | two-expert disagreement |
@@ -153,7 +152,7 @@ check attached — no orphan tasks.
 | Req | Statement (from §1 acceptance) | Served by |
 |---|---|---|
 | RQ-1 | Frozen golden green with trials + CIs | P0-1, P0-2, M2 |
-| RQ-2 | MODEL vs MODEL+STEROIDS separation | P0-3, P0-4, P0-5, M4 |
+| RQ-2 | Host with/without-plugin separation | P0-3, P0-4, P0-5, M4 |
 | RQ-3 | kill -9 resume demonstrated | SP-1, durability build |
 | RQ-4 | Run renders in unmodified OTel dashboard | SP-2, M7 |
 | RQ-5 | Utility-Under-Attack reported | SP-4, M8 |
