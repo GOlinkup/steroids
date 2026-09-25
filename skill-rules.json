@@ -60,7 +60,9 @@
       "ui",
       "layout",
       "theme",
-      "component"
+      "component",
+      "grid",
+      "styling"
     ],
     "dart-flutter-patterns": [
       "listview",
@@ -345,6 +347,37 @@
     ]
   },
   "neg": {
+    "git-workflow": [
+      [
+        "merge",
+        "conflict",
+        "rebase",
+        "branch"
+      ],
+      [
+        "workflow",
+        "git",
+        "team",
+        "strategy",
+        "release"
+      ]
+    ],
+    "homelab-network-setup": [
+      [
+        "wireguard",
+        "vpn",
+        "tunnel"
+      ],
+      [
+        "setup",
+        "dns",
+        "vlan",
+        "ssid",
+        "dhcp",
+        "subnet",
+        "segment"
+      ]
+    ],
     "free-tool-strategy": [
       [
         "free"

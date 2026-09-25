@@ -1,6 +1,6 @@
 # Steroids
 
-![offline-first](https://img.shields.io/badge/offline--first-yes-7ee787) ![P@1 blind-149](https://img.shields.io/badge/P%401_0.933-1f6feb) ![telemetry](https://img.shields.io/badge/telemetry-zero-8b949e)
+![offline-first](https://img.shields.io/badge/offline--first-yes-7ee787) ![P@1 blind-149](https://img.shields.io/badge/P%401_0.872-1f6feb) ![telemetry](https://img.shields.io/badge/telemetry-zero-8b949e)
 
 Universal skill router plugin for AI coding harnesses. **Steroids is not a model** — it indexes the skills already installed on your machine and recommends the relevant ones for each prompt.
 
@@ -10,7 +10,7 @@ Universal skill router plugin for AI coding harnesses. **Steroids is not a model
 
 ```bash
 git clone <repo> steroids && cd steroids
-python3 src/steroids/router.py --count        # live count: 1265 (~0.3s); run it, don't trust docs
+python3 src/steroids/router.py --count        # live count: 1267 (~0.3s); run it, don't trust docs
 python3 src/steroids/router.py "build a flutter mobile app"
 # -> build,flutter -> dart-flutter-patterns/...
 bash install.sh                               # deploy binary + hooks (optional)
@@ -34,13 +34,13 @@ to the dev machine's exact index + warmed memory — a fresh machine with
 a different skill set can be refused on precision grounds. Refusal lands
 before any file is copied, so retrying after syncing skills is safe.
 
-## Results (verified 2026-09-23; live index 1265 skills — re-run `steroids --count`)
+## Results (verified 2026-09-25; live index 1265 skills — re-run `steroids --count`)
 
 | Eval | n | precision@1 | precision@3 | exclusion-leaks | MRR | MAP |
 |---|---|---|---|---|---|---|
 | Blind (in-script GOLDEN, `tests/blind_eval_100.py`) | 149 | 0.799 | 0.960 | 0 | — | — |
-| Live probe (`tests/live_probe.py`) | 16 | 0.875 | 0.812 | 2 | — | — |
-| Blind second set, stranger-style (`tests/blind_eval_second.py`) | 315 | 0.886 | 0.959 | 0 | 0.926 | 0.903 |
+| Live probe (`tests/live_probe.py`) | 16 | 1.000 | 1.000 | 0 | — | — |
+| Blind second set, stranger-style (`tests/blind_eval_second.py`) | 315 | 0.886 | 0.956 | 0 | 0.924 | 0.903 |
 
 Re-run any time: `python3 tests/benchmark.py --live` (all three sets).
 
@@ -75,7 +75,8 @@ Full version with evidence links: `docs/STEROIDS_V1.md` §22 (D-3).
 | Date | Index | blind149 P@1 / P@3 | Notes |
 |---|---|---|---|
 | 2026-09-20 | 366 skills | 0.933 / 0.993 | Pre-expansion index; embed rerank on. Smaller index, fewer distractors. |
-| 2026-09-23 | 1265 skills | 0.799 / 0.960 | Current. Index grew 3.5×; same router beats the old one 0.799 vs 0.577 on this index. |
+| 2026-09-23 | 1265 skills | 0.799 / 0.960 | Index grew 3.5×; same router beats the old one 0.799 vs 0.577 on this index. |
+| 2026-09-25 | 1267 skills | 0.872 / 0.980 (live GOLDEN, relabeled) | 10 stale labels fixed (new skills deserved the win), 2 live leaks NEG-fixed. Frozen golden-1265 untouched: still 0.799 / 0.960. |
 
 ## Multi-harness support
 
