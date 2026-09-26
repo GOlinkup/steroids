@@ -62,6 +62,25 @@ main{padding-top:0}
 .updated:hover .info,.updated:focus-visible .info{display:block}
 .updated:focus-visible{outline:2px solid #fff;outline-offset:2px}
 
+/* ---------- auto-type demo: the routing joke, no narration needed ---------- */
+.demo{position:relative;z-index:1;margin:0 0 .9rem;max-width:44rem;border:1px solid rgba(255,255,255,.16);border-radius:14px;background:rgba(10,10,12,.62);backdrop-filter:blur(6px);-webkit-backdrop-filter:blur(6px);font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.86rem;line-height:1.5;overflow:hidden}
+.demo-bar{display:flex;align-items:center;gap:.45rem;padding:.5rem .8rem;border-bottom:1px solid rgba(255,255,255,.08);color:rgba(255,255,255,.45);font-size:.68rem;letter-spacing:.06em;text-transform:uppercase}
+.demo-bar .ddot{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.18)}
+.demo-bar .ddot:first-child{background:#ff5f57}.demo-bar .ddot:nth-child(2){background:#febc2e}.demo-bar .ddot:nth-child(3){background:#28c840}
+.demo-body{padding:.7rem .9rem .85rem;min-height:5.1em}
+.demo-line{display:flex;gap:.55rem;align-items:baseline;white-space:pre-wrap}
+.demo-line .prompt{color:var(--accent-2);flex:none}
+.demo-line .type{color:#fff}
+.demo-line .caret{display:inline-block;width:.55em;height:1.05em;background:#fff;vertical-align:-2px;animation:blink 1s steps(1) infinite}
+@keyframes blink{50%{opacity:0}}
+.demo-rip{color:#ff6a5e;font-weight:700;opacity:0;transition:opacity .18s ease}
+.demo-rip.on{opacity:1}
+.demo-out{color:var(--dim);opacity:0;transform:translateY(4px);transition:opacity .3s ease,transform .3s ease}
+.demo-out.on{opacity:1;transform:none}
+.demo-out b{color:#fff;font-weight:600}
+.demo-out .ms{color:var(--accent-2)}
+@media (prefers-reduced-motion:reduce){.caret{animation:none}.demo{min-height:5.1em}}
+
 /* ---------- hero ---------- */
 .hero{padding:2.5rem var(--gutter) 1rem}
 .hero-ts{position:relative;min-height:100svh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:#000;margin:0;padding:0}
@@ -193,10 +212,11 @@ footer a{color:var(--dim)}
 <body>
 
 <header class="shell-row">
-  <a class="wordmark" href="#">Steroids <em>vs</em> field</a>
+  <a class="wordmark" href="benchmarks.html" title="Home — you're on it">Steroids <em>vs</em> field</a>
   <div class="glass">
     <nav>
-      <a href="#our-bench" class="active">Our benchmark</a>
+      <a href="#" class="active">Live</a>
+      <a href="#our-bench">Our benchmark</a>
       <a href="#their-bench">Their benchmark</a>
       <a href="#headtohead">Head to head</a>
       <a href="#intel">Live intel</a>
@@ -226,6 +246,14 @@ footer a{color:var(--dim)}
           <b>Steroids</b> matches your question to the right skill. <b>No model. CPU only. About 40 ms per query.</b>
           Competitors train neural retrievers and serve them on GPUs. Orange bars are Steroids. Gray bars are everyone else.
         </p>
+        <div class="demo anim" style="--d:1.05s" aria-label="Auto-typed demo: routing a question to a skill without a model">
+          <div class="demo-bar"><span class="ddot"></span><span class="ddot"></span><span class="ddot"></span><span>your agent's prompt box</span></div>
+          <div class="demo-body">
+            <div class="demo-line"><span class="prompt">❯</span><span class="type" id="typeNow"></span><span class="caret" aria-hidden="true"></span></div>
+            <div class="demo-line demo-rip" id="ripLine">/skills — RIP 👋</div>
+            <div class="demo-line demo-out" id="demoOut">→ routed to <b id="demoSkill"></b> · no model, no GPU · <span class="ms">~40 ms</span></div>
+          </div>
+        </div>
         <div class="badge-row anim" style="--d:1s">
           <span class="badge hot">P@1 0.993 · live golden</span>
           <span class="badge hot">P@3 1.000</span>
@@ -493,18 +521,86 @@ footer a{color:var(--dim)}
   },{passive:true});
 })();
 // Bars carry inline heights; stagger + grow come from CSS. Nothing to compute.
-// Keep the glass nav's active link in sync with scroll position.
+// Keep the glass nav's active link in sync with scroll position — but skip
+// the static 'Live' link (href="#"); it is always on, it IS the home state.
 (function(){
   var links=document.querySelectorAll('.glass nav a');
-  var sections=[].map.call(links,function(a){return document.querySelector(a.getAttribute('href'));});
+  var sections=[].map.call(links,function(a){
+    var h=a.getAttribute('href');
+    return (h&&h.length>1)?document.querySelector(h):null;
+  });
   if(!('IntersectionObserver' in window))return;
   var io=new IntersectionObserver(function(es){
     es.forEach(function(e){
       if(!e.isIntersecting)return;
-      links.forEach(function(a){a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id);});
+      links.forEach(function(a,i){a.classList.toggle('active',sections[i]===e.target);});
     });
   },{rootMargin:'-40% 0px -55% 0px'});
   sections.forEach(function(s){if(s)io.observe(s);});
+})();
+
+// ---------- auto-type demo: /skills RIP, then just type, then the route ----------
+// Cycles typed prompts, pauses on the punchline, repeats. Honors reduced motion
+// (renders the first prompt + route statically, no animation).
+(function(){
+  var SAMPLES=[
+    {q:'my flutter list janks when I scroll', s:'dart-flutter-patterns'},
+    {q:'postgres query is crawling on 40M rows', s:'postgres-patterns'},
+    {q:'audit my django app for auth holes', s:'django-security'}
+  ];
+  var typeEl=document.getElementById('typeNow'),
+      ripEl=document.getElementById('ripLine'),
+      outEl=document.getElementById('demoOut'),
+      skillEl=document.getElementById('demoSkill');
+  if(!typeEl)return;
+  var reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+  function show(sample){
+    typeEl.textContent=sample.q;
+    ripEl.classList.add('on');
+    skillEl.textContent=sample.s;
+    outEl.classList.add('on');
+  }
+  if(reduce){show(SAMPLES[0]);return;}
+  var si=0;
+  function sleep(ms){return new Promise(function(r){setTimeout(r,ms);});}
+  function cycle(){
+    var sample=SAMPLES[si%SAMPLES.length];
+    ripEl.classList.remove('on');outEl.classList.remove('on');
+    typeEl.textContent='';
+    var text='/skills';
+    var i=0;
+    function step(){
+      if(i<=text.length){
+        typeEl.textContent=text.slice(0,i++);
+        setTimeout(step,120);
+      } else {
+        setTimeout(async function(){
+          ripEl.classList.add('on');
+          await sleep(1300);
+          // backspace /skills away — RIP
+          var j=text.length;
+          function del(){
+            if(j>=0){typeEl.textContent=text.slice(0,j--);setTimeout(del,70);}
+            else setTimeout(async function(){
+              var q=sample.q,k=0;
+              function type2(){
+                if(k<=q.length){typeEl.textContent=q.slice(0,k++);setTimeout(type2,34);}
+                else setTimeout(function(){
+                  skillEl.textContent=sample.s;
+                  outEl.classList.add('on');
+                  setTimeout(function(){si++;cycle();},3400);
+                },350);
+              }
+              type2();
+            },260);
+          }
+          del();
+        },420);
+      }
+    }
+    step();
+  }
+  cycle();
 })();
 </script>
 </body>
