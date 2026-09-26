@@ -462,6 +462,69 @@
     ]
   },
   "neg": {
+    "diagrammer": [
+      [
+        "architecture",
+        "repo",
+        "explore",
+        "codebase"
+      ],
+      [
+        "flowchart",
+        "circuit",
+        "pathway",
+        "neural",
+        "transformer",
+        "svg",
+        "render"
+      ]
+    ],
+    "premium-web-design": [
+      [
+        "really",
+        "where",
+        "who",
+        "gaps",
+        "competes"
+      ],
+      [
+        "premium",
+        "awwwards",
+        "luxury",
+        "agency",
+        "landing",
+        "portfolio",
+        "expensive"
+      ]
+    ],
+    "kotlin-coroutines-expert": [
+      [
+        "flows",
+        "scope",
+        "rotation",
+        "leak",
+        "stateflow",
+        "sharedflow"
+      ],
+      [
+        "coroutine",
+        "coroutines",
+        "launch",
+        "async",
+        "suspend",
+        "channel",
+        "job"
+      ]
+    ],
+    "sr-python-scala-idioms": [
+      [
+        "python",
+        "java"
+      ],
+      [
+        "scala"
+      ]
+    ],
     "mobile-design": [
       [
         "flutter",

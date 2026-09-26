@@ -1108,7 +1108,7 @@ I18N = {
     # ponytail: G70 — inject-time chrome in 2 languages. Only the chrome is
     # translated; skill content stays source-language (stated, not hidden).
     "en": {"hint": "Possibly relevant skills (load what applies, skip rest)",
-           "load": "load skill", "none": "no confident skill — abstaining"},
+           "load": "load skill", "none": "no confident skill — abstaining (try: steroids --install-skill <name>, steroids --propose)"},
     "es": {"hint": "Habilidades posiblemente relevantes (carga las que apliquen, omite el resto)",
            "load": "cargar habilidad", "none": "sin habilidad confiable — abstención"},
 }
@@ -2349,6 +2349,7 @@ def main():
     parser.add_argument("--force", action="store_true", help="With --ping: bypass the once-per-day gate")
     parser.add_argument("--global-counts", action="store_true", help="Fetch merged global learning counts from the hub (read-only)")
     parser.add_argument("--sync-shared", action="store_true", help="Pull hub-earned shared rules into shared-rules.json (add-only merge at route time)")
+    parser.add_argument("--unused", action="store_true", help="List installed skills with zero accepts ever — prune candidates; usage comes from memory.json accepts")
 
     args, unknown = parser.parse_known_args()
 
@@ -2389,6 +2390,10 @@ def main():
 
     if args.canvas:
         open_canvas()
+        return
+
+    if args.unused:
+        print(json.dumps(unused_skills()))
         return
 
     rules = load_rules()
@@ -2728,22 +2733,43 @@ def _validate_skill_rules(raw):
 
 HF_SKILLS_BASE = "https://raw.githubusercontent.com/huggingface/skills/main/skills"
 SKILL_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,80}$")
+SKILL_TRUSTED_REPOS = ("huggingface/skills", "anthropics/skills",
+                       "vercel-labs/skills", "google/skills",
+                       "anthropics/skills", "addyosmani/agent-skills")
 
 def install_skill(name, timeout=15):
-    """Fetch NAME/SKILL.md from the curated HF skills repo into the local
-    index (~/steroids/skills/ if the repo is present, else ~/.agents/skills/).
+    """Fetch a SKILL.md into the local index (~/steroids/skills/ if the repo
+    is present, else ~/.agents/skills/). Spec is `skill` (curated HF repo)
+    or `owner/repo:path/to/skill` for trusted repos only
+    (huggingface, anthropics, vercel-labs, google, addyosmani).
     Validates slug, size (<=100KB), and SKILL.md frontmatter (name: +
     description:). Never overwrites. Routing itself stays offline; only
     this flag touches the network."""
-    name = (name or "").strip().lower()
-    if not SKILL_SLUG_RE.match(name):
-        return {"ok": False, "error": "bad skill name (a-z, 0-9, -, _)"}
+    spec = (name or "").strip()
+    if "/" in spec and ":" in spec:
+        repo, path = spec.split(":", 1)
+        repo = repo.strip().lower()
+        segs = [g for g in path.strip().strip("/").split("/") if g not in ("", ".", "..")]
+        if repo not in SKILL_TRUSTED_REPOS or not segs or any(not SKILL_SLUG_RE.match(g) for g in segs):
+            return {"ok": False, "error": "untrusted repo or bad path (trusted: %s)" % ", ".join(sorted(set(SKILL_TRUSTED_REPOS)))}
+        urls = ["https://raw.githubusercontent.com/%s/%s/%s/SKILL.md" % (repo, _br, "/".join(segs))
+                for _br in ("main", "master")]
+        name = segs[-1]
+    else:
+        name = spec.lower()
+        if not SKILL_SLUG_RE.match(name):
+            return {"ok": False, "error": "bad skill name (a-z, 0-9, -, _)"}
+        urls = [HF_SKILLS_BASE + "/" + name + "/SKILL.md"]
     repo = os.path.expanduser("~/steroids/skills")
     dest_dir = repo if os.path.isdir(os.path.expanduser("~/steroids")) else os.path.expanduser("~/.agents/skills")
     dest_dir = os.path.join(dest_dir, name)
     if os.path.exists(os.path.join(dest_dir, "SKILL.md")):
         return {"ok": False, "error": "already installed: " + dest_dir}
-    raw = _fetch_bytes(HF_SKILLS_BASE + "/" + name + "/SKILL.md", timeout=timeout, max_bytes=100000)
+    raw = None
+    for _u in urls:
+        raw = _fetch_bytes(_u, timeout=timeout, max_bytes=100000)
+        if raw is not None:
+            break
     if raw is None:
         return {"ok": False, "error": "not found upstream (or >100KB): " + name}
     try:
@@ -2759,8 +2785,40 @@ def install_skill(name, timeout=15):
             f.write(text)
     except OSError as e:
         return {"ok": False, "error": str(e)}
+    links = []
+    for _h in ("~/.agents/skills", "~/.config/opencode/skills"):
+        _hd = os.path.expanduser(_h)
+        if not os.path.isdir(_hd):
+            continue
+        _link = os.path.join(_hd, name)
+        if os.path.lexists(_link):
+            continue
+        try:
+            os.symlink(dest_dir, _link)  # dir link: <harness>/<name>/SKILL.md
+            links.append(_link)
+        except OSError:
+            pass
     return {"ok": True, "skill": name, "path": os.path.join(dest_dir, "SKILL.md"),
-            "bytes": len(raw), "note": "indexed on next run (mtime cache)"}
+            "bytes": len(raw), "links": links,
+            "note": "indexed on next run (mtime cache)"}
+
+def unused_skills(mem_path=MEM_PATH):
+    """Installed-but-never-accepted skills = prune candidates.
+    Usage signal is memory.json accepts (populated by --learn hooks);
+    seen-without-accept counts as unused. Returns names sorted."""
+    try:
+        rules = load_rules()
+        names = sorted({n for n, _ in skill_files(rules.get("index_dirs", []))})
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:120]}
+    try:
+        mem = json.load(open(mem_path, encoding="utf-8"))
+        used = {str(k).strip().lower() for k in (mem.get("accepts") or {})}
+    except Exception:
+        used = set()
+    unused = [n for n in names if n.lower() not in used]
+    return {"ok": True, "indexed": len(names),
+            "used": len(names) - len(unused), "unused": unused}
 
 def check_skill_update(url=SKILL_RULES_URL, rules_path=RULES_PATH):
     # ponytail: read-only; routing never touches the network (flags only).
