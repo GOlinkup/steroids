@@ -1108,7 +1108,7 @@ I18N = {
     # ponytail: G70 — inject-time chrome in 2 languages. Only the chrome is
     # translated; skill content stays source-language (stated, not hidden).
     "en": {"hint": "Possibly relevant skills (load what applies, skip rest)",
-           "load": "load skill", "none": "no confident skill — abstaining"},
+           "load": "load skill", "none": "no confident skill — abstaining (try: steroids --install-skill <name>, steroids --propose)"},
     "es": {"hint": "Habilidades posiblemente relevantes (carga las que apliquen, omite el resto)",
            "load": "cargar habilidad", "none": "sin habilidad confiable — abstención"},
 }
@@ -2349,6 +2349,7 @@ def main():
     parser.add_argument("--force", action="store_true", help="With --ping: bypass the once-per-day gate")
     parser.add_argument("--global-counts", action="store_true", help="Fetch merged global learning counts from the hub (read-only)")
     parser.add_argument("--sync-shared", action="store_true", help="Pull hub-earned shared rules into shared-rules.json (add-only merge at route time)")
+    parser.add_argument("--unused", action="store_true", help="List installed skills with zero accepts ever — prune candidates; usage comes from memory.json accepts")
 
     args, unknown = parser.parse_known_args()
 
@@ -2389,6 +2390,10 @@ def main():
 
     if args.canvas:
         open_canvas()
+        return
+
+    if args.unused:
+        print(json.dumps(unused_skills()))
         return
 
     rules = load_rules()
@@ -2782,6 +2787,24 @@ def install_skill(name, timeout=15):
         return {"ok": False, "error": str(e)}
     return {"ok": True, "skill": name, "path": os.path.join(dest_dir, "SKILL.md"),
             "bytes": len(raw), "note": "indexed on next run (mtime cache)"}
+
+def unused_skills(mem_path=MEM_PATH):
+    """Installed-but-never-accepted skills = prune candidates.
+    Usage signal is memory.json accepts (populated by --learn hooks);
+    seen-without-accept counts as unused. Returns names sorted."""
+    try:
+        rules = load_rules()
+        names = sorted({n for n, _ in skill_files(rules.get("index_dirs", []))})
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:120]}
+    try:
+        mem = json.load(open(mem_path, encoding="utf-8"))
+        used = {str(k).strip().lower() for k in (mem.get("accepts") or {})}
+    except Exception:
+        used = set()
+    unused = [n for n in names if n.lower() not in used]
+    return {"ok": True, "indexed": len(names),
+            "used": len(names) - len(unused), "unused": unused}
 
 def check_skill_update(url=SKILL_RULES_URL, rules_path=RULES_PATH):
     # ponytail: read-only; routing never touches the network (flags only).
