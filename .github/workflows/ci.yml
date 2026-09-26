@@ -1,0 +1,28 @@
+# LCH-1: run the existing gates on every push/PR. No keys, no billable runs.
+# Each step mirrors scripts/eval_gate.sh (+ the skill linter); stdlib only.
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  gates:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.x"
+      - name: unit evals (router)
+        run: python3 tests/test_router.py
+      - name: unit evals (eval)
+        run: python3 tests/test_eval.py
+      - name: goldens per skill
+        run: python3 tests/goldens_per_skill.py
+      - name: bench precision vs baseline
+        run: python3 scripts/bench.py
+      - name: README claims match golden metadata
+        run: python3 tests/benchmark.py --check
+      - name: skill lint
+        run: python3 scripts/lint_skills.py

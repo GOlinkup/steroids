@@ -5,7 +5,9 @@
   "semantic_weight": 2.0,
   "mcp_needs": {    "query-or-url": {"server": "exa-web-search", "tool": "web_search"},
     "topic-or-url": {"server": "exa-web-search", "tool": "web_search"},
-    "source-file-or-url": {"server": "firecrawl", "tool": "scrape"}
+    "source-file-or-url": {"server": "firecrawl", "tool": "scrape"},
+    "motion-catalog-url": {"server": "exa-web-search", "tool": "web_search"},
+    "reference-url-or-brief": {"server": "exa-web-search", "tool": "web_search"}
   },
   "browser_fallback": {"server": "playwright"},
   "needs_overlay": {
@@ -58,7 +60,9 @@
       "ui",
       "layout",
       "theme",
-      "component"
+      "component",
+      "grid",
+      "styling"
     ],
     "dart-flutter-patterns": [
       "listview",
@@ -298,9 +302,525 @@
     "javascript-testing-patterns": [
       "vitest",
       "jest"
+    ],
+    "3d-web-experience": [
+      "three",
+      "webgl",
+      "blender-look",
+      "filmic",
+      "cinematic",
+      "aces",
+      "ibl",
+      "hdri",
+      "turntable",
+      "pbr",
+      "soft-shadows",
+      "photorealistic",
+      "product-viewer",
+      "car",
+      "wheel-spin",
+      "rolling",
+      "axle",
+      "rotation",
+      "rim",
+      "headless",
+      "eevee",
+      "cycles",
+      "slipping",
+      "spinning",
+      "tire"
+    ],
+    "asset-fetch": [
+      "glb",
+      "gltf",
+      "fbx",
+      "poly-pizza",
+      "quaternius",
+      "mixamo",
+      "sketchfab",
+      "asset-file",
+      "mocap",
+      "rigged",
+      "bvh",
+      "animated",
+      "character"
+    ],
+    "agent-payment-x402": [
+      "stablecoin"
+    ],
+    "article-writing": [
+      "launch",
+      "newsletter",
+      "draft"
+    ],
+    "brand-voice": [
+      "voice",
+      "tone",
+      "style"
+    ],
+    "canary-watch": [
+      "deployed",
+      "healthy",
+      "production",
+      "smoke"
+    ],
+    "code-tour": [
+      "tour",
+      "walkthrough",
+      "guide",
+      "guided",
+      "auth"
+    ],
+    "customer-billing-ops": [
+      "charged",
+      "duplicate",
+      "refund",
+      "invoice",
+      "customer"
+    ],
+    "dart-flutter-patterns": [
+      "payment",
+      "payments",
+      "paywall",
+      "purchase",
+      "billing"
+    ],
+    "django-patterns": [
+      "orm",
+      "queryset",
+      "query"
+    ],
+    "django-tdd": [
+      "pytest",
+      "django",
+      "testcase"
+    ],
+    "email-ops": [
+      "inbox",
+      "mailbox",
+      "triage",
+      "sent"
+    ],
+    "exa-search": [
+      "live",
+      "research",
+      "neural"
+    ],
+    "frontend-slides": [
+      "deck",
+      "stakeholder",
+      "pitch"
+    ],
+    "prediction-market-oracle-research": [
+      "prediction",
+      "markets",
+      "oracle",
+      "forecast",
+      "demand"
+    ],
+    "prompt-optimizer": [
+      "prompt",
+      "rewrite",
+      "cold"
+    ],
+    "quality-nonconformance": [
+      "corrective",
+      "capa",
+      "defect",
+      "nonconformance"
+    ],
+    "rust-patterns": [
+      "borrow",
+      "ownership",
+      "lifetime",
+      "trait",
+      "cargo",
+      "checker",
+      "tree",
+      "restructure"
+    ],
+    "clickhouse-io": [
+      "clickhouse",
+      "aggregation",
+      "billions",
+      "rows",
+      "tune"
+    ],
+    "finance-billing-ops": [
+      "billed",
+      "billing",
+      "twice",
+      "duplicate",
+      "charges"
+    ],
+    "flutter-dart-code-review": [
+      "jank",
+      "janks",
+      "rebuild",
+      "rebuilds",
+      "scroll"
     ]
   },
   "neg": {
+    "mobile-design": [
+      [
+        "flutter",
+        "dart",
+        "widget",
+        "listview",
+        "memoize"
+      ],
+      [
+        "design",
+        "ui",
+        "ux",
+        "layout",
+        "responsive",
+        "native",
+        "touch",
+        "platform"
+      ]
+    ],
+    "stripe-integration": [
+      [
+        "bill",
+        "billed",
+        "twice",
+        "prove",
+        "duplicate"
+      ],
+      [
+        "stripe",
+        "webhook",
+        "checkout",
+        "payment",
+        "subscription",
+        "connect"
+      ]
+    ],
+    "research": [
+      [
+        "dossier",
+        "cited",
+        "trust"
+      ],
+      [
+        "search",
+        "web",
+        "code",
+        "literature",
+        "paper",
+        "benchmark",
+        "study"
+      ]
+    ],
+    "templates": [
+      [
+        "template",
+        "launch",
+        "post",
+        "newsletter",
+        "voice"
+      ],
+      [
+        "scaffold",
+        "generator",
+        "boilerplate",
+        "starter",
+        "repo",
+        "cookiecutter",
+        "new",
+        "create",
+        "init"
+      ]
+    ],
+    "article-writing": [
+      [
+        "voice",
+        "tone"
+      ],
+      [
+        "article",
+        "post",
+        "blog",
+        "essay",
+        "draft",
+        "publish"
+      ]
+    ],
+    "forecast-accuracy-review": [
+      [
+        "prediction",
+        "markets",
+        "polymarket",
+        "oracle"
+      ],
+      [
+        "wmape",
+        "mape",
+        "bias",
+        "backtest",
+        "bench"
+      ]
+    ],
+    "orch-refine-code": [
+      [
+        "borrow",
+        "checker",
+        "lifetime",
+        "trait",
+        "cargo",
+        "rust",
+        "ownership"
+      ],
+      [
+        "orchestrate",
+        "pipeline",
+        "tdd",
+        "commit",
+        "worktree",
+        "agent",
+        "dispatch"
+      ]
+    ],
+    "python-testing-patterns": [
+      [
+        "django"
+      ],
+      [
+        "fixture",
+        "mock",
+        "parametrize",
+        "coverage",
+        "unittest",
+        "async"
+      ]
+    ],
+    "root-cause-pareto": [
+      [
+        "corrective",
+        "capa",
+        "action",
+        "ncr",
+        "defect"
+      ],
+      [
+        "pareto",
+        "downtime",
+        "chart",
+        "rate",
+        "trend"
+      ]
+    ],
+    "templates--railway": [
+      [
+        "template",
+        "launch",
+        "post",
+        "newsletter",
+        "voice",
+        "sound"
+      ],
+      [
+        "railway",
+        "deploy",
+        "service",
+        "postgres",
+        "volume",
+        "domain"
+      ]
+    ],
+    "internal-comms": [
+      [
+        "voice",
+        "tone",
+        "newsletter",
+        "write",
+        "my"
+      ],
+      [
+        "memo",
+        "announcement",
+        "standup",
+        "report",
+        "email",
+        "meeting",
+        "slack",
+        "team",
+        "update",
+        "digest"
+      ]
+    ],
+    "internal-comms-anthropic": [
+      [
+        "voice",
+        "tone",
+        "newsletter",
+        "write",
+        "my"
+      ],
+      [
+        "memo",
+        "announcement",
+        "standup",
+        "report",
+        "email",
+        "meeting",
+        "slack",
+        "team",
+        "update",
+        "digest"
+      ]
+    ],
+    "internal-comms-community": [
+      [
+        "voice",
+        "tone",
+        "newsletter",
+        "write",
+        "my"
+      ],
+      [
+        "memo",
+        "announcement",
+        "standup",
+        "report",
+        "email",
+        "meeting",
+        "slack",
+        "team",
+        "update",
+        "digest"
+      ]
+    ],
+    "canvas-design": [
+      [
+        "obsidian",
+        "mindmap",
+        "spatial",
+        "spatially",
+        "notes",
+        "rearrange"
+      ],
+      [
+        "png",
+        "pdf",
+        "poster",
+        "image",
+        "generate",
+        "art"
+      ]
+    ],
+    "find-bugs": [
+      [
+        "issue",
+        "spec",
+        "standards"
+      ],
+      [
+        "bug",
+        "vulnerability",
+        "leak",
+        "defect",
+        "exploit",
+        "audit"
+      ]
+    ],
+    "scroll-experience": [
+      [
+        "flutter",
+        "dart",
+        "widget",
+        "mobile",
+        "rebuild",
+        "jank"
+      ],
+      [
+        "parallax",
+        "storytelling",
+        "cinematic",
+        "animation",
+        "experience"
+      ]
+    ],
+    "finance-billing-ops": [
+      [
+        "twice",
+        "duplicate",
+        "charged",
+        "billed"
+      ],
+      [
+        "revenue",
+        "pricing",
+        "plan",
+        "subscription",
+        "mrr",
+        "tier",
+        "packaging"
+      ]
+    ],
+    "vaex": [
+      [
+        "clickhouse"
+      ],
+      [
+        "dataframe",
+        "pandas",
+        "csv",
+        "parquet",
+        "arrow",
+        "hdf5"
+      ]
+    ],
+    "videodb": [
+      [
+        "web",
+        "search",
+        "research",
+        "solved",
+        "codebase"
+      ],
+      [
+        "video",
+        "audio",
+        "stream",
+        "transcode",
+        "clip",
+        "footage"
+      ]
+    ],
+    "git-workflow": [
+      [
+        "merge",
+        "conflict",
+        "rebase",
+        "branch"
+      ],
+      [
+        "workflow",
+        "git",
+        "team",
+        "strategy",
+        "release"
+      ]
+    ],
+    "homelab-network-setup": [
+      [
+        "wireguard",
+        "vpn",
+        "tunnel"
+      ],
+      [
+        "setup",
+        "dns",
+        "vlan",
+        "ssid",
+        "dhcp",
+        "subnet",
+        "segment"
+      ]
+    ],
     "free-tool-strategy": [
       [
         "free"
@@ -641,14 +1161,18 @@
     ],
     "brand-voice": [
       [
-        "blunt"
+        "blunt",
+        "launch",
+        "post",
+        "template",
+        "sound"
       ],
       [
         "voice",
         "style",
         "tone",
-        "post",
-        "write"
+        "mimic",
+        "newsletter"
       ]
     ],
     "perl-security": [
@@ -998,6 +1522,74 @@
         "order",
         "delivery",
         "restaurant"
+      ]
+    ],
+    "3d-web-experience": [
+      [
+      "car",
+      "cinematic",
+      "photorealistic",
+      "product",
+      "render",
+      "roll",
+      "rotation",
+      "spin"
+      ],
+      [
+      "3d",
+      "aces",
+      "axle",
+      "blender",
+      "cycle",
+      "drift",
+      "eevee",
+      "filmic",
+      "game",
+      "hdri",
+      "ibl",
+      "pbr",
+      "rim",
+      "roll",
+      "scene",
+      "skid",
+      "slipp",
+      "spinn",
+      "three",
+      "tire",
+      "turntable",
+      "webgl",
+      "wheel"
+      ]
+    ],
+    "asset-fetch": [
+      [
+      "download",
+      "free",
+      "model",
+      "character",
+      "animation",
+      "video"
+      ],
+      [
+      "asset",
+      "blend",
+      "blender",
+      "bvh",
+      "downloadable",
+      "fbx",
+      "game",
+      "glb",
+      "gltf",
+      "kenney",
+      "mixamo",
+      "mocap",
+      "pizza",
+      "poly",
+      "poly-pizza",
+      "quaternius",
+      "rig",
+      "rigg",
+      "sketchfab"
       ]
     ]
   },

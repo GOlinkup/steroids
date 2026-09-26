@@ -21,7 +21,6 @@ _ROOT = os.path.normpath(os.path.join(_HERE, ".."))
 _RULES = os.path.join(_ROOT, "skill-rules.json")
 STALE_DAYS = 365
 
-
 def parse_frontmatter(text):
     """Return (fields dict, error or None). Minimal --- parser, no yaml needed."""
     lines = text.splitlines()
@@ -47,7 +46,6 @@ def parse_frontmatter(text):
     if key:
         fields[key] = " ".join(buf).strip()
     return fields, None
-
 
 def lint():
     with open(_RULES, encoding="utf-8") as f:
@@ -99,7 +97,60 @@ def lint():
             "collisions": collisions, "oldest": oldest}
 
 
+# Backlog #2 ritual: every new trigger batch must survive adversarial probes
+# (trigger word + unrelated domain). A TOP-1 carried ONLY by generic words
+# (df>=3, no distinctive anchor) = hijack class (cf. bare-car → 3d-web).
+_ADV_DOMAINS = ("postgres database server", "email inbox login",
+                "loan interest calculator", "rotate log files daily",
+                "standup meeting notes")
+
+def _load_router():
+    import importlib.util
+    rp = os.path.join(_ROOT, "src", "steroids", "router.py")
+    spec = importlib.util.spec_from_file_location("steroids_router_lint", rp)
+    mod = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(mod)
+    return mod
+
+def neg_check(skills=None):
+    """Return [(skill, trigger, query, top3)] hijack rows. Empty = clean."""
+    with open(_RULES, encoding="utf-8") as f:
+        rules = json.load(f)
+    rt = _load_router()
+    idx = rt.get_index(rules)
+    over = rules.get("skills", {})
+    names = skills or sorted(over)
+    # document frequency over the live index: triggers owned by >=3 skills
+    # are generic words that must never carry a top-1 alone.
+    df = {}
+    for keys in idx.values():
+        for k in set(keys):
+            df[k] = df.get(k, 0) + 1
+    rows = []
+    for name in names:
+        trigs = over.get(name, [])
+        if name not in idx:
+            continue
+        for t in trigs:
+            for d in _ADV_DOMAINS:
+                q = f"{t} {d}"
+                top = rt.route_query(q, rules, idx)[:3]
+                if not top or top[0][1] != name:
+                    continue
+                hits = top[0][2]
+                if hits and all(df.get(h, 99) >= 3 for h in hits):
+                    rows.append((name, t, q, [sk for _, sk, _ in top]))
+                    break
+    return rows
+
 def main():
+    if "--neg-check" in sys.argv:
+        names = [a for a in sys.argv[1:] if not a.startswith("-")] or None
+        rows = neg_check(names)
+        print(f"neg-check skills={names or 'ALL-overrides'} hijacks={len(rows)}")
+        for name, t, q, top3 in rows[:30]:
+            print(f"  HIJACK {name} via {t!r} on {q!r} top3={top3}")
+        return 1 if rows else 0
     r = lint()
     date = datetime.now().date().isoformat()
     out_dir = os.path.join(_ROOT, "reports")

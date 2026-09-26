@@ -1,0 +1,151 @@
+{
+ "date": "2026-09-26",
+ "n": 20,
+ "p_at_1": 0.95,
+ "latency_ms_mean": 86.34,
+ "latency_ms_p95": 54.82,
+ "offline": true,
+ "cost_usd": 0,
+ "rows": [
+  {
+   "ok": true,
+   "expected": "ck",
+   "top1": "ck",
+   "ms": 956.2,
+   "q": "persist this session so it survives a restart"
+  },
+  {
+   "ok": true,
+   "expected": "browser-qa",
+   "top1": "browser-qa",
+   "ms": 38.4,
+   "q": "verify the deployed checkout flow visually, screenshot each step"
+  },
+  {
+   "ok": true,
+   "expected": "cost-tracking",
+   "top1": "cost-tracking",
+   "ms": 28.8,
+   "q": "how much money did I spend on tokens last week"
+  },
+  {
+   "ok": true,
+   "expected": "postgres-patterns",
+   "top1": "postgres-patterns",
+   "ms": 37.1,
+   "q": "why is this postgres query slow on a million rows"
+  },
+  {
+   "ok": true,
+   "expected": "docker-patterns",
+   "top1": "docker-patterns",
+   "ms": 41.5,
+   "q": "write a dockerfile for local dev without compose"
+  },
+  {
+   "ok": true,
+   "expected": "resolving-merge-conflicts",
+   "top1": "resolving-merge-conflicts",
+   "ms": 35.8,
+   "q": "help me resolve this rebase conflict on my branch"
+  },
+  {
+   "ok": true,
+   "expected": "canvas",
+   "top1": "canvas",
+   "ms": 54.8,
+   "q": "put these notes on an obsidian canvas as a spatial mindmap"
+  },
+  {
+   "ok": true,
+   "expected": "design-system",
+   "top1": "design-system",
+   "ms": 48.0,
+   "q": "audit our spacing tokens and typography palette"
+  },
+  {
+   "ok": true,
+   "expected": "dart-flutter-patterns",
+   "top1": "dart-flutter-patterns",
+   "ms": 35.1,
+   "q": "my flutter listview stutters, memoize the widget build"
+  },
+  {
+   "ok": true,
+   "expected": "code-review",
+   "top1": "code-review",
+   "ms": 45.1,
+   "q": "review this pr diff against our standards and spec"
+  },
+  {
+   "ok": true,
+   "expected": "claude-devfleet",
+   "top1": "claude-devfleet",
+   "ms": 45.7,
+   "q": "dispatch parallel agents in isolated worktrees, a full fleet at once"
+  },
+  {
+   "ok": true,
+   "expected": "dmux-workflows",
+   "top1": "dmux-workflows",
+   "ms": 38.1,
+   "q": "drive long cli sessions side by side in tmux panes"
+  },
+  {
+   "ok": true,
+   "expected": "council",
+   "top1": "council",
+   "ms": 38.3,
+   "q": "argue both sides of this tradeoff before I decide"
+  },
+  {
+   "ok": true,
+   "expected": "blueprint",
+   "top1": "blueprint",
+   "ms": 40.3,
+   "q": "rambling idea, turn it into a build plan"
+  },
+  {
+   "ok": false,
+   "expected": "archify",
+   "top1": "diagrammer",
+   "ms": 45.3,
+   "q": "draw a diagram of this system architecture"
+  },
+  {
+   "ok": true,
+   "expected": "diagnosing-bugs",
+   "top1": "diagnosing-bugs",
+   "ms": 37.3,
+   "q": "intermittent crash, hunt it down"
+  },
+  {
+   "ok": true,
+   "expected": "django-security",
+   "top1": "django-security",
+   "ms": 38.5,
+   "q": "lock down auth cookies in this django app"
+  },
+  {
+   "ok": true,
+   "expected": "golang-patterns",
+   "top1": "golang-patterns",
+   "ms": 46.5,
+   "q": "idiomatic error handling and concurrency for this go service"
+  },
+  {
+   "ok": true,
+   "expected": "defuddle",
+   "top1": "defuddle",
+   "ms": 28.7,
+   "q": "strip the clutter from this article"
+  },
+  {
+   "ok": true,
+   "expected": "benchmark",
+   "top1": "benchmark",
+   "ms": 47.3,
+   "q": "make this endpoint faster, compare approaches"
+  }
+ ]
+}

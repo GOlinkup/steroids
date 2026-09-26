@@ -129,6 +129,7 @@ class TestRouter(unittest.TestCase):
             self.assertEqual(out2["missing"], ["source-file-or-url"])
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_thin_evidence_counts_as_unfetched(self):
         import threading
@@ -155,6 +156,7 @@ class TestRouter(unittest.TestCase):
             self.assertIn(url, out["unfetched"])
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_resolve_mcp_first(self):
         rules = {"mcp_needs": {"query-or-url": {"server": "exa-web-search", "tool": "web_search"}}}
@@ -308,6 +310,7 @@ class TestRouter(unittest.TestCase):
             self.assertEqual(step2["unbacked"], [])
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_propose_clusters_unmet(self):
         import tempfile, json
@@ -409,6 +412,7 @@ class TestRouter(unittest.TestCase):
             self.assertIsNone(router._fetch_bytes("http://127.0.0.1:1/nope", timeout=1))
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_autoinject_fires_above_threshold(self):
         import tempfile, os
@@ -590,6 +594,7 @@ class TestRouter(unittest.TestCase):
                 shutil.rmtree(tmp, ignore_errors=True)
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_b16_openapi_skew(self):
         import threading, json as _json
@@ -627,6 +632,7 @@ class TestRouter(unittest.TestCase):
                 shutil.rmtree(tmp, ignore_errors=True)
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_b17_figma_node_gated_and_fetched(self):
         self.assertFalse(router.figma_node(
@@ -656,6 +662,7 @@ class TestRouter(unittest.TestCase):
             self.assertFalse(router.figma_node("https://example.com/x", token="t")["ok"])
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_c21_learn_parses_three_harness_shapes(self):
         import tempfile, os, json as _json
@@ -863,8 +870,10 @@ class TestRouter(unittest.TestCase):
             py = os.path.join(tmp, "pyapp")
             os.makedirs(node)
             os.makedirs(py)
-            open(os.path.join(node, "package.json"), "w").write('{}')
-            open(os.path.join(py, "requirements.txt"), "w").write('x\n')
+            with open(os.path.join(node, "package.json"), "w") as f:
+                f.write('{}')
+            with open(os.path.join(py, "requirements.txt"), "w") as f:
+                f.write('x\n')
             self.assertEqual(router.detect_stack(node), ["node"])
             self.assertEqual(router.detect_stack(py), ["python"])
             self.assertEqual(router.detect_stack(tmp), [])

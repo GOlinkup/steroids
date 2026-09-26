@@ -252,3 +252,27 @@ Optimize model size.
 ## Related Skills
 
 Works well with: `scroll-experience`, `interactive-portfolio`, `frontend`, `landing-page-design`
+
+## Blender-look recipe (single HTML file, same three.js CDN, no new deps)
+
+Blender's filmic look is 90% lighting discipline, not the renderer. All stdlib:
+- IBL first: `RoomEnvironment` + `PMREMGenerator` as `scene.environment`
+  (this one line does more than any light you will add).
+- `renderer.toneMapping = ACESFilmicToneMapping`, exposure ~1.1.
+- 3-point rig: cool key with shadows (`PCFSoftShadowMap`, 1024 map is enough),
+  warm fill (no shadow), dim rim from behind.
+- Ground: `ShadowMaterial` catcher (opacity ~0.35) so models sit instead of float.
+- Emissive + real lights, never emissive alone: headlights/taillights get a
+  `SpotLight`/`PointLight` each, or the glow reads as paint.
+- Fog for depth; keep materials PBR (`roughness`/`metalness`, no flat colors
+  on hero objects).
+- Motion that loops must recycle fixed pools (wrap positions, never allocate
+  per frame) and roll wheels about the world lateral axle, matched to road
+  speed — verify with two timestamps, never by eyeballing one still.
+
+## Delivery checklist (every 3D attempt, no exceptions)
+
+Serve over http, headless screenshots (wide + close), console log, and a
+`metadata.json` (resolution, files, licenses with attribution, self-checklist).
+If a shot fails, save what exists + note why. Never declare PASS without all
+four artifacts on disk.
