@@ -18,6 +18,10 @@ run misses "$PYBIN" "$REPO/scripts/mine_misses.py"
 "$PYBIN" "$REPO/src/steroids/router.py" --sync-shared >>"$LOG" 2>&1 \
   || echo "WARN sync failed (exit $?) — shared rules keep yesterday's copy" >>"$LOG"
 run trust "$PYBIN" "$REPO/scripts/trust_report.py"
+# Mondays: trending-skills discover (report-only, never auto-installs).
+if [ "$(date +%u)" = "1" ]; then
+  bash "$REPO/scripts/trending-check.sh" >>"$LOG" 2>&1 || true
+fi
 if [ "$fail" -ne 0 ]; then
   echo "# Nightly ERROR $DATE — see cron-$DATE.log" > "$REPO/reports/nightly-$DATE-ERROR.md"
 fi

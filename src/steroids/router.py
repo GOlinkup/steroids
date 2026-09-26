@@ -2728,22 +2728,43 @@ def _validate_skill_rules(raw):
 
 HF_SKILLS_BASE = "https://raw.githubusercontent.com/huggingface/skills/main/skills"
 SKILL_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,80}$")
+SKILL_TRUSTED_REPOS = ("huggingface/skills", "anthropics/skills",
+                       "vercel-labs/skills", "google/skills",
+                       "anthropics/skills", "addyosmani/agent-skills")
 
 def install_skill(name, timeout=15):
-    """Fetch NAME/SKILL.md from the curated HF skills repo into the local
-    index (~/steroids/skills/ if the repo is present, else ~/.agents/skills/).
+    """Fetch a SKILL.md into the local index (~/steroids/skills/ if the repo
+    is present, else ~/.agents/skills/). Spec is `skill` (curated HF repo)
+    or `owner/repo:path/to/skill` for trusted repos only
+    (huggingface, anthropics, vercel-labs, google, addyosmani).
     Validates slug, size (<=100KB), and SKILL.md frontmatter (name: +
     description:). Never overwrites. Routing itself stays offline; only
     this flag touches the network."""
-    name = (name or "").strip().lower()
-    if not SKILL_SLUG_RE.match(name):
-        return {"ok": False, "error": "bad skill name (a-z, 0-9, -, _)"}
+    spec = (name or "").strip()
+    if "/" in spec and ":" in spec:
+        repo, path = spec.split(":", 1)
+        repo = repo.strip().lower()
+        segs = [g for g in path.strip().strip("/").split("/") if g not in ("", ".", "..")]
+        if repo not in SKILL_TRUSTED_REPOS or not segs or any(not SKILL_SLUG_RE.match(g) for g in segs):
+            return {"ok": False, "error": "untrusted repo or bad path (trusted: %s)" % ", ".join(sorted(set(SKILL_TRUSTED_REPOS)))}
+        urls = ["https://raw.githubusercontent.com/%s/%s/%s/SKILL.md" % (repo, _br, "/".join(segs))
+                for _br in ("main", "master")]
+        name = segs[-1]
+    else:
+        name = spec.lower()
+        if not SKILL_SLUG_RE.match(name):
+            return {"ok": False, "error": "bad skill name (a-z, 0-9, -, _)"}
+        urls = [HF_SKILLS_BASE + "/" + name + "/SKILL.md"]
     repo = os.path.expanduser("~/steroids/skills")
     dest_dir = repo if os.path.isdir(os.path.expanduser("~/steroids")) else os.path.expanduser("~/.agents/skills")
     dest_dir = os.path.join(dest_dir, name)
     if os.path.exists(os.path.join(dest_dir, "SKILL.md")):
         return {"ok": False, "error": "already installed: " + dest_dir}
-    raw = _fetch_bytes(HF_SKILLS_BASE + "/" + name + "/SKILL.md", timeout=timeout, max_bytes=100000)
+    raw = None
+    for _u in urls:
+        raw = _fetch_bytes(_u, timeout=timeout, max_bytes=100000)
+        if raw is not None:
+            break
     if raw is None:
         return {"ok": False, "error": "not found upstream (or >100KB): " + name}
     try:
