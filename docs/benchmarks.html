@@ -214,7 +214,7 @@ footer a{color:var(--dim)}
 <main>
   <div class="hero hero-ts">
     <div class="hero-strip" aria-hidden="true">
-      <video autoplay muted loop playsinline preload="metadata">
+      <video id="timelapse" autoplay muted loop playsinline preload="auto">
         <source src="hero.mp4" type="video/mp4" />
       </video>
     </div>
@@ -473,6 +473,25 @@ footer a{color:var(--dim)}
 </footer>
 
 <script>
+// Timelapse: hero video scrubs with page scroll. When the reader scrolls,
+// the loop pauses and the video follows the page. At the top it resumes.
+(function(){
+  var v=document.getElementById('timelapse');
+  if(!v||!('requestAnimationFrame' in window))return;
+  var dur=0, ticking=false;
+  v.addEventListener('loadedmetadata',function(){dur=v.duration||0;});
+  function scrub(){
+    ticking=false;
+    var max=document.documentElement.scrollHeight-window.innerHeight;
+    if(!(dur>0)||max<=0)return;
+    var p=Math.min(1,Math.max(0,window.scrollY/max));
+    if(p>0.02){ if(!v.paused)v.pause(); try{v.currentTime=dur*p;}catch(e){} }
+    else { if(v.paused)v.play().catch(function(){}); }
+  }
+  window.addEventListener('scroll',function(){
+    if(!ticking){ticking=true;requestAnimationFrame(scrub);}
+  },{passive:true});
+})();
 // Bars carry inline heights; stagger + grow come from CSS. Nothing to compute.
 // Keep the glass nav's active link in sync with scroll position.
 (function(){
