@@ -35,7 +35,7 @@ GOLDEN = [
     ("help me build an angular form with signals and validation", "angular", ["angular-developer"], []),
     ("wire up another REST API the same way our codebase already does it", "api-connector-builder", [], []),
     ("how should I name endpoints and handle paging and errors", "api-design", ["backend-patterns"], []),
-    ("draw the architecture of this repo as a diagram I can explore", "mermaid-diagrams", ["archify"], []),
+    ("draw the architecture of this repo as a diagram I can explore", "archify", ["mermaid-diagrams"], []),
     ("record why we picked postgres so future devs stop asking", "architecture-decision-records", [], []),
     ("write my launch post so it sounds like me, not a template", "article-writing", ["brand-voice"], []),
     ("I'm lost in the skill list, which one fits my task", "ask-matt", [], []),

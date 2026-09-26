@@ -2785,8 +2785,22 @@ def install_skill(name, timeout=15):
             f.write(text)
     except OSError as e:
         return {"ok": False, "error": str(e)}
+    links = []
+    for _h in ("~/.agents/skills", "~/.config/opencode/skills"):
+        _hd = os.path.expanduser(_h)
+        if not os.path.isdir(_hd):
+            continue
+        _link = os.path.join(_hd, name)
+        if os.path.lexists(_link):
+            continue
+        try:
+            os.symlink(dest_dir, _link)  # dir link: <harness>/<name>/SKILL.md
+            links.append(_link)
+        except OSError:
+            pass
     return {"ok": True, "skill": name, "path": os.path.join(dest_dir, "SKILL.md"),
-            "bytes": len(raw), "note": "indexed on next run (mtime cache)"}
+            "bytes": len(raw), "links": links,
+            "note": "indexed on next run (mtime cache)"}
 
 def unused_skills(mem_path=MEM_PATH):
     """Installed-but-never-accepted skills = prune candidates.
