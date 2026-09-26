@@ -91,10 +91,11 @@ Full version with evidence links: `docs/STEROIDS_V1.md` §22 (D-3).
 ## How routing works
 
 - **TF-IDF scoring** over indexed skill names, descriptions, and keywords.
+- **Semantic backup**: trigram similarity + offline ONNX embeddings rescue paraphrased prompts (lexical vote still wins ties).
 - **Stemming** so `testing`/`tests` match the same skills.
 - **NEG blocklist** filters out noise terms before scoring.
-- **Name bonus** for direct skill-name mentions in the prompt.
-- **Closed-loop memory + log** records which suggestions were useful and biases future routing.
+- **Closed-loop memory + log** records which suggestions were useful and biases future routing (accepts bonus, shared rules, `--correct`).
+- **Missing skills installable**: `steroids --install-skill <name>` fetches a validated SKILL.md into the index.
 
 ## Privacy
 
@@ -102,8 +103,8 @@ Steroids runs fully offline on your machine. Routine routing sends nothing anywh
 
 ## Limitations
 
-- Keyword overlap, not semantic search — paraphrased prompts may miss.
-- Only routes skills already installed and indexed; it can't fetch new ones.
+- Semantic layer can outvote keywords on close calls (1 known flip: django-tdd vs python-testing-patterns; your accepts overrule it).
+- Installs only from the curated HF skills repo (`--install-skill`); arbitrary URLs refused.
 - Hints are suggestions, not guarantees — the agent decides what to load.
 
 ## Demo

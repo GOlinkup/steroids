@@ -2339,6 +2339,7 @@ def main():
     parser.add_argument("--learn", default="", metavar="PATH", help="Harvest accepts from a transcript file (same scan as per-prompt learning, on demand)")
     parser.add_argument("--learn-opencode", nargs="?", const="ALL", default=None, metavar="SESSION", help="Harvest accepts from opencode.db skill calls (optional session id; default all new)")
     parser.add_argument("--self-update", action="store_true", help="Fetch latest skill-rules.json from GitHub (offline TF-IDF default untouched)")
+    parser.add_argument("--install-skill", default="", metavar="NAME", help="Install a skill by name from the curated HF skills repo into ~/steroids/skills/ (validates SKILL.md, refuses overwrite)")
     parser.add_argument("--check", action="store_true", help="Check whether local skill-rules.json is behind GitHub (read-only)")
     parser.add_argument("--ranker", default="v1", choices=["v1", "v2", "ab"], help="Ranker variant: v1 default, v2 lexical challenger, ab 10%% auto-assign")
     parser.add_argument("--team", default="", help="Opt-in shared org accept pool JSON path (C29 team learning)")
@@ -2380,6 +2381,10 @@ def main():
 
     if args.self_update:
         print(json.dumps(self_update()))
+        return
+
+    if args.install_skill:
+        print(json.dumps(install_skill(args.install_skill)))
         return
 
     if args.canvas:
@@ -2720,6 +2725,42 @@ def _validate_skill_rules(raw):
     if not isinstance(doc, dict) or not isinstance(doc.get("skills"), dict):
         return None
     return doc
+
+HF_SKILLS_BASE = "https://raw.githubusercontent.com/huggingface/skills/main/skills"
+SKILL_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,80}$")
+
+def install_skill(name, timeout=15):
+    """Fetch NAME/SKILL.md from the curated HF skills repo into the local
+    index (~/steroids/skills/ if the repo is present, else ~/.agents/skills/).
+    Validates slug, size (<=100KB), and SKILL.md frontmatter (name: +
+    description:). Never overwrites. Routing itself stays offline; only
+    this flag touches the network."""
+    name = (name or "").strip().lower()
+    if not SKILL_SLUG_RE.match(name):
+        return {"ok": False, "error": "bad skill name (a-z, 0-9, -, _)"}
+    repo = os.path.expanduser("~/steroids/skills")
+    dest_dir = repo if os.path.isdir(os.path.expanduser("~/steroids")) else os.path.expanduser("~/.agents/skills")
+    dest_dir = os.path.join(dest_dir, name)
+    if os.path.exists(os.path.join(dest_dir, "SKILL.md")):
+        return {"ok": False, "error": "already installed: " + dest_dir}
+    raw = _fetch_bytes(HF_SKILLS_BASE + "/" + name + "/SKILL.md", timeout=timeout, max_bytes=100000)
+    if raw is None:
+        return {"ok": False, "error": "not found upstream (or >100KB): " + name}
+    try:
+        text = raw.decode("utf-8")
+    except Exception:
+        return {"ok": False, "error": "not UTF-8 markdown: " + name}
+    head = text[:2000]
+    if not re.search(r"^name:\s*\S+", head, re.M) or not re.search(r"^description:", head, re.M):
+        return {"ok": False, "error": "missing name:/description: frontmatter: " + name}
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+        with open(os.path.join(dest_dir, "SKILL.md"), "w", encoding="utf-8") as f:
+            f.write(text)
+    except OSError as e:
+        return {"ok": False, "error": str(e)}
+    return {"ok": True, "skill": name, "path": os.path.join(dest_dir, "SKILL.md"),
+            "bytes": len(raw), "note": "indexed on next run (mtime cache)"}
 
 def check_skill_update(url=SKILL_RULES_URL, rules_path=RULES_PATH):
     # ponytail: read-only; routing never touches the network (flags only).
