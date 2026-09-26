@@ -5,6 +5,7 @@ Supports Antigravity, Claude Code, OpenCode, and Terminal CLI.
 """
 import argparse
 import hashlib
+import importlib.util
 import json
 import math
 import os
@@ -27,6 +28,7 @@ def get_base_dir():
 
 BASE_DIR = get_base_dir()
 RULES_PATH = os.path.join(BASE_DIR, "skill-rules.json")
+SHARED_RULES_PATH = os.path.join(BASE_DIR, "shared-rules.json")
 CACHE_PATH = os.path.join(BASE_DIR, "skill-index.json")
 MEM_PATH = os.path.join(BASE_DIR, "memory.json")
 LOG_PATH = os.path.join(BASE_DIR, "served.jsonl")
@@ -210,10 +212,39 @@ def load_rules():
                 for k, v in default_rules.items():
                     if k not in rules:
                         rules[k] = v
-                return rules
+                return _merge_shared_rules(rules)
         except Exception:
             pass
-    return default_rules
+    return _merge_shared_rules(default_rules)
+
+
+def _merge_shared_rules(rules):
+    # ponytail: phase 2 shared learning — hub-earned trigger clusters.
+    # ADD-only union onto rules["skills"]: shared rules can add triggers for
+    # a skill the local rules already know (and add whole skills), but can
+    # never remove or shrink a local list. Read-only at route time: if the
+    # file is missing/corrupt, routing is unaffected.
+    try:
+        with open(SHARED_RULES_PATH, encoding="utf-8") as f:
+            shared = json.load(f)
+        skills = shared.get("skills") if isinstance(shared, dict) else None
+        if not isinstance(skills, dict):
+            return rules
+        local = rules.get("skills")
+        if not isinstance(local, dict):
+            local = {}
+            rules["skills"] = local
+        for skill, trigs in skills.items():
+            if not isinstance(trigs, list) or not trigs:
+                continue
+            cur = local.get(skill)
+            if cur is None:
+                local[skill] = list(trigs)
+            elif isinstance(cur, list):
+                local[skill] = cur  # never overwrite — add-only guarantee
+        return rules
+    except Exception:
+        return rules
 
 def skill_files_all(dirs):
     # ponytail: skill_files dedups by name; this keeps every copy for needs precedence.
@@ -433,6 +464,53 @@ def learn(transcript_path, now=None):
         except OSError:
             pass
     return accepts
+
+
+def harvest_opencode(session=None):
+    """Accepts harvest from opencode.db skill calls (read-only). Incremental
+    per session via memory.json opencode_offsets (max time_created seen).
+    Returns (new_skills, total_accepts). Stdlib sqlite3 only; never writes
+    the database. Missing/corrupt db = ([], total)."""
+    try:
+        mem = json.load(open(MEM_PATH, encoding="utf-8"))
+    except Exception:
+        mem = {}
+    accepts = mem.get("accepts", {})
+    seen = mem.get("seen", {})
+    if not isinstance(seen, dict):
+        seen = {}
+    offsets = mem.get("opencode_offsets", {})
+    new = []
+    try:
+        import sqlite3
+        db = sqlite3.connect("file://" + os.path.expanduser(
+            "~/.local/share/opencode/opencode.db") + "?mode=ro", uri=True)
+        q = ("SELECT session_id, time_created, "
+             "json_extract(data,'$.state.input.name') FROM part "
+             "WHERE json_extract(data,'$.tool')='skill'")
+        params = ()
+        if session:
+            q += " AND session_id=?"
+            params = (session,)
+        for sess, ts, name in db.execute(q, params):
+            if not name or not isinstance(name, str):
+                continue
+            if ts <= offsets.get(sess, 0):
+                continue
+            offsets[sess] = max(offsets.get(sess, 0), ts)
+            accepts[name] = accepts.get(name, 0) + 1
+            seen[name] = time.time()
+            new.append(name)
+        db.close()
+    except Exception:
+        pass
+    try:
+        mem["accepts"], mem["seen"], mem["opencode_offsets"] = accepts, seen, offsets
+        with open(MEM_PATH, "w", encoding="utf-8") as f:
+            json.dump(mem, f)
+    except OSError:
+        pass
+    return new, sum(accepts.values())
 
 def load_outcomes(mem_path=MEM_PATH):
     # ponytail: C22 — {skill: [ok, bad]}; missing file = no outcomes.
@@ -1030,7 +1108,7 @@ I18N = {
     # ponytail: G70 — inject-time chrome in 2 languages. Only the chrome is
     # translated; skill content stays source-language (stated, not hidden).
     "en": {"hint": "Possibly relevant skills (load what applies, skip rest)",
-           "load": "load skill", "none": "no confident skill — abstaining"},
+           "load": "load skill", "none": "no confident skill — abstaining (try: steroids --install-skill <name>, steroids --propose)"},
     "es": {"hint": "Habilidades posiblemente relevantes (carga las que apliquen, omite el resto)",
            "load": "cargar habilidad", "none": "sin habilidad confiable — abstención"},
 }
@@ -1499,7 +1577,36 @@ def route_query(prompt, rules, idx, accepts=None):
     top = scored[:rules.get("max_recommendations", 3)]
     return top
 
-def log_impression(prompt, trigs, skills):
+_RUN_ID = None  # ponytail: one run-id per process; stamped on every impression.
+
+
+def _maybe_daily_ping():
+    # ponytail: shared learning — background once-per-day counters POST.
+    # Best-effort daemon thread: never delays the hint, never raises.
+    try:
+        import threading
+        from . import share as _share
+    except ImportError:
+        return
+    def _run():
+        try:
+            _share.ping(BASE_DIR)
+        except Exception:
+            pass
+    threading.Thread(target=_run, daemon=True).start()
+
+
+def log_impression(prompt, trigs, skills, task_id="", extra=None):
+    global _RUN_ID
+    if _RUN_ID is None:
+        try:
+            from . import ids as _ids
+        except ImportError:  # ponytail: spec-load without package falls back here
+            _spec_ids = importlib.util.spec_from_file_location(
+                "st_ids", os.path.join(os.path.dirname(os.path.abspath(__file__)), "ids.py"))
+            _ids = importlib.util.module_from_spec(_spec_ids)
+            _spec_ids.loader.exec_module(_ids)
+        _RUN_ID = _ids.run_id()
     try:
         os.makedirs(os.path.dirname(LOG_PATH), exist_ok=True)
         q = hashlib.sha1(prompt.encode()).hexdigest()[:12]
@@ -1522,19 +1629,39 @@ def log_impression(prompt, trigs, skills):
         with open(LOG_PATH, "a", encoding="utf-8") as f:
             f.write(json.dumps({
                 "t": now,
+                "run": _RUN_ID,
+                "task": task_id,
                 "q": q,
                 "trigs": trigs,
-                "skills": skills
+                "skills": skills,
+                **(extra or {}),
             }) + "\n")
-        # ponytail: cap log at 5000 rows; size-gated so the check is ~free.
+        _maybe_daily_ping()
+        # ponytail: age-trim, not count-cap. Heavy users keep full history
+        # (their disk, our $0); mining only ever reads recent rows anyway.
+        # Keep 90 days, floor 5000 rows so light users lose nothing.
         try:
-            if os.path.getsize(LOG_PATH) > 512000:
+            if os.path.getsize(LOG_PATH) > 10485760:
+                import time as _t
+                import json as _j
+                cutoff = _t.time() - 90 * 86400
                 with open(LOG_PATH, encoding="utf-8") as f:
                     rows = f.readlines()
-                if len(rows) > 5000:
+                kept = []
+                for r in rows:
+                    try:
+                        o = _j.loads(r)
+                        keep = not isinstance(o, dict) or o.get("t", 0) >= cutoff
+                    except ValueError:
+                        keep = True  # corrupt line: keep, never destroy data
+                    if keep:
+                        kept.append(r)
+                if len(kept) < 5000:
+                    kept = rows[-5000:]
+                if len(kept) < len(rows):
                     with open(LOG_PATH, "w", encoding="utf-8") as f:
-                        f.writelines(rows[-5000:])
-        except OSError:
+                        f.writelines(kept)
+        except (OSError, ValueError):
             pass
     except Exception:
         pass
@@ -1559,39 +1686,74 @@ def extract_prompt_from_transcript(tp):
         pass
     return last_prompt
 
-def extract_urls(prompt):
-    # ponytail: http(s) only; bare domains stay out (precision over recall).
-    found = re.findall(r"https?://[^\s) '\"<>]+", prompt)
-    return list(dict.fromkeys(u.rstrip(".,;:!?") for u in found))[:5]
-
-def fetch_text(url, timeout=10, max_bytes=20000):
-    # ponytail: stdlib urllib; any failure (DNS, TLS, timeout, huge) = None, never raise.
+def _load_net():
+    # ponytail: thin-slice split — net.py is canonical; file-path load keeps
+    # single-file deploy (binary + net.py alongside) and spec-load tests working.
     try:
-        import urllib.request
-        req = urllib.request.Request(url, headers={"User-Agent": "Steroids-gather/1.0"})
-        with urllib.request.urlopen(req, timeout=timeout) as res:
-            raw = res.read(max_bytes + 1)
-        text = raw[:max_bytes].decode("utf-8", "replace")
-        text = re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>|<!--[\s\S]*?-->", " ", text)
-        text = re.sub(r"<[^>]+>", " ", text)
-        text = re.sub(r"\s+", " ", text).strip()
-        return text[:max_bytes] or None
+        import importlib.util as _ilu
+        _np = os.path.join(os.path.dirname(os.path.abspath(__file__)), "net.py")
+        if os.path.isfile(_np):
+            _spec = _ilu.spec_from_file_location("steroids_net", _np)
+            _mod = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_mod)
+            return _mod
     except Exception:
-        return None
+        pass
+    return None
 
-SHELL_MARKERS = ("loading", "enable javascript", "just a moment",
-                 "checking your browser", "cloudflare", "nreum", "__next_f")
 
-def looks_like_shell(text):
-    # ponytail: >=2 JS-shell markers in the head = bot-wall/SPA shell, not content.
-    head = (text or "")[:2000].lower()
-    return sum(1 for m in SHELL_MARKERS if m in head) >= 2
+_net = _load_net()
+
+if _net is not None:
+    extract_urls = _net.extract_urls
+    fetch_text = _net.fetch_text
+    SHELL_MARKERS = _net.SHELL_MARKERS
+    looks_like_shell = _net.looks_like_shell
+else:
+    def extract_urls(prompt):
+        # ponytail: http(s) only; bare domains stay out (precision over recall).
+        found = re.findall(r"https?://[^\s) '\"<>]+", prompt)
+        return list(dict.fromkeys(u.rstrip(".,;:!?") for u in found))[:5]
+
+    def fetch_text(url, timeout=10, max_bytes=20000):
+        # ponytail: stdlib urllib; any failure (DNS, TLS, timeout, huge) = None, never raise.
+        try:
+            import urllib.request
+            req = urllib.request.Request(url, headers={"User-Agent": "Steroids-gather/1.0"})
+            with urllib.request.urlopen(req, timeout=timeout) as res:
+                raw = res.read(max_bytes + 1)
+            text = raw[:max_bytes].decode("utf-8", "replace")
+            text = re.sub(r"<script[\s\S]*?</script>|<style[\s\S]*?</style>|<!--[\s\S]*?-->", " ", text)
+            text = re.sub(r"<[^>]+>", " ", text)
+            text = re.sub(r"\s+", " ", text).strip()
+            return text[:max_bytes] or None
+        except Exception as e:
+            # ponytail: HTTPError is file-like; close to avoid ResourceWarning.
+            try:
+                e.close()
+            except Exception:
+                pass
+            return None
+
+    SHELL_MARKERS = ("loading", "enable javascript", "just a moment",
+                     "checking your browser", "cloudflare", "nreum", "__next_f")
+
+    def looks_like_shell(text):
+        # ponytail: >=2 JS-shell markers in the head = bot-wall/SPA shell, not content.
+        head = (text or "")[:2000].lower()
+        return sum(1 for m in SHELL_MARKERS if m in head) >= 2
 
 def resolve_mcp(need, rules):
     # ponytail: static map only; execution stays agent-side (no MCP client in stdlib).
     entry = (rules.get("mcp_needs") or {}).get(need)
     if isinstance(entry, dict) and entry.get("server"):
         return {"kind": "mcp", "server": entry["server"], "tool": entry.get("tool", "")}
+    # ponytail: any url/link-ish need falls back to the query-or-url search entry; else ask.
+    n = (need or "").lower()
+    if any(t in n for t in ("url", "link", "ref", "brief", "catalog", "asset", "source", "site", "repo", "doc")):
+        fb = (rules.get("mcp_needs") or {}).get("query-or-url")
+        if isinstance(fb, dict) and fb.get("server"):
+            return {"kind": "mcp", "server": fb["server"], "tool": fb.get("tool", "")}
     return None
 
 def verify_proof(item):
@@ -1781,6 +1943,10 @@ def figma_node(node_url, token=None, base="https://api.figma.com", timeout=10):
         with urllib.request.urlopen(req2, timeout=timeout) as res2:
             imgs = json.loads(res2.read(100000).decode("utf-8"))
     except Exception as e:
+        try:
+            e.close()
+        except Exception:
+            pass
         return {"ok": False, "error": str(e)[:120]}
     images = (imgs.get("images") or {})
     return {"ok": True, "key": key, "node": node,
@@ -2168,12 +2334,22 @@ def main():
     parser.add_argument("--chain", default=None, help='Two-step plan "step one > step two": gather each, verdict go or blocked-at-N')
     parser.add_argument("--mcp", action="store_true", help="Run stdio JSON-RPC server exposing tool recommend_skills")
     parser.add_argument("--share", action="store_true", help="Export graph to /tmp + print share-ready summary")
+    parser.add_argument("--correct", nargs="*", default=None, metavar="WORD", help="Log a correction: this prompt was missed (D-2). Lands in the miss pipeline; pair with --skill")
+    parser.add_argument("--skill", default="", help="The skill that should have matched (used with --correct)")
+    parser.add_argument("--learn", default="", metavar="PATH", help="Harvest accepts from a transcript file (same scan as per-prompt learning, on demand)")
+    parser.add_argument("--learn-opencode", nargs="?", const="ALL", default=None, metavar="SESSION", help="Harvest accepts from opencode.db skill calls (optional session id; default all new)")
     parser.add_argument("--self-update", action="store_true", help="Fetch latest skill-rules.json from GitHub (offline TF-IDF default untouched)")
+    parser.add_argument("--install-skill", default="", metavar="NAME", help="Install a skill by name from the curated HF skills repo into ~/steroids/skills/ (validates SKILL.md, refuses overwrite)")
     parser.add_argument("--check", action="store_true", help="Check whether local skill-rules.json is behind GitHub (read-only)")
     parser.add_argument("--ranker", default="v1", choices=["v1", "v2", "ab"], help="Ranker variant: v1 default, v2 lexical challenger, ab 10%% auto-assign")
     parser.add_argument("--team", default="", help="Opt-in shared org accept pool JSON path (C29 team learning)")
     parser.add_argument("--dry-run", action="store_true", help="Preview what I'd load + why; no side effects (A10, default off)")
     parser.add_argument("--explain", action="store_true", help="Self-explaining hints: why each pick + tokens saved (J93)")
+    parser.add_argument("--ping", action="store_true", help="Share today's anonymous counters with the global hub (once/day; --force to retry now)")
+    parser.add_argument("--force", action="store_true", help="With --ping: bypass the once-per-day gate")
+    parser.add_argument("--global-counts", action="store_true", help="Fetch merged global learning counts from the hub (read-only)")
+    parser.add_argument("--sync-shared", action="store_true", help="Pull hub-earned shared rules into shared-rules.json (add-only merge at route time)")
+    parser.add_argument("--unused", action="store_true", help="List installed skills with zero accepts ever — prune candidates; usage comes from memory.json accepts")
 
     args, unknown = parser.parse_known_args()
 
@@ -2181,16 +2357,51 @@ def main():
         print(json.dumps(check_skill_update()))
         return
 
+    if args.ping or args.global_counts or args.sync_shared:
+        # ponytail: shared learning — counters only, one POST per local day.
+        try:
+            from . import share as _share
+        except ImportError:
+            _share_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "share.py")
+            if not os.path.isfile(_share_path):
+                _share = None
+            else:
+                import importlib.util as _ilu
+                _spec = _ilu.spec_from_file_location("steroids_share", _share_path)
+                _share = _ilu.module_from_spec(_spec)
+                _spec.loader.exec_module(_share)
+        if _share is None:
+            print(json.dumps({"ok": False, "error": "share.py not deployed alongside router"}))
+        elif args.global_counts:
+            print(json.dumps(_share.global_counts()))
+        elif args.sync_shared:
+            print(json.dumps(_share.sync_shared_rules(BASE_DIR)))
+        else:
+            print(json.dumps(_share.ping(BASE_DIR, force=args.force)))
+        return
+
     if args.self_update:
         print(json.dumps(self_update()))
+        return
+
+    if args.install_skill:
+        print(json.dumps(install_skill(args.install_skill)))
         return
 
     if args.canvas:
         open_canvas()
         return
 
+    if args.unused:
+        print(json.dumps(unused_skills()))
+        return
+
     rules = load_rules()
     idx = get_index(rules, force_rebuild=args.reindex)
+    if args.reindex:
+        # ponytail: needs/proof derive from skill dirs too; stale cache hides new skills' gates.
+        get_needs(rules, force_rebuild=True)
+        get_proof(rules, force_rebuild=True)
 
     if args.dry_run:
         # ponytail: A10 — preview only; returns before any logging/inject.
@@ -2279,6 +2490,29 @@ def main():
         print(f"Indexed skills ({len(idx)} total):")
         for s in sorted(idx.keys()):
             print(f"  - {s}")
+        return
+
+    if args.correct:
+        # ponytail: D-2 correction — unmet-shaped row (empty skills) so propose() mines it; the right answer rides in "correction".
+        cprompt = " ".join(args.correct)
+        attempted = ",".join(sorted(set(toks(cprompt)) - set(rules.get("glue", [])))[:6])
+        log_impression(cprompt, attempted, "",
+                       extra={"correction": args.skill} if args.skill else None)
+        print(f"correction logged: {attempted}" + (f" -> {args.skill}" if args.skill else ""))
+        return
+
+    if args.learn:
+        before = dict(learn(""))
+        learn(args.learn)
+        after = learn("")
+        print(json.dumps({"ok": True, "accepts_total": sum(after.values()),
+                          "new": sum(after.values()) - sum(before.values())}))
+        return
+    if args.learn_opencode:
+        sess = None if args.learn_opencode == "ALL" else args.learn_opencode
+        new, total = harvest_opencode(sess)
+        print(json.dumps({"ok": True, "session": sess or "ALL",
+                          "new": new, "accepts_total": total}))
         return
 
     if args.prompt and args.prompt[0] == "graph":
@@ -2423,6 +2657,10 @@ def main():
             print(json.dumps({}))
         elif args.json:
             print(json.dumps({"triggers": [], "skills": [], "hint": ""}))
+        else:
+            # ponytail: D-1 — plain CLI abstained silently (exit 0, 0 bytes);
+            # say so with the existing inject-chrome string. Scoring untouched.
+            print(I18N["en"]["none"])
 
     if args.explain and prompt:
         # ponytail: J93 output lives here (pure addition) so --json/hook paths stay untouched.
@@ -2467,6 +2705,9 @@ def _sha8(raw):
     return hashlib.sha256(raw).hexdigest()[:8]
 
 def _fetch_bytes(url, timeout=15, max_bytes=1000000):
+    # ponytail: canonical in net.py; delegate when loaded, else local fallback.
+    if _net is not None:
+        return _net._fetch_bytes(url, timeout=timeout, max_bytes=max_bytes)
     # ponytail: raw bytes, not fetch_text (that strips tags/whitespace meant for evidence HTML).
     try:
         import urllib.request
@@ -2474,7 +2715,11 @@ def _fetch_bytes(url, timeout=15, max_bytes=1000000):
         with urllib.request.urlopen(req, timeout=timeout) as res:
             raw = res.read(max_bytes + 1)
         return raw if len(raw) <= max_bytes else None
-    except Exception:
+    except Exception as e:
+        try:
+            e.close()
+        except Exception:
+            pass
         return None
 
 def _validate_skill_rules(raw):
@@ -2485,6 +2730,95 @@ def _validate_skill_rules(raw):
     if not isinstance(doc, dict) or not isinstance(doc.get("skills"), dict):
         return None
     return doc
+
+HF_SKILLS_BASE = "https://raw.githubusercontent.com/huggingface/skills/main/skills"
+SKILL_SLUG_RE = re.compile(r"^[a-z0-9][a-z0-9_-]{0,80}$")
+SKILL_TRUSTED_REPOS = ("huggingface/skills", "anthropics/skills",
+                       "vercel-labs/skills", "google/skills",
+                       "anthropics/skills", "addyosmani/agent-skills")
+
+def install_skill(name, timeout=15):
+    """Fetch a SKILL.md into the local index (~/steroids/skills/ if the repo
+    is present, else ~/.agents/skills/). Spec is `skill` (curated HF repo)
+    or `owner/repo:path/to/skill` for trusted repos only
+    (huggingface, anthropics, vercel-labs, google, addyosmani).
+    Validates slug, size (<=100KB), and SKILL.md frontmatter (name: +
+    description:). Never overwrites. Routing itself stays offline; only
+    this flag touches the network."""
+    spec = (name or "").strip()
+    if "/" in spec and ":" in spec:
+        repo, path = spec.split(":", 1)
+        repo = repo.strip().lower()
+        segs = [g for g in path.strip().strip("/").split("/") if g not in ("", ".", "..")]
+        if repo not in SKILL_TRUSTED_REPOS or not segs or any(not SKILL_SLUG_RE.match(g) for g in segs):
+            return {"ok": False, "error": "untrusted repo or bad path (trusted: %s)" % ", ".join(sorted(set(SKILL_TRUSTED_REPOS)))}
+        urls = ["https://raw.githubusercontent.com/%s/%s/%s/SKILL.md" % (repo, _br, "/".join(segs))
+                for _br in ("main", "master")]
+        name = segs[-1]
+    else:
+        name = spec.lower()
+        if not SKILL_SLUG_RE.match(name):
+            return {"ok": False, "error": "bad skill name (a-z, 0-9, -, _)"}
+        urls = [HF_SKILLS_BASE + "/" + name + "/SKILL.md"]
+    repo = os.path.expanduser("~/steroids/skills")
+    dest_dir = repo if os.path.isdir(os.path.expanduser("~/steroids")) else os.path.expanduser("~/.agents/skills")
+    dest_dir = os.path.join(dest_dir, name)
+    if os.path.exists(os.path.join(dest_dir, "SKILL.md")):
+        return {"ok": False, "error": "already installed: " + dest_dir}
+    raw = None
+    for _u in urls:
+        raw = _fetch_bytes(_u, timeout=timeout, max_bytes=100000)
+        if raw is not None:
+            break
+    if raw is None:
+        return {"ok": False, "error": "not found upstream (or >100KB): " + name}
+    try:
+        text = raw.decode("utf-8")
+    except Exception:
+        return {"ok": False, "error": "not UTF-8 markdown: " + name}
+    head = text[:2000]
+    if not re.search(r"^name:\s*\S+", head, re.M) or not re.search(r"^description:", head, re.M):
+        return {"ok": False, "error": "missing name:/description: frontmatter: " + name}
+    try:
+        os.makedirs(dest_dir, exist_ok=True)
+        with open(os.path.join(dest_dir, "SKILL.md"), "w", encoding="utf-8") as f:
+            f.write(text)
+    except OSError as e:
+        return {"ok": False, "error": str(e)}
+    links = []
+    for _h in ("~/.agents/skills", "~/.config/opencode/skills"):
+        _hd = os.path.expanduser(_h)
+        if not os.path.isdir(_hd):
+            continue
+        _link = os.path.join(_hd, name)
+        if os.path.lexists(_link):
+            continue
+        try:
+            os.symlink(dest_dir, _link)  # dir link: <harness>/<name>/SKILL.md
+            links.append(_link)
+        except OSError:
+            pass
+    return {"ok": True, "skill": name, "path": os.path.join(dest_dir, "SKILL.md"),
+            "bytes": len(raw), "links": links,
+            "note": "indexed on next run (mtime cache)"}
+
+def unused_skills(mem_path=MEM_PATH):
+    """Installed-but-never-accepted skills = prune candidates.
+    Usage signal is memory.json accepts (populated by --learn hooks);
+    seen-without-accept counts as unused. Returns names sorted."""
+    try:
+        rules = load_rules()
+        names = sorted({n for n, _ in skill_files(rules.get("index_dirs", []))})
+    except Exception as e:
+        return {"ok": False, "error": str(e)[:120]}
+    try:
+        mem = json.load(open(mem_path, encoding="utf-8"))
+        used = {str(k).strip().lower() for k in (mem.get("accepts") or {})}
+    except Exception:
+        used = set()
+    unused = [n for n in names if n.lower() not in used]
+    return {"ok": True, "indexed": len(names),
+            "used": len(names) - len(unused), "unused": unused}
 
 def check_skill_update(url=SKILL_RULES_URL, rules_path=RULES_PATH):
     # ponytail: read-only; routing never touches the network (flags only).

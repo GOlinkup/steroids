@@ -8,12 +8,12 @@
 Usage:  python3 scripts/preflight_check.py [--home DIR]
 Stdlib only. Paths take an explicit home (no environ mutation).
 """
+import hashlib
 import json
 import os
 import sys
 
 MODEL_FILES = ("model_quantized.onnx", "vocab.txt")
-
 
 def expand(home, path):
     if path == "~":
@@ -21,7 +21,6 @@ def expand(home, path):
     if path.startswith("~/"):
         return os.path.join(home, path[2:])
     return path
-
 
 def preflight(home, rules):
     skills = 0
@@ -45,6 +44,15 @@ def preflight(home, rules):
     return {"skills": skills, "model": model, "verdict": verdict, "warnings": warnings}
 
 
+def rules_sha8(path):
+    try:
+        h = hashlib.sha256()
+        with open(path, "rb") as f:
+            h.update(f.read())
+        return h.hexdigest()[:8]
+    except OSError:
+        return "missing"
+
 def main(argv):
     home = os.path.expanduser("~")
     if "--home" in argv:
@@ -53,6 +61,11 @@ def main(argv):
               encoding="utf-8") as f:
         rules = json.load(f)
     r = preflight(home, rules)
+    live = os.path.join(home, ".config", "steroids", "skill-rules.json")
+    repo_rules = os.path.join(os.path.dirname(os.path.abspath(__file__)), "..", "skill-rules.json")
+    rs, ls = rules_sha8(repo_rules), rules_sha8(live)
+    if rs != ls:
+        r["warnings"].append(f"repo skill-rules.json ({rs}) != live ({ls}) — routing reads LIVE; re-deploy (cp) before trusting probe results")
     print(f"skills={r['skills']} model={'yes' if r['model'] else 'no'} verdict={r['verdict']}")
     for w in r["warnings"]:
         print(f"warn: {w}")

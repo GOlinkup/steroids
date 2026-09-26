@@ -1,0 +1,6 @@
+# st-26 reference drops: keep the zips + licenses in-tree, ignore the
+# extracted working copies (rebuild with unzip when needed).
+city-kit-commercial/*
+!city-kit-commercial/License.txt
+blocky-characters/*
+!blocky-characters/License.txt
