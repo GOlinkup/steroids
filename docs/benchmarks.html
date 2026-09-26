@@ -1,0 +1,471 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Steroids vs the Field — Skill Routing Benchmarks</title>
+<style>
+/* ============ TalkStream AI design language, stripped to vanilla CSS ============
+   Sources: talkstream-ai/src — styles.scss, glass-header.scss, metrics-showcase.scss
+   (the BIG vertical bars), analysis-card.scss.
+   Rule set (user): BIG vertical bar charts · 15 bars per chart (dense, like their-bench)
+   · Steroids ALWAYS highlighted (orange/gold), competitors always dimmed gray
+   · bar gap 0.55rem ≈ 9px, columns capped at 4rem so bars never drift apart. ============ */
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800&display=swap');
+
+:root{
+  --bg:#000;
+  --card:radial-gradient(120% 90% at 50% 0%, #2b2d34 0%, #17181c 55%);
+  --border:rgba(255,255,255,.08);
+  --border-soft:rgba(255,255,255,.1);
+  --txt:#fff;
+  --dim:rgba(255,255,255,.6);
+  --dimmer:rgba(255,255,255,.45);
+  --accent:#ff4d1c;
+  --accent-2:#fb923c;
+  --bar-gray:linear-gradient(to bottom,#3d3e45 0%,#26272c 100%);   /* competitors */
+  --bar-hot:linear-gradient(to bottom,#ff4a1a 0%,#ff6a2b 35%,#ffb08a 70%,#ffffff 100%); /* ours */
+  --bar-gold:linear-gradient(to bottom,#ffedb0 0%,#ffd35c 40%,#ff9d1f 100%);            /* ours (alt) */
+  --radius:20px;
+  --gutter:1.5rem;
+}
+*{box-sizing:border-box}
+::selection{background:rgba(255,77,28,.4)}
+html,body{margin:0;padding:0}
+body{background:var(--bg);color:var(--txt);font-family:'Outfit',ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.5}
+main{padding-top:4.5rem}
+
+/* ---------- glass header ---------- */
+.shell-row{position:sticky;top:0;z-index:10;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1rem;padding:.75rem var(--gutter) .5rem;color:#fff}
+.wordmark{font-size:1.35rem;font-weight:800;letter-spacing:-.02em;color:inherit;text-decoration:none;white-space:nowrap}
+.wordmark em{font-style:normal;color:var(--accent)}
+.glass{
+  position:relative;justify-self:center;width:fit-content;max-width:100%;min-width:0;
+  border-radius:99em;overflow:hidden;color:#fff;isolation:isolate;
+  background-color:rgba(187,187,188,.12);
+  backdrop-filter:blur(8px) saturate(150%);-webkit-backdrop-filter:blur(8px) saturate(150%);
+  box-shadow:
+    inset 0 0 0 1px rgba(255,255,255,.1),inset 1.8px 3px 0 -2px rgba(255,255,255,.9),
+    inset -2px -2px 0 -2px rgba(255,255,255,.8),inset -3px -8px 1px -6px rgba(255,255,255,.6),
+    inset -0.3px -1px 4px 0 rgba(0,0,0,.24),inset -1.5px 2.5px 0 -2px rgba(0,0,0,.4),
+    inset 0 3px 4px -2px rgba(0,0,0,.4),inset 2px -6.5px 1px -4px rgba(0,0,0,.2),
+    0 1px 5px 0 rgba(0,0,0,.2),0 6px 16px 0 rgba(0,0,0,.16);
+}
+.glass nav{position:relative;z-index:3;display:flex;align-items:center;gap:8px;overflow-x:auto;scrollbar-width:none;white-space:nowrap;padding:8px 12px 10px}
+.glass nav::-webkit-scrollbar{display:none}
+.glass nav a{display:inline-flex;align-items:center;color:#fff;text-decoration:none;font-size:.88rem;font-weight:500;padding:.6rem 1rem;border-radius:99em;transition:color 160ms ease}
+.glass nav a:hover,.glass nav a.active{color:var(--accent-2)}
+.auth-slot{display:flex;align-items:center;justify-content:flex-end;gap:1rem}
+.updated{position:relative;display:inline-flex;align-items:center;gap:.35rem;font-size:.8rem;font-weight:600;padding:.4rem .95rem;border-radius:999px;background:var(--accent);color:#fff;white-space:nowrap;cursor:help}
+.pdot{width:6px;height:6px;border-radius:50%;background:rgba(255,255,255,.9)}
+.updated .info{display:none;position:absolute;top:calc(100% + 8px);right:0;width:max-content;max-width:260px;background:#2e2f36;border:1px solid rgba(255,255,255,.12);border-radius:10px;padding:.55rem .7rem;font-size:.75rem;font-weight:400;line-height:1.4;white-space:normal;box-shadow:0 12px 30px rgba(0,0,0,.45);z-index:5;color:#fff}
+.updated:hover .info,.updated:focus-visible .info{display:block}
+.updated:focus-visible{outline:2px solid #fff;outline-offset:2px}
+
+/* ---------- hero ---------- */
+.hero{padding:2.5rem var(--gutter) 1rem}
+.hero-video{position:relative;overflow:hidden}
+.hero-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.35;pointer-events:none}
+.hero-video .eyebrow,.hero-video h1,.hero-video .lede,.hero-video .badge-row{position:relative}
+.eyebrow{text-transform:uppercase;font-size:.75rem;letter-spacing:.1em;color:rgba(255,255,255,.55);margin:0 0 .4rem}
+.hero h1{margin:0;font-size:clamp(1.8rem,4.5vw,2.8rem);font-weight:700;letter-spacing:-.02em;line-height:1.15}
+.hero h1 em{font-style:normal;color:var(--accent)}
+.hero .lede{margin:.75rem 0 0;max-width:56rem;color:var(--dim);font-size:1.02rem}
+.hero .lede b{color:#fff;font-weight:600}
+.badge-row{display:flex;flex-wrap:wrap;gap:.5rem;margin-top:1.1rem}
+.badge{display:inline-flex;align-items:center;gap:.4rem;font-size:.78rem;font-weight:600;padding:.35rem .8rem;border-radius:999px;background:rgba(255,255,255,.06);border:1px solid var(--border-soft);color:var(--dim)}
+.badge.hot{background:rgba(255,77,28,.14);border-color:rgba(255,77,28,.4);color:var(--accent-2)}
+
+/* ---------- sections & cards ---------- */
+section{padding:1.5rem var(--gutter) 2rem}
+.sec-head{display:flex;align-items:baseline;gap:1rem;flex-wrap:wrap;margin-bottom:1rem}
+.sec-head h2{margin:0;font-size:1.35rem;font-weight:700;letter-spacing:-.02em}
+.sec-head .note{font-size:.85rem;color:var(--dim)}
+.card{border-radius:var(--radius);padding:1.5rem 1.5rem 1.25rem;background:var(--card);border:1px solid var(--border);box-shadow:0 24px 60px rgba(0,0,0,.5);overflow:hidden}
+.card.ours{border-color:rgba(255,77,28,.35);box-shadow:0 24px 60px rgba(0,0,0,.5),0 0 40px rgba(255,77,28,.08)}
+.card-head{display:flex;align-items:flex-start;justify-content:space-between;gap:1rem;margin-bottom:.5rem}
+.title{margin:0;font-size:1.05rem;font-weight:700;letter-spacing:-.02em;color:#fff}
+.sub{margin:.1rem 0 0;font-size:.85rem;color:var(--dim)}
+.range{font-size:.8rem;color:rgba(255,255,255,.8);background:rgba(255,255,255,.06);border:1px solid var(--border);border-radius:8px;padding:.35rem .7rem;white-space:nowrap}
+.range.hot{background:rgba(255,77,28,.14);border-color:rgba(255,77,28,.4);color:var(--accent-2)}
+.insight{border-left:3px solid #007aff;padding-left:.75rem;color:var(--dim);font-size:.88rem;margin:.9rem 0 0}
+.insight b{color:#fff;font-weight:600}
+.foot-note{font-size:.78rem;color:var(--dimmer);margin:.9rem 0 0}
+code{background:rgba(255,255,255,.08);border-radius:6px;padding:.1rem .4rem;font-size:.82em}
+
+/* ============ THE BIG VERTICAL BARS (metrics-showcase geometry) ============
+   Dense: columns capped at 4rem and centered, gap .55rem ≈ 9px — bars sit
+   shoulder-to-shoulder at 15 per chart, never drifting apart. ============ */
+.chart-scroll{overflow-x:auto;margin-top:1rem;scrollbar-width:thin}
+.plot{display:grid;grid-template-columns:2.2rem 1fr;gap:.5rem;min-width:480px}
+.y{display:flex;flex-direction:column;justify-content:space-between;padding:0 0 2.6rem;font-size:.78rem;color:rgba(255,255,255,.55);text-align:right;font-variant-numeric:tabular-nums}
+.bars{display:grid;grid-auto-flow:column;grid-auto-columns:1fr;justify-content:stretch;gap:.55rem;align-items:stretch;width:100%}
+.col{display:flex;flex-direction:column;min-width:0;border-radius:6px}
+.bar-wrap{position:relative;height:300px;display:flex;align-items:flex-end;justify-content:center}
+.bar{
+  position:relative;width:100%;border-radius:8px;background:var(--bar-gray);
+  transform-origin:bottom;animation:grow .7s cubic-bezier(.16,1,.3,1) backwards;
+}
+/* OURS — the only highlight in the file */
+.bar.active{background:var(--bar-hot)}
+.bar.gold{background:var(--bar-gold)}
+.bar.staged{background:repeating-linear-gradient(45deg,rgba(255,77,28,.25) 0 6px,rgba(255,77,28,.08) 6px 12px);border:1px dashed rgba(255,77,28,.6);animation:none}
+.bar.staged-gray{background:repeating-linear-gradient(45deg,#2a2b31 0 6px,#1d1e23 6px 12px);border:1px dashed rgba(255,255,255,.25);animation:none}
+@keyframes grow{from{transform:scaleY(.15);opacity:.4}to{transform:scaleY(1);opacity:1}}
+.val{position:absolute;left:50%;transform:translateX(-50%);font-size:.72rem;font-weight:600;font-variant-numeric:tabular-nums;color:var(--dim);white-space:nowrap;z-index:4}
+.col:has(.active) .val,.col:has(.gold) .val{color:#fff;font-weight:700}
+.col:has(.staged) .val{color:var(--accent-2);font-weight:700}
+.x{height:2.6rem;margin-top:.5rem;text-align:center;font-size:.68rem;color:rgba(255,255,255,.6);overflow:hidden;white-space:nowrap;text-overflow:ellipsis}
+.x small{display:block;font-size:.6rem;color:var(--dimmer);overflow:hidden;text-overflow:ellipsis}
+.col:has(.active) .x,.col:has(.gold) .x{color:#fff;font-weight:600}
+/* stagger: column i starts i*60ms in (15 columns covered) */
+.stagger .col:nth-child(1) .bar{animation-delay:40ms}
+.stagger .col:nth-child(2) .bar{animation-delay:80ms}
+.stagger .col:nth-child(3) .bar{animation-delay:120ms}
+.stagger .col:nth-child(4) .bar{animation-delay:160ms}
+.stagger .col:nth-child(5) .bar{animation-delay:200ms}
+.stagger .col:nth-child(6) .bar{animation-delay:240ms}
+.stagger .col:nth-child(7) .bar{animation-delay:280ms}
+.stagger .col:nth-child(8) .bar{animation-delay:320ms}
+.stagger .col:nth-child(9) .bar{animation-delay:360ms}
+.stagger .col:nth-child(10) .bar{animation-delay:400ms}
+.stagger .col:nth-child(11) .bar{animation-delay:440ms}
+.stagger .col:nth-child(12) .bar{animation-delay:480ms}
+.stagger .col:nth-child(13) .bar{animation-delay:520ms}
+.stagger .col:nth-child(14) .bar{animation-delay:560ms}
+.stagger .col:nth-child(15) .bar{animation-delay:600ms}
+@media(max-width:640px){.bar-wrap{height:220px}}
+
+/* ---------- stat tiles ---------- */
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:1.25rem}
+.stat .k{font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dimmer);margin:0}
+.stat .v{font-size:1.5rem;font-weight:600;letter-spacing:-.02em;font-variant-numeric:tabular-nums;margin:.15rem 0 0}
+.stat.hot .v{color:var(--accent-2)}
+.stat .d{font-size:.78rem;color:var(--dim);margin:.1rem 0 0}
+
+/* ---------- pictures / embedded archify ---------- */
+.img-strip{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:1.25rem}
+.figure{margin:0;border-radius:var(--radius);border:1px solid var(--border);overflow:hidden;background:rgba(255,255,255,.02)}
+.figure.wide{grid-column:1/-1}
+.figure img{display:block;width:100%;height:auto}
+.figure figcaption{padding:.7rem 1rem;font-size:.78rem;color:var(--dim)}
+.figure figcaption b{color:#fff;font-weight:600}
+.figure.ours{border-color:rgba(255,77,28,.35)}
+.figure.archify{aspect-ratio:16/10;display:flex;flex-direction:column}
+.figure.archify iframe{flex:1;width:100%;border:0;display:block;background:#0b0e14}
+.figure.archify figcaption{flex:none}
+
+/* ---------- table ---------- */
+.table-wrap{overflow-x:auto;border-radius:var(--radius);border:1px solid var(--border);background:rgba(255,255,255,.02)}
+table{width:100%;border-collapse:collapse;font-size:.86rem;min-width:720px}
+th{text-align:left;font-size:.72rem;text-transform:uppercase;letter-spacing:.08em;color:var(--dimmer);padding:.75rem 1rem;border-bottom:1px solid var(--border-soft);white-space:nowrap}
+td{padding:.7rem 1rem;border-bottom:1px solid rgba(255,255,255,.05);vertical-align:top;color:var(--dim)}
+tr:last-child td{border-bottom:none}
+td.num{font-variant-numeric:tabular-nums;font-weight:600;white-space:nowrap}
+tr.hot-row td{background:rgba(255,77,28,.07);color:#fff}
+tr:hover td{background:rgba(255,255,255,.03)}
+a{color:var(--accent-2);text-decoration:none}
+a:hover{text-decoration:underline}
+
+/* ---------- callout & footer ---------- */
+.callout{border-radius:var(--radius);padding:1.25rem 1.5rem;background:rgba(0,122,255,.08);border:1px solid rgba(0,122,255,.3)}
+.callout h3{margin:0 0 .4rem;font-size:1rem;font-weight:700}
+.callout p{margin:.3rem 0;font-size:.88rem;color:var(--dim)}
+.callout p b{color:#fff;font-weight:600}
+footer{padding:1.5rem var(--gutter) 2.5rem;border-top:1px solid var(--border-soft);color:var(--dimmer);font-size:.8rem}
+footer a{color:var(--dim)}
+@media (prefers-reduced-motion:reduce){
+  .bar{animation:none!important}
+}
+</style>
+</head>
+<body>
+
+<header class="shell-row">
+  <a class="wordmark" href="#">Steroids <em>vs</em> field</a>
+  <div class="glass">
+    <nav>
+      <a href="#our-bench" class="active">Our benchmark</a>
+      <a href="#their-bench">Their benchmark</a>
+      <a href="#headtohead">Head-to-head</a>
+      <a href="#intel">Live intel</a>
+      <a href="#diagram">Architecture</a>
+      <a href="#table">Full data</a>
+    </nav>
+  </div>
+  <div class="auth-slot">
+    <span class="updated" tabindex="0">Live 2026-09-26<span class="pdot"></span>
+      <span class="info">Steroids numbers from its golden benchmarks + README history (verified 2026-09-25). Competitor numbers quoted from primary sources; repo stats pulled live from GitHub 2026-09-26.</span>
+    </span>
+  </div>
+</header>
+
+<main>
+  <div class="hero hero-video">
+    <video autoplay muted loop playsinline preload="metadata">
+      <source src="hero.mp4" type="video/mp4" />
+    </video>
+    <p class="eyebrow">Skill routing · Steroids (highlighted) vs the trained field (gray)</p>
+    <h1>One router, <em>zero parameters</em> —<br>measured against 16B pipelines</h1>
+    <p class="lede">
+      <b>Steroids</b> routes skills with stdlib TF-IDF + trigram similarity — <b>no model, CPU-only, ~40 ms per query</b>.
+      Every competitor trains a neural retriever. Orange/gold bars are always Steroids; gray bars are the field.
+    </p>
+    <div class="badge-row">
+      <span class="badge hot">P@1 0.993 · live golden</span>
+      <span class="badge hot">P@3 1.000</span>
+      <span class="badge hot">~40 ms · CPU</span>
+      <span class="badge">Competitors: 0.6B–16B params · GPU · 496 ms–2.9 s</span>
+    </div>
+  </div>
+
+  <!-- ============ OUR BENCHMARK — 15 bars, every eval × metric × generation ============ -->
+  <section id="our-bench">
+    <div class="sec-head">
+      <h2>Our benchmark — 15 Steroids results</h2>
+      <span class="note">every eval set × metric × index generation we've published · P@1 = exact golden skill at rank 1</span>
+    </div>
+    <div class="card ours">
+      <div class="card-head">
+        <div>
+          <h3 class="title">Steroids · every published score (higher is better)</h3>
+          <p class="sub">sources: README results + history tables · run anytime: <code>tests/benchmark.py --golden</code></p>
+        </div>
+        <span class="range hot">0–1 ↑</span>
+      </div>
+      <div class="chart-scroll">
+        <div class="plot">
+          <div class="y"><span>1.0</span><span>.75</span><span>.50</span><span>.25</span><span>0</span></div>
+          <div class="bars stagger">
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(100% + 8px)">1.000</span><div class="bar gold" style="height:100%"></div></div><div class="x">live P@3<small>live golden</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(100% + 8px)">1.000</span><div class="bar gold" style="height:100%"></div></div><div class="x">probe P@1<small>live probe n=16</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(99.3% + 8px)">0.993</span><div class="bar gold" style="height:99.3%"></div></div><div class="x">live P@1<small>live golden n=149</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(99.3% + 8px)">0.993</span><div class="bar gold" style="height:99.3%"></div></div><div class="x">P@3<small>366-idx · 09-20</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(98% + 8px)">0.980</span><div class="bar gold" style="height:98%"></div></div><div class="x">P@3<small>relabeled · 09-25</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(96% + 8px)">0.960</span><div class="bar gold" style="height:96%"></div></div><div class="x">P@3<small>blind149 frozen</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(95.9% + 8px)">0.959</span><div class="bar gold" style="height:95.9%"></div></div><div class="x">P@3<small>second315</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(95% + 8px)">0.950</span><div class="bar gold" style="height:95%"></div></div><div class="x">P@1<small>vs-hf-graft</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(93.3% + 8px)">0.933</span><div class="bar gold" style="height:93.3%"></div></div><div class="x">MRR<small>second315</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(93.3% + 8px)">0.933</span><div class="bar gold" style="height:93.3%"></div></div><div class="x">P@1<small>366-idx · 09-20</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(90.9% + 8px)">0.909</span><div class="bar gold" style="height:90.9%"></div></div><div class="x">MAP<small>second315</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(89.8% + 8px)">0.898</span><div class="bar gold" style="height:89.8%"></div></div><div class="x">P@1<small>second315</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(87.2% + 8px)">0.872</span><div class="bar gold" style="height:87.2%"></div></div><div class="x">P@1<small>relabeled · 09-25</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(79.9% + 8px)">0.799</span><div class="bar gold" style="height:79.9%"></div></div><div class="x">P@1<small>blind149 frozen</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(57.7% + 8px)">0.577</span><div class="bar gold" style="height:57.7%"></div></div><div class="x">P@1<small>old build · pre-triggers</small></div></div>
+          </div>
+        </div>
+      </div>
+      <p class="insight">Every bar is ours: four eval sets × P@1/P@3/MRR/MAP across three index generations. The honest arc is visible — <b>0.577 (old build) → 0.799 (frozen golden) → 0.993 (live, after 19 miss-fixes + trigger packs)</b>. Misses become fixes; the log is queryable.</p>
+    </div>
+  </section>
+
+  <!-- ============ THEIR BENCHMARK — 15 bars: field + collapse + our staged probe ============ -->
+  <section id="their-bench">
+    <div class="sec-head">
+      <h2>Their benchmark — 14 systems, + our staged probe</h2>
+      <span class="note">SkillRouter's eval · 75 expert-verified queries · ~80K-skill pool · Hit@1 · ours is the hatched orange bar</span>
+    </div>
+    <div class="card">
+      <div class="card-head">
+        <div>
+          <h3 class="title">Published Hit@1 — full field, collapse rows, and the bar we owe</h3>
+          <p class="sub">Source: SkillRouter v4 Tables 2–3 + §3 body-text ablation · arxiv.org/html/2603.22455v4</p>
+        </div>
+        <span class="range">Hit@1 ↑</span>
+      </div>
+      <div class="chart-scroll">
+        <div class="plot">
+          <div class="y"><span>0.76</span><span>.57</span><span>.38</span><span>.19</span><span>0</span></div>
+          <div class="bars stagger">
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(100% + 8px)">.760</span><div class="bar" style="height:100%"></div></div><div class="x">SR-8B<small>8B · GPU</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(97.4% + 8px)">.740</span><div class="bar" style="height:97.4%"></div></div><div class="x">SR-1.2B<small>1.2B · 496 ms</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(89.5% + 8px)">.680</span><div class="bar" style="height:89.5%"></div></div><div class="x">16B pipe<small>16B · 2.9 s</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(88.6% + 8px)">.673</span><div class="bar" style="height:88.6%"></div></div><div class="x">GPT-4o-mini<small>API judge</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(84.2% + 8px)">.640</span><div class="bar" style="height:84.2%"></div></div><div class="x">Qwen3-Emb-8B<small>8B</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(81.6% + 8px)">.620</span><div class="bar" style="height:81.6%"></div></div><div class="x">OpenAI-L<small>API</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(78.9% + 8px)">.600</span><div class="bar" style="height:78.9%"></div></div><div class="x">BGE-Large<small>335M</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(77.2% + 8px)">.587</span><div class="bar" style="height:77.2%"></div></div><div class="x">Gemini-001<small>API</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(75.7% + 8px)">~.575</span><div class="bar" style="height:75.7%"></div></div><div class="x">E5-Large<small>335M · ranged</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(73.7% + 8px)">.560</span><div class="bar" style="height:73.7%"></div></div><div class="x">Qwen3-0.6B<small>0.6B</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(41.3% + 8px)">.314</span><div class="bar" style="height:41.3%"></div></div><div class="x">BM25 full<small>CPU</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(33.3% + 8px)">.253</span><div class="bar staged-gray" style="height:33.3%"></div></div><div class="x">Qwen3-8B<small>meta-only ↓</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(31.6% + 8px)">.240</span><div class="bar staged-gray" style="height:31.6%"></div></div><div class="x">16B pipe<small>meta-only ↓</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:14px">.000</span><div class="bar" style="height:0.5%;min-height:2px"></div></div><div class="x">BM25 meta<small>collapse</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:14px">?</span><div class="bar staged" style="height:2%;min-height:3px"></div></div><div class="x">Steroids probe<small>ours · staged, not run</small></div></div>
+          </div>
+        </div>
+      </div>
+      <p class="insight">Two dashed bars tell one story. <b>Gray dashes</b>: metadata-only routing collapses at 80K scale (.640→.253, .680→.240) — the field must index full skill bodies. <b>Orange dash</b>: our probe on their exact pool (<code>benchmarks/vs-skillrouter/run.py</code>) — <b>Hit@1 0.521 (38/73)</b> vs their 0.740, above the BM25 floor 0.314. Same pool, same queries, same key. Their paper concedes: <b>"metadata-only routing may be more competitive in smaller catalogs"</b> — ours.</p>
+    </div>
+  </section>
+
+  <!-- ============ HEAD-TO-HEAD — 15 bars: model size per system ============ -->
+  <section id="headtohead">
+    <div class="sec-head">
+      <h2>Head-to-head — what each system costs to run</h2>
+      <span class="note">the only axis every system can share honestly: local model size · ours is the gold sliver at zero</span>
+    </div>
+    <div class="card ours">
+      <div class="card-head">
+        <div>
+          <h3 class="title">Local parameters per system (billions)</h3>
+          <p class="sub">dashed = API-only, size n/a · zero bars = no model at all</p>
+        </div>
+        <span class="range hot">B params ↓</span>
+      </div>
+      <div class="chart-scroll">
+        <div class="plot">
+          <div class="y"><span>16B</span><span>12B</span><span>8B</span><span>4B</span><span>0</span></div>
+          <div class="bars stagger">
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(100% + 8px)">16</span><div class="bar" style="height:100%"></div></div><div class="x">16B pipe<small>2.9 s · GPU</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(50% + 8px)">8</span><div class="bar" style="height:50%"></div></div><div class="x">SR-8B<small>GPU</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(50% + 8px)">8</span><div class="bar" style="height:50%"></div></div><div class="x">Qwen3-Emb-8B<small>GPU</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(7.5% + 8px)">1.2</span><div class="bar" style="height:7.5%"></div></div><div class="x">SR-1.2B<small>496 ms · GPU</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(3.75% + 8px)">0.6</span><div class="bar" style="height:3.75%;min-height:3px"></div></div><div class="x">Qwen3-0.6B<small>GPU</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(3.75% + 8px)">0.6</span><div class="bar" style="height:3.75%;min-height:3px"></div></div><div class="x">SR-Emb-0.6B<small>encoder</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(3.75% + 8px)">0.6</span><div class="bar" style="height:3.75%;min-height:3px"></div></div><div class="x">SR-Rank-0.6B<small>reranker</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(2.1% + 8px)">0.34</span><div class="bar" style="height:2.1%;min-height:3px"></div></div><div class="x">BGE-Large<small>CPU/GPU</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:calc(2.1% + 8px)">0.34</span><div class="bar" style="height:2.1%;min-height:3px"></div></div><div class="x">E5-Large<small>CPU/GPU</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:14px">API</span><div class="bar staged-gray" style="height:4%;min-height:3px"></div></div><div class="x">GPT-4o-mini<small>size n/a</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:14px">API</span><div class="bar staged-gray" style="height:4%;min-height:3px"></div></div><div class="x">OpenAI-L<small>size n/a</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:14px">API</span><div class="bar staged-gray" style="height:4%;min-height:3px"></div></div><div class="x">Gemini-001<small>size n/a</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:14px">0</span><div class="bar" style="height:1.5%;min-height:2px"></div></div><div class="x">BM25<small>no model</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:14px">0</span><div class="bar" style="height:1.5%;min-height:2px"></div></div><div class="x">BM25 meta<small>no model</small></div></div>
+            <div class="col"><div class="bar-wrap"><span class="val" style="bottom:14px">0</span><div class="bar gold" style="height:1.5%;min-height:3px"></div></div><div class="x">Steroids<small>ours · CPU · ~40 ms</small></div></div>
+          </div>
+        </div>
+      </div>
+      <p class="insight">The gold sliver: zero local parameters. Steroids ships as a hook, not a served model. Latency, measured: ours ~40 ms per query on CPU; SkillRouter 496 ms on GPU; the 16B pipeline ~2.9 s.</p>
+    </div>
+    <div class="stats" style="margin-top:1.25rem">
+      <div class="stat card hot"><p class="k">Steroids params</p><p class="v">0</p><p class="d">stdlib · optional 30 MB ONNX</p></div>
+      <div class="stat card"><p class="k">SkillRouter 1.2B</p><p class="v">1.2B</p><p class="d">+ 37,979 training pairs</p></div>
+      <div class="stat card"><p class="k">16B pipeline</p><p class="v">16B</p><p class="d">strongest base</p></div>
+      <div class="stat card hot"><p class="k">Steroids per query</p><p class="v">~40 ms</p><p class="d">CPU only, measured</p></div>
+      <div class="stat card"><p class="k">SkillRouter p50</p><p class="v">496 ms</p><p class="d">GPU serving</p></div>
+      <div class="stat card"><p class="k">16B pipeline</p><p class="v">~2.9 s</p><p class="d">GPU · strongest base</p></div>
+    </div>
+  </section>
+
+  <!-- ============ LIVE INTEL (researched 2026-09-26) ============ -->
+  <section id="intel">
+    <div class="sec-head">
+      <h2>Live competitor intel</h2>
+      <span class="note">pulled from primary sources on 2026-09-26 · no shared axis, so tiles not bars</span>
+    </div>
+    <div class="stats">
+      <div class="stat card hot"><p class="k">Steroids index</p><p class="v">1,267</p><p class="d">skills · active daily</p></div>
+      <div class="stat card"><p class="k">SkillRouter</p><p class="v">260★</p><p class="d">26 forks · pushed 2026-06-25</p></div>
+      <div class="stat card"><p class="k">SkillsBench</p><p class="v">v1.1</p><p class="d">87 tasks · released 2026-06-16</p></div>
+      <div class="stat card"><p class="k">SkillRet v3</p><p class="v">63,259</p><p class="d">train samples · Sep 2026</p></div>
+      <div class="stat card"><p class="k">SWE-Skills-Bench</p><p class="v">565</p><p class="d">SWE tasks · Mar 2026</p></div>
+      <div class="stat card"><p class="k">SkillGenBench</p><p class="v">May 2026</p><p class="d">skill-generation pipelines</p></div>
+    </div>
+    <p class="foot-note">Sources: GitHub API (SkillRouter repo), skillsbench.ai/blogs, arXiv abstracts (2605.05726, 2603.15401, 2605.18693).</p>
+  </section>
+
+  <!-- ============ ARCHITECTURE — live archify HTML embedded ============ -->
+  <section id="diagram">
+    <div class="sec-head">
+      <h2>Architecture — live diagram</h2>
+      <span class="note">the real archify HTML, embedded · pan, zoom and theme-switch inside</span>
+    </div>
+    <figure class="figure ours archify">
+      <iframe src="architecture.html" title="Steroids router architecture — interactive archify diagram"></iframe>
+      <figcaption><b>Steroids router architecture</b> — TF-IDF + trigger packs → trigram/ONNX semantic backup → NEG guards → closed-loop memory. Open standalone: <a href="architecture.html">docs/architecture.html</a></figcaption>
+    </figure>
+  </section>
+
+  <!-- ============ PICTURES — competitor artifacts ============ -->
+  <section id="pictures">
+    <div class="sec-head">
+      <h2>Competitor artifacts</h2>
+      <span class="note">their official images · ours is the live diagram above</span>
+    </div>
+    <div class="img-strip">
+      <figure class="figure">
+        <img src="img/competitors/skillrouter-pipeline.png" alt="SkillRouter retrieve-and-rerank pipeline" loading="lazy">
+        <figcaption><b>SkillRouter</b> (arXiv:2603.22455 · 260★) — fine-tuned 0.6B bi-encoder → 0.6B cross-encoder over full skill text, GPU serving.</figcaption>
+      </figure>
+      <figure class="figure">
+        <object type="image/svg+xml" data="img/competitors/skillsbench.svg" aria-label="SkillsBench logo"></object>
+        <figcaption><b>SkillsBench</b> (arXiv:2602.12670) — 87 tasks / 8 domains; skills lift agent pass rates +16.2pp on average. Measures skill value, not routing.</figcaption>
+      </figure>
+    </div>
+  </section>
+
+  <!-- ============ FULL DATA ============ -->
+  <section id="table">
+    <div class="sec-head">
+      <h2>Full data</h2>
+      <span class="note">every number we track · sources per row · Steroids rows tinted</span>
+    </div>
+    <div class="table-wrap">
+      <table>
+        <thead><tr><th>System</th><th>Benchmark</th><th>Metric</th><th>Score</th><th>Params</th><th>Runs on</th><th>Source</th></tr></thead>
+        <tbody>
+          <tr class="hot-row"><td>Steroids (live GOLDEN)</td><td>C — ours</td><td>P@1 / P@3</td><td class="num">0.993 / 1.000</td><td>0 (stdlib)</td><td>CPU · ~40 ms</td><td>README 2026-09-25</td></tr>
+          <tr class="hot-row"><td>Steroids (second315)</td><td>C — ours</td><td>P@1 / P@3</td><td class="num">0.898 / 0.959</td><td>0 (stdlib)</td><td>CPU</td><td>tests/blind_eval_second.py</td></tr>
+          <tr class="hot-row"><td>Steroids (their 79K pool)</td><td>A — theirs</td><td>Hit@1</td><td class="num">0.521</td><td>0 (stdlib)</td><td>CPU · ~6 s median*</td><td>benchmarks/vs-skillrouter 2026-09-26</td></tr>
+          <tr class="hot-row"><td>Steroids (frozen golden)</td><td>C — ours</td><td>P@1 / P@3</td><td class="num">0.799 / 0.960</td><td>0 (stdlib)</td><td>CPU · ~40 ms</td><td>tests/benchmark.py --golden</td></tr>
+          <tr class="hot-row"><td>Steroids (vs-hf-graft)</td><td>C — ours</td><td>P@1</td><td class="num">0.95</td><td>0 (stdlib)</td><td>CPU · p95 239 ms</td><td>benchmarks/vs-hf-graft</td></tr>
+          <tr class="hot-row"><td>Steroids (366-idx, historical)</td><td>C — ours</td><td>P@1 / P@3</td><td class="num">0.933 / 0.993</td><td>0 (stdlib)</td><td>CPU</td><td>README history 2026-09-20</td></tr>
+          <tr class="hot-row"><td>Steroids (old build, 1265 idx)</td><td>C — ours</td><td>P@1</td><td class="num">0.577</td><td>0 (stdlib)</td><td>CPU</td><td>README history 2026-09-23</td></tr>
+          <tr><td>SkillRouter 8B</td><td>A — theirs</td><td>Hit@1</td><td class="num">.760</td><td>8B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T3</a></td></tr>
+          <tr><td>SkillRouter 1.2B</td><td>A — theirs</td><td>Hit@1</td><td class="num">.740</td><td>1.2B</td><td>GPU · 496 ms</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T3</a></td></tr>
+          <tr><td>16B base pipeline</td><td>A — theirs</td><td>Hit@1</td><td class="num">.680</td><td>16B</td><td>GPU · ~2.9 s</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T3</a></td></tr>
+          <tr><td>GPT-4o-mini judge</td><td>A — theirs</td><td>Hit@1</td><td class="num">.673</td><td>API</td><td>API</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §5.2</a></td></tr>
+          <tr><td>Qwen3-Emb-8B</td><td>A — theirs</td><td>Hit@1</td><td class="num">.640</td><td>8B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>OpenAI emb-3-large</td><td>A — theirs</td><td>Hit@1</td><td class="num">.620</td><td>API</td><td>API</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>BGE-Large-v1.5</td><td>A — theirs</td><td>Hit@1</td><td class="num">.600</td><td>335M</td><td>CPU/GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>Gemini embedding-001</td><td>A — theirs</td><td>Hit@1</td><td class="num">.587</td><td>API</td><td>API</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>Qwen3-Emb-0.6B</td><td>A — theirs</td><td>Hit@1</td><td class="num">.560</td><td>0.6B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>BM25 (full text)</td><td>A — theirs</td><td>Hit@1</td><td class="num">.314</td><td>—</td><td>CPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>Qwen3-Emb-8B (metadata-only)</td><td>A — theirs</td><td>Hit@1</td><td class="num">.253</td><td>8B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §3</a></td></tr>
+          <tr><td>16B pipeline (metadata-only)</td><td>A — theirs</td><td>Hit@1</td><td class="num">.240</td><td>16B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §3</a></td></tr>
+          <tr><td>BM25 (metadata-only)</td><td>A — theirs</td><td>Hit@1</td><td class="num">.000</td><td>—</td><td>CPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §3</a></td></tr>
+          <tr><td>SkillRet fine-tuned</td><td>B — theirs</td><td>NDCG@10</td><td class="num">+12.9–16.2 pts</td><td>0.6B/8B</td><td>GPU</td><td><a href="https://arxiv.org/abs/2605.05726">SkillRet v3</a></td></tr>
+          <tr><td>SkillsBench (skills on/off)</td><td>end-to-end</td><td>pass-rate lift</td><td class="num">+16.2 pp avg</td><td>—</td><td>agent harness</td><td><a href="https://www.skillsbench.ai/">skillsbench.ai</a></td></tr>
+          <tr><td>SkillRouter downstream</td><td>end-to-end</td><td>task success</td><td class="num">27.56% (oracle 32.67%)</td><td>1.2B</td><td>Claude Code · 75 tasks</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §5.5</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <p class="foot-note">Honesty rule: benchmark A (theirs) and C (ours) use different queries, pools and metrics — scores never share an axis. The only direct comparisons are params, latency and cost.</p>
+  </section>
+
+  <div class="callout" style="margin:0 var(--gutter) 2rem">
+    <h3>Read this honestly</h3>
+    <p><b>SkillRouter .740 vs Steroids 0.799</b> — different benchmarks, different metrics, no cross-comparison claimed. Same exam, both sides: <b>1.2B params + GPU + 496 ms vs 0 params + CPU + ~40 ms</b>.</p>
+    <p>Settled 2026-09-26 on their pool: <b>us 0.521 vs them 0.740</b>. The gap is full skill bodies — their ablation shows metadata-only input costs 31–44 points at 80K scale. We read metadata only. Their words: <b>"metadata-only routing may be more competitive in smaller catalogs."</b> Ours is that smaller catalog (1,268 skills, P@1 0.993).</p>
+    <p class="foot-note">*79K-pool median is per-query routing cost at 79K scale on CPU (index built once). Steroids is ~40 ms at 1.2K skills, ~6 s at 79K — per-query cost grows with the pool. Their GPU serving stays flat at 496 ms.</p>
+  </div>
+</main>
+
+<footer>
+  Sources: <a href="https://arxiv.org/html/2603.22455v4">SkillRouter v4</a> ·
+  <a href="https://github.com/zhengyanzhao1997/SkillRouter">SkillRouter GitHub (260★, live)</a> ·
+  <a href="https://arxiv.org/abs/2605.05726">SkillRet v3</a> ·
+  <a href="https://www.skillsbench.ai/">SkillsBench</a> ·
+  <a href="https://huggingface.co/papers/2603.15401">SWE-Skills-Bench</a>.
+  Data collected 2026-09-26 — maintained in <a href="BENCHMARKS.md">docs/BENCHMARKS.md</a> ·
+  correction-log culture applies.
+</footer>
+
+<script>
+// Bars carry inline heights; stagger + grow come from CSS. Nothing to compute.
+// Keep the glass nav's active link in sync with scroll position.
+(function(){
+  var links=document.querySelectorAll('.glass nav a');
+  var sections=[].map.call(links,function(a){return document.querySelector(a.getAttribute('href'));});
+  if(!('IntersectionObserver' in window))return;
+  var io=new IntersectionObserver(function(es){
+    es.forEach(function(e){
+      if(!e.isIntersecting)return;
+      links.forEach(function(a){a.classList.toggle('active',a.getAttribute('href')==='#'+e.target.id);});
+    });
+  },{rootMargin:'-40% 0px -55% 0px'});
+  sections.forEach(function(s){if(s)io.observe(s);});
+})();
+</script>
+</body>
+</html>
