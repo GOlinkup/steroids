@@ -39,6 +39,10 @@ main{padding-top:0}
 .shell-row{position:fixed;top:0;left:0;right:0;z-index:10;background:transparent;z-index:10;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1rem;padding:.75rem var(--gutter) .5rem;color:#fff}
 .wordmark{font-size:1.35rem;font-weight:800;letter-spacing:-.02em;color:inherit;text-decoration:none;white-space:nowrap}
 .wordmark em{font-style:normal;color:var(--accent)}
+.logo-slot{display:inline-block;width:150px;height:64px;vertical-align:middle;margin-right:.5rem;pointer-events:none}
+.logo-slot{position:relative}
+.logo-slot::after{content:"";position:absolute;left:0;right:0;bottom:0;height:7px;background:#000}
+.logo-slot canvas{width:100%;height:100%;display:block}
 .glass{
   position:relative;justify-self:center;width:fit-content;max-width:100%;min-width:0;
   border-radius:99em;overflow:hidden;color:#fff;isolation:isolate;
@@ -212,7 +216,7 @@ footer a{color:var(--dim)}
 <body>
 
 <header class="shell-row">
-  <a class="wordmark" href="benchmarks.html" title="Home: you are here"><img src="img/logo.png" alt="Steroids mascot" style="height:1.9em;vertical-align:-0.45em;margin-right:.35rem">Steroids <em>vs</em> field</a>
+  <a class="wordmark" href="benchmarks.html" title="Home: you are here"><span class="logo-slot"><canvas id="mascot"></canvas></span>Steroids <em>vs</em> field</a>
   <div class="glass">
     <nav>
       <a href="#" class="active">Live</a>
@@ -603,5 +607,6 @@ footer a{color:var(--dim)}
   cycle();
 })();
 </script>
+<script src="../demo/mascot.js"></script>
 </body>
 </html>
