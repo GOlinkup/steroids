@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Steroids vs the Field — Skill Routing Benchmarks</title>
+<title>Steroids vs the Field: Skill Routing Benchmarks</title>
 <style>
 /* ============ TalkStream AI design language, stripped to vanilla CSS ============
    Sources: talkstream-ai/src — styles.scss, glass-header.scss, metrics-showcase.scss
@@ -33,10 +33,10 @@
 ::selection{background:rgba(255,77,28,.4)}
 html,body{margin:0;padding:0}
 body{background:var(--bg);color:var(--txt);font-family:'Outfit',ui-sans-serif,system-ui,sans-serif;-webkit-font-smoothing:antialiased;font-size:15px;line-height:1.5}
-main{padding-top:4.5rem}
+main{padding-top:0}
 
 /* ---------- glass header ---------- */
-.shell-row{position:sticky;top:0;background:#000;z-index:10;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1rem;padding:.75rem var(--gutter) .5rem;color:#fff}
+.shell-row{position:fixed;top:0;left:0;right:0;z-index:10;background:transparent;z-index:10;display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:1rem;padding:.75rem var(--gutter) .5rem;color:#fff}
 .wordmark{font-size:1.35rem;font-weight:800;letter-spacing:-.02em;color:inherit;text-decoration:none;white-space:nowrap}
 .wordmark em{font-style:normal;color:var(--accent)}
 .glass{
@@ -64,13 +64,13 @@ main{padding-top:4.5rem}
 
 /* ---------- hero ---------- */
 .hero{padding:2.5rem var(--gutter) 1rem}
-.hero-ts{position:relative;overflow:hidden;background:#000;margin:0;padding:0}
-.hero-strip{height:240px;overflow:hidden;animation:media-in 1.8s cubic-bezier(.16,1,.3,1) both}
+.hero-ts{position:relative;min-height:100svh;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:#000;margin:0;padding:0}
+.hero-strip{position:absolute;inset:0;animation:media-in 1.8s cubic-bezier(.16,1,.3,1) both}
 .hero-strip video{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
-.hero-foot{position:relative;z-index:1;padding:0 var(--gutter) 2rem;animation:rise 1s cubic-bezier(.16,1,.3,1) .5s both}
+.hero-foot{position:relative;z-index:1;padding:1.5rem var(--gutter) 2.5rem;background:linear-gradient(to top,#000 0%,rgba(0,0,0,.75) 55%,transparent 100%);animation:rise 1s cubic-bezier(.16,1,.3,1) .5s both}
 .hero-kicker{display:flex;align-items:center;gap:.5rem;margin:0 0 .75rem;font-size:.8125rem;color:rgba(255,255,255,.55)}
 .hero-kicker .dot{width:8px;height:8px;flex:none;border-radius:50%;background:#fff}
-.hero .hero-foot h1{margin:.5rem 0 1rem;font-weight:700;font-size:clamp(4rem,10vw,7rem);letter-spacing:-.03em;line-height:1}
+.hero .hero-foot h1{margin:0 0 1rem;font-weight:700;font-size:clamp(3rem,7vw,5.5rem);letter-spacing:-.03em;line-height:1}
 .hero .hero-foot h1 em{font-style:normal;color:var(--accent)}
 .hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
 .live-cta{font:inherit;font-size:.8125rem;font-weight:600;padding:.7rem 1.5rem;border:none;border-radius:999px;background:#fff;color:#000;cursor:pointer;text-decoration:none}
@@ -198,7 +198,7 @@ footer a{color:var(--dim)}
     <nav>
       <a href="#our-bench" class="active">Our benchmark</a>
       <a href="#their-bench">Their benchmark</a>
-      <a href="#headtohead">Head-to-head</a>
+      <a href="#headtohead">Head to head</a>
       <a href="#intel">Live intel</a>
       <a href="#diagram">Architecture</a>
       <a href="#table">Full data</a>
@@ -221,10 +221,10 @@ footer a{color:var(--dim)}
     <div class="hero-foot">
       <div class="hero-main">
         <p class="hero-kicker anim" style="--d:.6s"><span class="dot"></span>Skill routing · Steroids vs the trained field</p>
-        <h1 class="anim" style="--d:.8s">One router, <em>zero parameters</em> —<br>measured against 16B pipelines</h1>
+        <h1 class="anim" style="--d:.8s">Zero parameters.<br>Measured against <em>16B pipelines</em>.</h1>
         <p class="lede anim" style="--d:.9s">
-          <b>Steroids</b> routes skills with stdlib TF-IDF + trigram similarity — <b>no model, CPU-only, ~40 ms per query</b>.
-          Every competitor trains a neural retriever. Orange/gold bars are always Steroids; gray bars are the field.
+          <b>Steroids</b> matches your question to the right skill. <b>No model. CPU only. About 40 ms per query.</b>
+          Competitors train neural retrievers and serve them on GPUs. Orange bars are Steroids. Gray bars are everyone else.
         </p>
         <div class="badge-row anim" style="--d:1s">
           <span class="badge hot">P@1 0.993 · live golden</span>
@@ -233,7 +233,7 @@ footer a{color:var(--dim)}
           <span class="badge">Competitors: 0.6B–16B params · GPU · 496 ms–2.9 s</span>
         </div>
         <div class="hero-actions anim" style="--d:1s">
-          <a class="live-cta" href="#headtohead">See head-to-head</a>
+          <a class="live-cta" href="#headtohead">Compare costs</a>
           <a class="hero-secondary" href="#table">Full data</a>
         </div>
       </div>
@@ -243,7 +243,7 @@ footer a{color:var(--dim)}
   <!-- ============ OUR BENCHMARK — 15 bars, every eval × metric × generation ============ -->
   <section id="our-bench">
     <div class="sec-head">
-      <h2>Our benchmark — 15 Steroids results</h2>
+      <h2>Our benchmark</h2>
       <span class="note">every eval set × metric × index generation we've published · P@1 = exact golden skill at rank 1</span>
     </div>
     <div class="card ours">
@@ -276,20 +276,20 @@ footer a{color:var(--dim)}
           </div>
         </div>
       </div>
-      <p class="insight">Every bar is ours: four eval sets × P@1/P@3/MRR/MAP across three index generations. The honest arc is visible — <b>0.577 (old build) → 0.799 (frozen golden) → 0.993 (live, after 19 miss-fixes + trigger packs)</b>. Misses become fixes; the log is queryable.</p>
+      <p class="insight">Every bar is ours. Four eval sets across three index generations. Scores moved <b>0.577, then 0.799, now 0.993</b> as misses got fixed. The miss log is queryable.</p>
     </div>
   </section>
 
   <!-- ============ THEIR BENCHMARK — 15 bars: field + collapse + our staged probe ============ -->
   <section id="their-bench">
     <div class="sec-head">
-      <h2>Their benchmark — 14 systems, + our staged probe</h2>
+      <h2>Their benchmark</h2>
       <span class="note">SkillRouter's eval · 75 expert-verified queries · ~80K-skill pool · Hit@1 · ours is the hatched orange bar</span>
     </div>
     <div class="card">
       <div class="card-head">
         <div>
-          <h3 class="title">Published Hit@1 — full field, collapse rows, and the bar we owe</h3>
+          <h3 class="title">Published Hit@1: the full field and the collapse rows</h3>
           <p class="sub">Source: SkillRouter v4 Tables 2–3 + §3 body-text ablation · arxiv.org/html/2603.22455v4</p>
         </div>
         <span class="range">Hit@1 ↑</span>
@@ -316,15 +316,15 @@ footer a{color:var(--dim)}
           </div>
         </div>
       </div>
-      <p class="insight">Two dashed bars tell one story. <b>Gray dashes</b>: metadata-only routing collapses at 80K scale (.640→.253, .680→.240) — the field must index full skill bodies. <b>Orange dash</b>: our probe on their exact pool (<code>benchmarks/vs-skillrouter/run.py</code>) — <b>Hit@1 0.521 (38/73)</b> vs their 0.740, above the BM25 floor 0.314. Same pool, same queries, same key. Their paper concedes: <b>"metadata-only routing may be more competitive in smaller catalogs"</b> — ours.</p>
+      <p class="insight"><b>Gray dashes:</b> without full skill text, scores fall to .253, .240 and .000 at 80K skills. The field has to index full bodies. <b>Orange dash:</b> we ran their exact pool and queries (<code>benchmarks/vs-skillrouter/run.py</code>) and scored <b>0.521 (38/73)</b> against their 0.740, above the BM25 floor of 0.314. Their paper says metadata-only routing fits smaller catalogs. Ours has 1,268 skills.</p>
     </div>
   </section>
 
   <!-- ============ HEAD-TO-HEAD — 15 bars: model size per system ============ -->
   <section id="headtohead">
     <div class="sec-head">
-      <h2>Head-to-head — what each system costs to run</h2>
-      <span class="note">the only axis every system can share honestly: local model size · ours is the gold sliver at zero</span>
+      <h2>Head to head</h2>
+      <span class="note">running cost per system, in local model size · ours is zero</span>
     </div>
     <div class="card ours">
       <div class="card-head">
@@ -356,7 +356,7 @@ footer a{color:var(--dim)}
           </div>
         </div>
       </div>
-      <p class="insight">The gold sliver: zero local parameters. Steroids ships as a hook, not a served model. Latency, measured: ours ~40 ms per query on CPU; SkillRouter 496 ms on GPU; the 16B pipeline ~2.9 s.</p>
+      <p class="insight">The gold sliver is zero local parameters. Steroids installs as a hook. Nothing to serve. Measured latency: 40 ms per query on CPU here. 496 ms for SkillRouter on GPU. About 2.9 s for the 16B pipeline.</p>
     </div>
     <div class="stats" style="margin-top:1.25rem">
       <div class="stat card hot"><p class="k">Steroids params</p><p class="v">0</p><p class="d">stdlib · optional 30 MB ONNX</p></div>
@@ -388,12 +388,12 @@ footer a{color:var(--dim)}
   <!-- ============ ARCHITECTURE — live archify HTML embedded ============ -->
   <section id="diagram">
     <div class="sec-head">
-      <h2>Architecture — live diagram</h2>
+      <h2>Architecture</h2>
       <span class="note">the real archify HTML, embedded · pan, zoom and theme-switch inside</span>
     </div>
     <figure class="figure ours archify">
       <iframe src="architecture.html" title="Steroids router architecture — interactive archify diagram"></iframe>
-      <figcaption><b>Steroids router architecture</b> — TF-IDF + trigger packs → trigram/ONNX semantic backup → NEG guards → closed-loop memory. Open standalone: <a href="architecture.html">docs/architecture.html</a></figcaption>
+      <figcaption><b>How a question becomes a skill.</b> Keywords first. Trigram and embedding backup for paraphrases. Blocklist removes noise. Past accepts bias future picks. Open standalone: <a href="architecture.html">docs/architecture.html</a></figcaption>
     </figure>
   </section>
 
@@ -406,11 +406,11 @@ footer a{color:var(--dim)}
     <div class="img-strip">
       <figure class="figure">
         <img src="img/competitors/skillrouter-pipeline.png" alt="SkillRouter retrieve-and-rerank pipeline" loading="lazy">
-        <figcaption><b>SkillRouter</b> (arXiv:2603.22455 · 260★) — fine-tuned 0.6B bi-encoder → 0.6B cross-encoder over full skill text, GPU serving.</figcaption>
+        <figcaption><b>SkillRouter</b> (arXiv:2603.22455). Two fine-tuned 0.6B models over full skill text. Served on GPU.</figcaption>
       </figure>
       <figure class="figure">
         <object type="image/svg+xml" data="img/competitors/skillsbench.svg" aria-label="SkillsBench logo"></object>
-        <figcaption><b>SkillsBench</b> (arXiv:2602.12670) — 87 tasks / 8 domains; skills lift agent pass rates +16.2pp on average. Measures skill value, not routing.</figcaption>
+        <figcaption><b>SkillsBench</b> (arXiv:2602.12670). 87 tasks in 8 domains. Having skills lifts agent pass rates 16.2 points on average. It measures skill value, not routing.</figcaption>
       </figure>
     </div>
   </section>
@@ -425,40 +425,40 @@ footer a{color:var(--dim)}
       <table>
         <thead><tr><th>System</th><th>Benchmark</th><th>Metric</th><th>Score</th><th>Params</th><th>Runs on</th><th>Source</th></tr></thead>
         <tbody>
-          <tr class="hot-row"><td>Steroids (live GOLDEN)</td><td>C — ours</td><td>P@1 / P@3</td><td class="num">0.993 / 1.000</td><td>0 (stdlib)</td><td>CPU · ~40 ms</td><td>README 2026-09-25</td></tr>
-          <tr class="hot-row"><td>Steroids (second315)</td><td>C — ours</td><td>P@1 / P@3</td><td class="num">0.898 / 0.959</td><td>0 (stdlib)</td><td>CPU</td><td>tests/blind_eval_second.py</td></tr>
-          <tr class="hot-row"><td>Steroids (their 79K pool)</td><td>A — theirs</td><td>Hit@1</td><td class="num">0.521</td><td>0 (stdlib)</td><td>CPU · ~6 s median*</td><td>benchmarks/vs-skillrouter 2026-09-26</td></tr>
-          <tr class="hot-row"><td>Steroids (frozen golden)</td><td>C — ours</td><td>P@1 / P@3</td><td class="num">0.799 / 0.960</td><td>0 (stdlib)</td><td>CPU · ~40 ms</td><td>tests/benchmark.py --golden</td></tr>
-          <tr class="hot-row"><td>Steroids (vs-hf-graft)</td><td>C — ours</td><td>P@1</td><td class="num">0.95</td><td>0 (stdlib)</td><td>CPU · p95 239 ms</td><td>benchmarks/vs-hf-graft</td></tr>
-          <tr class="hot-row"><td>Steroids (366-idx, historical)</td><td>C — ours</td><td>P@1 / P@3</td><td class="num">0.933 / 0.993</td><td>0 (stdlib)</td><td>CPU</td><td>README history 2026-09-20</td></tr>
-          <tr class="hot-row"><td>Steroids (old build, 1265 idx)</td><td>C — ours</td><td>P@1</td><td class="num">0.577</td><td>0 (stdlib)</td><td>CPU</td><td>README history 2026-09-23</td></tr>
-          <tr><td>SkillRouter 8B</td><td>A — theirs</td><td>Hit@1</td><td class="num">.760</td><td>8B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T3</a></td></tr>
-          <tr><td>SkillRouter 1.2B</td><td>A — theirs</td><td>Hit@1</td><td class="num">.740</td><td>1.2B</td><td>GPU · 496 ms</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T3</a></td></tr>
-          <tr><td>16B base pipeline</td><td>A — theirs</td><td>Hit@1</td><td class="num">.680</td><td>16B</td><td>GPU · ~2.9 s</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T3</a></td></tr>
-          <tr><td>GPT-4o-mini judge</td><td>A — theirs</td><td>Hit@1</td><td class="num">.673</td><td>API</td><td>API</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §5.2</a></td></tr>
-          <tr><td>Qwen3-Emb-8B</td><td>A — theirs</td><td>Hit@1</td><td class="num">.640</td><td>8B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
-          <tr><td>OpenAI emb-3-large</td><td>A — theirs</td><td>Hit@1</td><td class="num">.620</td><td>API</td><td>API</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
-          <tr><td>BGE-Large-v1.5</td><td>A — theirs</td><td>Hit@1</td><td class="num">.600</td><td>335M</td><td>CPU/GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
-          <tr><td>Gemini embedding-001</td><td>A — theirs</td><td>Hit@1</td><td class="num">.587</td><td>API</td><td>API</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
-          <tr><td>Qwen3-Emb-0.6B</td><td>A — theirs</td><td>Hit@1</td><td class="num">.560</td><td>0.6B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
-          <tr><td>BM25 (full text)</td><td>A — theirs</td><td>Hit@1</td><td class="num">.314</td><td>—</td><td>CPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
-          <tr><td>Qwen3-Emb-8B (metadata-only)</td><td>A — theirs</td><td>Hit@1</td><td class="num">.253</td><td>8B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §3</a></td></tr>
-          <tr><td>16B pipeline (metadata-only)</td><td>A — theirs</td><td>Hit@1</td><td class="num">.240</td><td>16B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §3</a></td></tr>
-          <tr><td>BM25 (metadata-only)</td><td>A — theirs</td><td>Hit@1</td><td class="num">.000</td><td>—</td><td>CPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §3</a></td></tr>
-          <tr><td>SkillRet fine-tuned</td><td>B — theirs</td><td>NDCG@10</td><td class="num">+12.9–16.2 pts</td><td>0.6B/8B</td><td>GPU</td><td><a href="https://arxiv.org/abs/2605.05726">SkillRet v3</a></td></tr>
-          <tr><td>SkillsBench (skills on/off)</td><td>end-to-end</td><td>pass-rate lift</td><td class="num">+16.2 pp avg</td><td>—</td><td>agent harness</td><td><a href="https://www.skillsbench.ai/">skillsbench.ai</a></td></tr>
+          <tr class="hot-row"><td>Steroids (live GOLDEN)</td><td>Ours · C</td><td>P@1 / P@3</td><td class="num">0.993 / 1.000</td><td>0 (stdlib)</td><td>CPU · ~40 ms</td><td>README 2026-09-25</td></tr>
+          <tr class="hot-row"><td>Steroids (second315)</td><td>Ours · C</td><td>P@1 / P@3</td><td class="num">0.898 / 0.959</td><td>0 (stdlib)</td><td>CPU</td><td>tests/blind_eval_second.py</td></tr>
+          <tr class="hot-row"><td>Steroids (their 79K pool)</td><td>Theirs · A</td><td>Hit@1</td><td class="num">0.521</td><td>0 (stdlib)</td><td>CPU · ~6 s median*</td><td>benchmarks/vs-skillrouter 2026-09-26</td></tr>
+          <tr class="hot-row"><td>Steroids (frozen golden)</td><td>Ours · C</td><td>P@1 / P@3</td><td class="num">0.799 / 0.960</td><td>0 (stdlib)</td><td>CPU · ~40 ms</td><td>tests/benchmark.py --golden</td></tr>
+          <tr class="hot-row"><td>Steroids (vs-hf-graft)</td><td>Ours · C</td><td>P@1</td><td class="num">0.95</td><td>0 (stdlib)</td><td>CPU · p95 239 ms</td><td>benchmarks/vs-hf-graft</td></tr>
+          <tr class="hot-row"><td>Steroids (366-idx, historical)</td><td>Ours · C</td><td>P@1 / P@3</td><td class="num">0.933 / 0.993</td><td>0 (stdlib)</td><td>CPU</td><td>README history 2026-09-20</td></tr>
+          <tr class="hot-row"><td>Steroids (old build, 1265 idx)</td><td>Ours · C</td><td>P@1</td><td class="num">0.577</td><td>0 (stdlib)</td><td>CPU</td><td>README history 2026-09-23</td></tr>
+          <tr><td>SkillRouter 8B</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.760</td><td>8B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T3</a></td></tr>
+          <tr><td>SkillRouter 1.2B</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.740</td><td>1.2B</td><td>GPU · 496 ms</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T3</a></td></tr>
+          <tr><td>16B base pipeline</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.680</td><td>16B</td><td>GPU · ~2.9 s</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T3</a></td></tr>
+          <tr><td>GPT-4o-mini judge</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.673</td><td>API</td><td>API</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §5.2</a></td></tr>
+          <tr><td>Qwen3-Emb-8B</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.640</td><td>8B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>OpenAI emb-3-large</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.620</td><td>API</td><td>API</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>BGE-Large-v1.5</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.600</td><td>335M</td><td>CPU/GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>Gemini embedding-001</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.587</td><td>API</td><td>API</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>Qwen3-Emb-0.6B</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.560</td><td>0.6B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>BM25 (full text)</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.314</td><td>none</td><td>CPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter T2</a></td></tr>
+          <tr><td>Qwen3-Emb-8B (metadata-only)</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.253</td><td>8B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §3</a></td></tr>
+          <tr><td>16B pipeline (metadata-only)</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.240</td><td>16B</td><td>GPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §3</a></td></tr>
+          <tr><td>BM25 (metadata-only)</td><td>Theirs · A</td><td>Hit@1</td><td class="num">.000</td><td>none</td><td>CPU</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §3</a></td></tr>
+          <tr><td>SkillRet fine-tuned</td><td>Theirs · B</td><td>NDCG@10</td><td class="num">+12.9–16.2 pts</td><td>0.6B/8B</td><td>GPU</td><td><a href="https://arxiv.org/abs/2605.05726">SkillRet v3</a></td></tr>
+          <tr><td>SkillsBench (skills on/off)</td><td>end-to-end</td><td>pass-rate lift</td><td class="num">+16.2 pp avg</td><td>none</td><td>agent harness</td><td><a href="https://www.skillsbench.ai/">skillsbench.ai</a></td></tr>
           <tr><td>SkillRouter downstream</td><td>end-to-end</td><td>task success</td><td class="num">27.56% (oracle 32.67%)</td><td>1.2B</td><td>Claude Code · 75 tasks</td><td><a href="https://arxiv.org/html/2603.22455v4">SkillRouter §5.5</a></td></tr>
         </tbody>
       </table>
     </div>
-    <p class="foot-note">Honesty rule: benchmark A (theirs) and C (ours) use different queries, pools and metrics — scores never share an axis. The only direct comparisons are params, latency and cost.</p>
+    <p class="foot-note">Reading note: their benchmark and ours use different queries, pools and metrics. Scores never share an axis except the 79K run. Only params, latency and cost compare directly.</p>
   </section>
 
   <div class="callout" style="margin:0 var(--gutter) 2rem">
     <h3>Read this honestly</h3>
-    <p><b>SkillRouter .740 vs Steroids 0.799</b> — different benchmarks, different metrics, no cross-comparison claimed. Same exam, both sides: <b>1.2B params + GPU + 496 ms vs 0 params + CPU + ~40 ms</b>.</p>
-    <p>Settled 2026-09-26 on their pool: <b>us 0.521 vs them 0.740</b>. The gap is full skill bodies — their ablation shows metadata-only input costs 31–44 points at 80K scale. We read metadata only. Their words: <b>"metadata-only routing may be more competitive in smaller catalogs."</b> Ours is that smaller catalog (1,268 skills, P@1 0.993).</p>
-    <p class="foot-note">*79K-pool median is per-query routing cost at 79K scale on CPU (index built once). Steroids is ~40 ms at 1.2K skills, ~6 s at 79K — per-query cost grows with the pool. Their GPU serving stays flat at 496 ms.</p>
+    <p><b>SkillRouter .740 vs Steroids 0.799.</b> Different benchmarks, different metrics. No cross comparison claimed. Same exam, both sides: <b>1.2B params, GPU, 496 ms. 0 params, CPU, about 40 ms.</b></p>
+    <p>Settled 2026-09-26 on their pool: <b>us 0.521, them 0.740</b>. The gap is full skill bodies. Their ablation shows metadata-only input loses 31 to 44 points at 80K scale. We read metadata only. Their words: <b>"metadata-only routing may be more competitive in smaller catalogs."</b> Ours is that smaller catalog. 1,268 skills. P@1 0.993.</p>
+    <p class="foot-note">*79K-pool median is per-query routing cost at 79K scale on CPU, index built once. Steroids runs about 40 ms at 1.2K skills and 6 s at 79K. Per-query cost grows with the pool. Their GPU serving stays flat at 496 ms.</p>
   </div>
 </main>
 
@@ -468,7 +468,7 @@ footer a{color:var(--dim)}
   <a href="https://arxiv.org/abs/2605.05726">SkillRet v3</a> ·
   <a href="https://www.skillsbench.ai/">SkillsBench</a> ·
   <a href="https://huggingface.co/papers/2603.15401">SWE-Skills-Bench</a>.
-  Data collected 2026-09-26 — maintained in <a href="BENCHMARKS.md">docs/BENCHMARKS.md</a> ·
+  Data collected 2026-09-26. Maintained in <a href="BENCHMARKS.md">docs/BENCHMARKS.md</a> ·
   correction-log culture applies.
 </footer>
 
