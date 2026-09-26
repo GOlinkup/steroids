@@ -64,9 +64,20 @@ main{padding-top:4.5rem}
 
 /* ---------- hero ---------- */
 .hero{padding:2.5rem var(--gutter) 1rem}
-.hero-video{position:relative;overflow:hidden}
-.hero-video video{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;opacity:.35;pointer-events:none}
-.hero-video .eyebrow,.hero-video h1,.hero-video .lede,.hero-video .badge-row{position:relative}
+.hero-ts{position:relative;min-height:100svh;margin:-4.5rem 0 0;padding:4.5rem 0 0;display:flex;flex-direction:column;justify-content:flex-end;overflow:hidden;background:#000}
+.hero-media{position:absolute;inset:0;z-index:0;animation:media-in 1.8s cubic-bezier(.16,1,.3,1) both}
+.hero-video{width:100%;height:100%;object-fit:cover;object-position:center;display:block}
+.hero-foot{position:relative;z-index:1;display:grid;gap:1.25rem;padding:1.5rem var(--gutter) 2rem;background:linear-gradient(to top,#000 0%,rgba(0,0,0,.8) 50%,transparent 100%);animation:rise 1s cubic-bezier(.16,1,.3,1) .5s both}
+.hero-kicker{display:flex;align-items:center;gap:.5rem;margin:0 0 .75rem;font-size:.8125rem;color:rgba(255,255,255,.55)}
+.hero-kicker .dot{width:8px;height:8px;flex:none;border-radius:50%;background:#fff}
+.hero-foot h1{margin:0 0 1.25rem;font-weight:700;font-size:clamp(2rem,8vw,4.5rem);letter-spacing:-.03em;line-height:1}
+.hero-foot h1 em{font-style:normal;color:var(--accent)}
+.hero-actions{display:flex;flex-wrap:wrap;align-items:center;gap:.75rem}
+.live-cta{font:inherit;font-size:.8125rem;font-weight:600;padding:.7rem 1.5rem;border:none;border-radius:999px;background:#fff;color:#000;cursor:pointer;text-decoration:none}
+.hero-secondary{display:inline-block;font-size:.8125rem;font-weight:600;color:#fff;text-decoration:none;border:1px solid rgba(255,255,255,.35);border-radius:999px;padding:.7rem 1.5rem}
+.anim{animation:rise .8s cubic-bezier(.16,1,.3,1) both;animation-delay:var(--d,.6s)}
+@keyframes media-in{from{opacity:0;transform:scale(1.05)}to{opacity:1;transform:scale(1)}}
+@keyframes rise{from{opacity:0;transform:translateY(20px)}to{opacity:1;transform:translateY(0)}}
 .eyebrow{text-transform:uppercase;font-size:.75rem;letter-spacing:.1em;color:rgba(255,255,255,.55);margin:0 0 .4rem}
 .hero h1{margin:0;font-size:clamp(1.8rem,4.5vw,2.8rem);font-weight:700;letter-spacing:-.02em;line-height:1.15}
 .hero h1 em{font-style:normal;color:var(--accent)}
@@ -201,21 +212,31 @@ footer a{color:var(--dim)}
 </header>
 
 <main>
-  <div class="hero hero-video">
-    <video autoplay muted loop playsinline preload="metadata">
-      <source src="hero.mp4" type="video/mp4" />
-    </video>
-    <p class="eyebrow">Skill routing · Steroids (highlighted) vs the trained field (gray)</p>
-    <h1>One router, <em>zero parameters</em> —<br>measured against 16B pipelines</h1>
-    <p class="lede">
-      <b>Steroids</b> routes skills with stdlib TF-IDF + trigram similarity — <b>no model, CPU-only, ~40 ms per query</b>.
-      Every competitor trains a neural retriever. Orange/gold bars are always Steroids; gray bars are the field.
-    </p>
-    <div class="badge-row">
-      <span class="badge hot">P@1 0.993 · live golden</span>
-      <span class="badge hot">P@3 1.000</span>
-      <span class="badge hot">~40 ms · CPU</span>
-      <span class="badge">Competitors: 0.6B–16B params · GPU · 496 ms–2.9 s</span>
+  <div class="hero hero-ts">
+    <div class="hero-media" aria-hidden="true">
+      <video class="hero-video" autoplay muted loop playsinline preload="metadata">
+        <source src="hero.mp4" type="video/mp4" />
+      </video>
+    </div>
+    <div class="hero-foot">
+      <div class="hero-main">
+        <p class="hero-kicker anim" style="--d:.6s"><span class="dot"></span>Skill routing · Steroids vs the trained field</p>
+        <h1 class="anim" style="--d:.8s">One router, <em>zero parameters</em> —<br>measured against 16B pipelines</h1>
+        <p class="lede anim" style="--d:.9s">
+          <b>Steroids</b> routes skills with stdlib TF-IDF + trigram similarity — <b>no model, CPU-only, ~40 ms per query</b>.
+          Every competitor trains a neural retriever. Orange/gold bars are always Steroids; gray bars are the field.
+        </p>
+        <div class="badge-row anim" style="--d:1s">
+          <span class="badge hot">P@1 0.993 · live golden</span>
+          <span class="badge hot">P@3 1.000</span>
+          <span class="badge hot">~40 ms · CPU</span>
+          <span class="badge">Competitors: 0.6B–16B params · GPU · 496 ms–2.9 s</span>
+        </div>
+        <div class="hero-actions anim" style="--d:1s">
+          <a class="live-cta" href="#headtohead">See head-to-head</a>
+          <a class="hero-secondary" href="#table">Full data</a>
+        </div>
+      </div>
     </div>
   </div>
 
