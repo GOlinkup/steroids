@@ -26,7 +26,8 @@ def latest(pattern):
 
 
 def parse_nightly(path):
-    text = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
     bench = re.findall(r"\| (\w+) \| (\d+) \| ([\d.]+) \| ([\d.]+) \| ([\d.]+) \| (\d+) \|", text)
     m = re.search(r"bench @ `(\w+)`", text)
     traffic = {}
@@ -46,7 +47,8 @@ def parse_nightly(path):
 
 
 def parse_lint(path):
-    text = open(path, encoding="utf-8").read()
+    with open(path, encoding="utf-8") as f:
+        text = f.read()
     m = re.search(r"skills scanned: (\d+) files / (\d+) unique  errors: (\d+)  warnings: (\d+)  collisions: (\d+)", text)
     if not m:
         raise SystemExit(f"cannot parse {path}")

@@ -24,7 +24,8 @@ bench @ `abc123` (dirty paths: 0)
 class TestTrust(unittest.TestCase):
     def _tmp(self, text):
         p = os.path.join(tempfile.mkdtemp(), "r.md")
-        open(p, "w", encoding="utf-8").write(text)
+        with open(p, "w", encoding="utf-8") as f:
+            f.write(text)
         return p
 
     def test_parse_nightly(self):
