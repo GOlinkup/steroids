@@ -1,0 +1,1312 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%237dffb0'/></svg>">
+<title>Steroids Town — a knowledge town (STEP 01)</title>
+<script type="importmap">
+{"imports":{
+ "three":"https://cdn.jsdelivr.net/npm/three@0.183.2/build/three.module.js",
+ "three/addons/":"https://cdn.jsdelivr.net/npm/three@0.183.2/examples/jsm/",
+ "three-pathfinding":"https://cdn.jsdelivr.net/npm/three-pathfinding@1.3.0/dist/three-pathfinding.module.js"}}
+</script>
+<style>
+:root{font-family:'DM Sans',Arial,sans-serif;color:#f2f4fa}
+*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#333b49}
+#app{height:100svh;position:relative;user-select:none}
+#app::after{content:'';position:absolute;inset:0;pointer-events:none;
+ background:linear-gradient(180deg,#1a223380,transparent 26%,transparent 76%,#141b2670),
+ radial-gradient(ellipse at 50% 45%,transparent 45%,#121822aa 100%)}
+canvas.webgl{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
+.hud{position:absolute;text-shadow:0 1px 10px #0a0f1899;pointer-events:none}
+#brand{top:26px;left:30px;display:flex;gap:14px;align-items:flex-start}
+.brand-icon{width:44px;height:44px;border-radius:50%;flex:none;margin-top:2px;
+ background:radial-gradient(circle at 35% 30%,#7fa2ff,#2f55d4 70%);box-shadow:0 0 26px #5b8cff55;
+ position:relative}
+.brand-icon::after{content:'✦';position:absolute;inset:0;display:flex;align-items:center;
+ justify-content:center;color:#fff;font-size:20px}
+.brand{font-size:40px;font-weight:700;letter-spacing:-.5px;line-height:1}
+.brand small{display:block;font-size:15px;font-weight:400;color:#d6dae2;margin-top:8px;letter-spacing:0}
+#nav{top:30px;right:30px;display:flex;gap:16px;align-items:center;pointer-events:auto}
+#nav button{border:1px solid #ffffff2c;background:transparent;color:inherit;border-radius:30px;
+ padding:13px 26px;font:inherit;font-size:18px;cursor:pointer}
+#nav button:hover{background:#ffffff22}
+#navCount{font-size:17px}
+/* one glass header, shared with docs/benchmarks.html (mint accent = town brand) */
+.glassnav{position:absolute;top:20px;left:50%;transform:translateX(-50%);z-index:6;
+ border-radius:99em;overflow:hidden;color:#f2f4fa;isolation:isolate;
+ background-color:rgba(187,187,188,.12);
+ backdrop-filter:blur(8px) saturate(150%);-webkit-backdrop-filter:blur(8px) saturate(150%);
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 6px 16px rgba(0,0,0,.16)}
+.glassnav nav{display:flex;align-items:center;gap:6px;padding:6px 10px}
+.glassnav a{color:#f2f4fa;text-decoration:none;font-size:.85rem;font-weight:500;padding:.5rem .95rem;border-radius:99em;transition:color .16s ease;white-space:nowrap}
+.glassnav a:hover,.glassnav a.active{color:#7dffb0}
+@media(max-width:900px){.glassnav{display:none}}
+#card{left:0;top:0;width:480px;max-width:calc(100vw - 60px);padding:20px 22px 14px;
+ border:1px solid #d2dcf033;border-radius:20px;background:linear-gradient(135deg,#2a3240b8,#3c4250a0);
+ backdrop-filter:blur(12px);pointer-events:none;will-change:transform;
+ transition:opacity .18s ease}
+#card.out{opacity:0;transition-duration:.12s;transition-delay:0s}
+#card.side{box-shadow:0 14px 44px rgba(0,0,0,.45)}
+/* embed mode (?embed=1): the town lives inside the benchmarks hero — scene only,
+   the parent page owns the chrome; the card still floats over the buildings */
+body.embed .glassnav,body.embed #brand,body.embed #nav,body.embed #foot,
+body.embed #street{display:none!important}
+body.embed canvas.webgl{touch-action:pan-y}
+#card .row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px}
+#avatar{width:44px;height:44px;border-radius:50%;background:#fbf7f1;flex:none}
+#latestPill{font-size:13px;border:1px solid #ffffff2c;border-radius:20px;padding:5px 14px;color:#d6dae2}
+#card h1{font-size:19px;margin:0 0 4px}#card p{font-size:12.5px;color:#c6cede;margin:6px 0 0;line-height:1.55}
+#card canvas{margin-top:8px;max-width:100%;height:auto;display:block}
+#tabs{display:none}
+#tl{display:none}
+#help{left:50%;top:50%;transform:translate(-50%,-50%);width:440px;max-width:92vw;padding:20px 22px;
+ border:1px solid #ffffff2a;border-radius:16px;background:#141b29f2;display:none;pointer-events:auto;font-size:13px}
+#help.on{display:block}#help td{padding:2px 10px 2px 0;color:#c6cede}
+#help .tlier{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;font-size:12px}
+#help .tlier button{border:1px solid #ffffff2c;background:#ffffff10;color:inherit;border-radius:10px;
+ padding:6px 12px;font:inherit;font-size:12px;cursor:pointer}
+#help .tlier input{width:110px;accent-color:#7dffb0}
+#help .tlier label{display:flex;gap:6px;align-items:center}
+#info{left:50%;top:50%;transform:translate(-50%,-50%);width:520px;max-width:92vw;max-height:84svh;overflow:auto;padding:20px 22px;
+ border:1px solid #ffffff2a;border-radius:16px;background:#141b29f2;display:none;pointer-events:auto;font-size:13px;line-height:1.6}
+#info.on{display:block}#info h3{margin:0 0 8px}#info table{border-collapse:collapse;margin:8px 0}
+#info th{font-weight:600;color:#8fc2ff;text-align:left;padding:1px 12px 1px 0;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+#info td{padding:1px 12px 1px 0;color:#c6cede}#info td.n{text-align:right;color:#7dffb0}#info th.n{text-align:right}
+#info .fine{font-size:11.5px;color:#8b93a3}
+#foot{left:30px;bottom:22px;font-size:10px;letter-spacing:1.5px;color:#8b93a3;text-transform:uppercase;max-width:60vw}
+#street{right:30px;bottom:64px;text-align:right}
+#street .l1{font-size:19px}#street .l2{font-size:19px;margin-top:2px}
+#street button{display:block;margin:14px 0 0 auto;border:none;background:none;color:#c6cede;
+ font:inherit;font-size:13px;cursor:pointer;pointer-events:auto}
+#street button:hover{color:#fff}
+#street .credits{font-size:10px;letter-spacing:1.5px;color:#8b93a3;text-transform:uppercase;margin-top:10px}
+@media(max-width:650px){.brand{font-size:26px}#brand{left:18px;right:18px;max-width:calc(100vw - 36px)}.brand small{font-size:11px}#card{max-width:calc(100vw - 32px)}#street{display:none}#foot{display:none}
+ #nav{top:92px;left:16px;right:16px;justify-content:space-between;gap:8px}
+ #nav button{padding:11px 16px;font-size:14px}#navCount{font-size:13px}}
+@media(prefers-reduced-motion:reduce){}
+</style>
+</head>
+<body>
+<div id="app">
+<!-- one glass header, shared with benchmarks.html · Live first, Home = benchmarks page -->
+<div class="glassnav"><nav>
+ <a href="http://127.0.0.1:8095/docs/benchmarks.html" class="active">Live</a>
+ <a href="http://127.0.0.1:8095/docs/benchmarks.html#our-bench">Benchmark</a>
+ <a href="http://127.0.0.1:8095/docs/benchmarks.html#their-bench">Their benchmark</a>
+ <a href="http://127.0.0.1:8095/docs/benchmarks.html#headtohead">Head to head</a>
+ <a href="http://127.0.0.1:8095/docs/benchmarks.html#table">Full data</a>
+ <a href="http://127.0.0.1:8095/step01-evolution.html">Town</a>
+</nav></div>
+<div class="hud" id="brand"><span class="brand-icon"></span><span class="brand">Steroids Town<small>A KNOWLEDGE TOWN · WHAT THE SYSTEM LEARNS</small></span></div>
+<div class="hud" id="nav"><button id="prev">← Previous</button><span id="navCount">1 / 12</span><button id="next">Next →</button></div>
+<div class="hud" id="card"><div class="row1"><span id="avatar"></span><span id="latestPill">Latest</span></div><h1 id="shop">Harness</h1><p id="shopdesc"></p><canvas id="spark" width="360" height="44"></canvas><p id="shopmeta" style="color:#8fc2ff"></p></div>
+<div class="hud" id="tabs"></div>
+<div class="hud" id="foot">LEARNING COUNTS: SNAPSHOT 2026-09-24 (served log 09-20…09-23) · corrections live-count · 23% long-tail skills unmapped — see card</div>
+<div class="hud" id="global" style="top:26px;left:50%;transform:translateX(-50%);text-align:center;display:none">
+ <div style="font-size:34px;font-weight:700;letter-spacing:-.5px;color:#7dffb0" id="globalNum">0</div>
+ <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#8b93a3" id="globalLabel">LEARNERS WORLDWIDE · LIVE</div>
+</div>
+<div class="hud" id="street"><div class="l1">Different system.</div><div class="l2">A More Open Town.</div><button id="about">About this town —</button><div class="credits" id="credits">Data: served-log counts · Scene: voxel procedural, no models</div></div>
+<div class="hud" id="help"><h3 style="margin:0 0 8px">Keyboard map</h3><table>
+<tr><td>← / →</td><td>prev / next shop</td></tr>
+<tr><td>1–9, 0, -, =</td><td>jump to shop 1–12</td></tr>
+<tr><td>space</td><td>pause / play traffic + clock</td></tr>
+<tr><td>T</td><td>speed 2× → 16× → 48× → 96×</td></tr>
+<tr><td>D</td><td>macro close-up on / off</td></tr>
+<tr><td>[ / ]</td><td>shutter shorter / longer</td></tr>
+<tr><td>H</td><td>this panel</td></tr></table><div class="tlier">
+<label>hour <input id="hour" type="range" min="0" max="24" step="0.1" value="21"></label>
+<label>shutter <input id="shutter" type="range" min="0" max="1" step="0.01" value="0.6"></label>
+<label>speed <input id="speed" type="range" min="0" max="3" step="1" value="1"></label>
+<button id="macro">Macro: off</button>
+<button id="pause">Pause</button>
+<button id="moreinfo">More about this town</button>
+</div></div>
+<div class="hud" id="info"><h3>About this town</h3><div id="infobody"></div><button id="infoclose">Close</button></div>
+</div>
+<script src="town-data.js"></script>
+<script>
+// ponytail: CDN-fail watchdog — module imports die silent on a dead CDN and
+// leave a blank page. If the scene never boots, say so in plain text.
+setTimeout(function(){
+  if(window.__townBooted) return;
+  var d=document.createElement('div');
+  d.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#141b29;color:#f2f4fa;font:15px/1.6 sans-serif;z-index:99;text-align:center;padding:20px';
+  d.textContent='Steroids Town could not start: the three.js CDN did not load. Check your connection and reload — your snapshot data is safe.';
+  document.getElementById('app').appendChild(d);
+},15000);
+</script>
+<script type="module">
+import * as THREE from 'three';
+import {OrbitControls} from 'three/addons/controls/OrbitControls.js';
+import {mergeGeometries} from 'three/addons/utils/BufferGeometryUtils.js';
+import {EffectComposer} from 'three/addons/postprocessing/EffectComposer.js';
+import {RenderPass} from 'three/addons/postprocessing/RenderPass.js';
+import {GTAOPass} from 'three/addons/postprocessing/GTAOPass.js';
+import {UnrealBloomPass} from 'three/addons/postprocessing/UnrealBloomPass.js';
+import {Pass,FullScreenQuad} from 'three/addons/postprocessing/Pass.js';
+import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
+
+// ---------- snapshot (REAL served-log counts, baked 2026-09-24; see honesty footnote) ----------
+// learns = routed-skill rows per domain, 1670 impressions 09-20…09-23 (77% mapped, long tail unmapped).
+// corrections = 0 live (D-2 door proven, unused). daily = learns per day for the sparkline.
+const FALLBACK={date:'2026-09-24',corrections:0,domains:[
+ {name:'Harness', learns:919, color:0x7dffb0, daily:[354,81,261,223]},
+ {name:'Comms', learns:821, color:0x8fc2ff, daily:[135,7,217,462]},
+ {name:'Mobile', learns:425, color:0x3f6fe0, daily:[87,62,19,257]},
+ {name:'Fixes', learns:359, color:0xffb07d, daily:[116,22,186,35]},
+ {name:'Design', learns:286, color:0xd88ff2, daily:[134,50,40,62]},
+ {name:'Research', learns:259, color:0x8ff2e2, daily:[87,68,74,30]},
+ {name:'Planning', learns:153, color:0xf2e38f, daily:[68,12,10,63]},
+ {name:'Building', learns:152, color:0x9fb08f, daily:[56,43,21,32]},
+ {name:'Media', learns:148, color:0xf28fa8, daily:[33,74,34,7]},
+ {name:'Review', learns:118, color:0xb0c4de, daily:[51,10,26,31]},
+ {name:'Docs', learns:71, color:0xd8d3c8, daily:[17,17,15,22]},
+ {name:'Data', learns:52, color:0x6fe0c8, daily:[24,7,15,6]},
+]};
+// ---------- live-data swap (st-20 seam; inline FALLBACK is ultimate fallback) ----------
+// st-10 source -> display mapping (name affinity; science is all-zero, unmapped).
+const MAP={devops:'Harness',general:'Comms',mobile:'Mobile',security:'Fixes',frontend:'Design',
+ 'design-media':'Media','ai-ml':'Research',business:'Planning',backend:'Building',testing:'Review',
+ 'docs-writing':'Docs',data:'Data'};
+function mapLive(snap,tr){
+ const tmap={};(tr.domains||[]).forEach(d=>{tmap[d.name]=Array.isArray(d.daily)?d.daily.slice(0,4):[];});
+ const smap={};((snap&&snap.domains)||[]).forEach(d=>{smap[d.name]=d;});
+ return {date:String((snap&&snap.generated_at)||FALLBACK.date).slice(0,10),
+  corrections:(snap&&snap.totals&&typeof snap.totals.corrections==='number')?snap.totals.corrections:null,
+  domains:FALLBACK.domains.map(f=>{
+   const k=Object.keys(MAP).find(k=>MAP[k]===f.name);
+   const daily=(k&&tmap[k]&&tmap[k].length?tmap[k]:f.daily).slice(0,4);
+   while(daily.length<4)daily.push(0);
+   const sd=k?smap[k]:null;
+   return {name:f.name,learns:daily.reduce((a,b)=>a+b,0),color:f.color,daily,
+    depth:sd&&typeof sd.depth==='number'?sd.depth:null,
+    corrections:sd&&typeof sd.corrections==='number'?sd.corrections:null};})};}
+let SNAPSHOT=FALLBACK,SOURCE='fallback';
+let GLOBAL=null; // live hub: {totals:{serves,accepts,misses},domains,daily} — everyone's counts
+try{
+ const r=await TownData.load();
+ if(r.snapshot&&r.trends){SNAPSHOT=mapLive(r.snapshot,r.trends);SOURCE=r.source;}
+}catch(e){/* ultimate fallback: inline */}
+// ---------- global hub (shared learning) ----------
+// Everyone's plugin pings once/day; the hub merges ALL users' counters.
+// This page reads the merged totals so the town shows the whole world's
+// learning, not one machine's. Fallback: baked snapshot (above).
+try{
+ let gr=null;
+ try{const r0=await fetch(TownData.hubUrl,{cache:'no-store'});if(r0.ok)gr=r0;}catch(e0){}
+ if(!gr&&TownData.hubFallbackUrl){try{const r1=await fetch(TownData.hubFallbackUrl,{cache:'no-store'});if(r1.ok)gr=r1;}catch(e1){}}
+ if(gr){const g=await gr.json();
+  if(g&&g.totals&&(g.totals.serves>0||g.totals.accepts>0)){
+   GLOBAL=g;
+   const dm={};(g.domains||[]).forEach(d=>dm[d.name]=d);
+   // hub counts ADD on top of the local snapshot: snapshot = this machine's
+   // baked history; hub = every user's live daily counters.
+   // shared = hub-earned routing rules (>=3 users corrected the same trigs).
+   // Hub rows are keyed by hub names (devops/general/...) while SNAPSHOT uses
+   // display names (Harness/Comms/...) — reverse through MAP like mapLive does.
+   // Hub rows are sparse (only non-empty domains), so shared defaults to 0 for
+   // missing rows once the hub answered; rules whose skill lands in `misc`
+   // map to no display domain and are counted by the ticker chip + panel total.
+   SNAPSHOT.domains.forEach(f=>{const k=Object.keys(MAP).find(k=>MAP[k]===f.name);const h=k&&dm[k];if(h)f.learns+=h.serves;f.shared=(h&&h.shared)||0;});
+  }
+ }
+}catch(e){/* hub unreachable: snapshot stands */}
+const MAXV=Math.max(...SNAPSHOT.domains.map(d=>typeof d.depth==='number'?d.depth:d.learns));
+const MAXD=Math.max(1,...SNAPSHOT.domains.map(d=>(d.daily&&d.daily[3])||1)); // busiest day drives entry flow
+
+// ---------- renderer / scene ----------
+const reduceMotion=matchMedia('(prefers-reduced-motion: reduce)').matches;
+const app=document.getElementById('app');
+const renderer=new THREE.WebGLRenderer({antialias:true});
+renderer.setPixelRatio(Math.min(devicePixelRatio,2));
+renderer.setSize(innerWidth,innerHeight);
+renderer.shadowMap.enabled=true;
+renderer.toneMapping=THREE.ACESFilmicToneMapping;
+app.prepend(renderer.domElement);
+renderer.domElement.classList.add('webgl');
+const scene=new THREE.Scene();
+scene.background=new THREE.Color(0x333b49);
+scene.fog=new THREE.FogExp2(0x454d5d,0.0028);
+const camera=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,0.5,3000);
+camera.position.set(0,120,340); // intro start; first flyTo settles to hero
+const controls=new OrbitControls(camera,renderer.domElement);
+controls.enablePan=false;controls.enableDamping=true;controls.dampingFactor=0.06;
+controls.maxPolarAngle=Math.PI*0.52;controls.target.set(0,4,0);
+controls.minDistance=25;controls.maxDistance=380;
+// embed (?embed=1): inside the benchmarks hero — no chrome, no wheel-steal;
+// page scroll must keep working over the canvas (pan-y lets vertical swipes through)
+const EMBED=new URLSearchParams(location.search).has('embed');
+if(EMBED){document.body.classList.add('embed');controls.enableZoom=false;}
+// ---------- cinematic camera rig (original): intro reveal + curved shop flights ----------
+// ponytail: one CatmullRom + target lerp; OrbitControls owns the camera otherwise
+const HERO_POS=new THREE.Vector3(0,52,178),HERO_TGT=new THREE.Vector3(0,4,0);
+let camAnim=null;
+const easeIO=t=>t*t*(3-2*t);
+function flyTo(destPos,destTgt,dur=1.4){
+ if(reduceMotion||dur<=0){camera.position.copy(destPos);controls.target.copy(destTgt);camDirty=true;return;}
+ const mid=camera.position.clone().add(destPos).multiplyScalar(.5);
+ mid.y=Math.max(camera.position.y,destPos.y)+16;
+ camAnim={curve:new THREE.CatmullRomCurve3([camera.position.clone(),mid,destPos.clone()]),
+  from:controls.target.clone(),to:destTgt.clone(),t:0,dur};
+ controls.enabled=false;}
+function stepFlight(dt){
+ if(!camAnim)return;
+ camAnim.t=Math.min(1,camAnim.t+dt/camAnim.dur);
+ const e=easeIO(camAnim.t);
+ camera.position.copy(camAnim.curve.getPoint(e));
+ controls.target.lerpVectors(camAnim.from,camAnim.to,e);
+ if(camAnim.t>=1){camAnim=null;controls.enabled=true;}
+ camDirty=true;}
+function frameShop(s){ // swing onto the hero's face side, keep viewer height/angle
+ const dir=camera.position.clone().sub(controls.target);
+ if(dir.lengthSq()<1)dir.set(0,40,120);
+ dir.y=Math.max(dir.y,24);
+ const fz=s.front||1;
+ if(Math.abs(dir.z)<8)dir.z=8*fz;else dir.z=Math.abs(dir.z)*fz;
+ dir.setLength(72);
+ return s.focus.clone().add(dir);}
+const composer=new EffectComposer(renderer);
+composer.addPass(new RenderPass(scene,camera));
+// GTAO (Jim st-24 values; Default composite + blendIntensity .8 = ref's Off+manual blend math, no wrapper)
+const gtao=new GTAOPass(scene,camera,innerWidth,innerHeight);
+const gtaoSize=gtao.setSize.bind(gtao);
+gtao.setSize=(w,h)=>gtaoSize(Math.ceil(w/2),Math.ceil(h/2));
+gtao.blendIntensity=.8;
+if(typeof gtao.updateGtaoMaterial==='function')
+ gtao.updateGtaoMaterial({radius:.5,thickness:.9,distanceExponent:1.5,distanceFallOff:.9,scale:1.1,samples:12});
+if(typeof gtao.updatePdMaterial==='function')
+ gtao.updatePdMaterial({radius:6,rings:2,samples:12,lumaPhi:10,depthPhi:2,normalPhi:3});
+composer.addPass(gtao);
+const bloom=new UnrealBloomPass(new THREE.Vector2(innerWidth,innerHeight),0.55,0.6,0.95);
+composer.addPass(bloom);
+// MacroDOF gather (recon technique, own code): half-res min+CoC, 64-tap spiral, composite
+const quadVS='varying vec2 vUv;void main(){vUv=uv;gl_Position=vec4(position.xy,0.,1.);}';
+const fsMat=(fs,u)=>new THREE.ShaderMaterial({uniforms:u,vertexShader:quadVS,fragmentShader:fs,depthTest:false,depthWrite:false});
+const DOF_COMMON=`uniform sampler2D tDepth;uniform float near;uniform float far;uniform float focus;uniform float range;uniform vec2 cocScale;uniform float maxCoc;
+float viewDist(vec2 uv){float d=texture2D(tDepth,uv).x;return near*far/((far-near)*d-far)*-1.;}
+float coc(vec2 uv){float z=viewDist(uv)-focus;float c=max(abs(z)-range,0.)*(z<0.?cocScale.x:cocScale.y);return sign(z)*min(c,maxCoc);}`;
+class MacroDOF extends Pass{
+ constructor(){super();const o={type:THREE.HalfFloatType};
+  this.half=new THREE.WebGLRenderTarget(1,1,o);this.blurRT=new THREE.WebGLRenderTarget(1,1,o);
+  this.u={tColor:{value:null},tDepth:{value:null},tHalf:{value:this.half.texture},tBlur:{value:this.blurRT.texture},
+   near:{value:camera.near},far:{value:camera.far},focus:{value:20},range:{value:3.2},
+   cocScale:{value:new THREE.Vector2(2.2,.85)},maxCoc:{value:13},
+   texel:{value:new THREE.Vector2()},fullTexel:{value:new THREE.Vector2()}};
+  this.pre=new FullScreenQuad(fsMat(`uniform sampler2D tColor;uniform vec2 fullTexel;varying vec2 vUv;${DOF_COMMON}
+   void main(){vec2 f=fullTexel*.5;vec3 c=(texture2D(tColor,vUv+vec2(-f.x,-f.y)).rgb+texture2D(tColor,vUv+vec2(f.x,-f.y)).rgb+texture2D(tColor,vUv+vec2(-f.x,f.y)).rgb+texture2D(tColor,vUv+f).rgb)*.25;
+   gl_FragColor=vec4(min(c,vec3(24.)),coc(vUv));}`,this.u));
+  this.blur=new FullScreenQuad(fsMat(`uniform sampler2D tHalf;uniform vec2 texel;uniform float maxCoc;varying vec2 vUv;
+   void main(){vec4 c0=texture2D(tHalf,vUv);float cc=abs(c0.a);vec3 col=c0.rgb;float tot=1.;float nz=0.;float r=1.6;float ang=0.;
+   for(int i=0;i<64;i++){if(r>=maxCoc)break;vec2 tc=vUv+vec2(cos(ang),sin(ang))*texel*r;vec4 s=texture2D(tHalf,tc);float sc=abs(s.a);if(s.a>c0.a)sc=min(sc,cc*2.);
+    float m=smoothstep(r-.8,r+.8,sc);col+=mix(col/tot,s.rgb,m);tot+=1.;if(s.a<0.)nz=max(nz,m*sc);ang+=2.39996;r+=2.2/r;}
+   gl_FragColor=vec4(col/tot,max(cc,nz));}`,this.u));
+  this.comp=new FullScreenQuad(fsMat(`uniform sampler2D tColor;uniform sampler2D tBlur;varying vec2 vUv;
+   void main(){vec3 s=texture2D(tColor,vUv).rgb;vec4 b=texture2D(tBlur,vUv);gl_FragColor=vec4(mix(s,b.rgb,smoothstep(.45,1.8,b.a)),1.);}`,this.u));}
+ setSize(w,h){const hw=Math.max(1,Math.ceil(w/2)),hh=Math.max(1,Math.ceil(h/2));
+  this.half.setSize(hw,hh);this.blurRT.setSize(hw,hh);
+  this.u.texel.value.set(1/hw,1/hh);this.u.fullTexel.value.set(1/w,1/h);}
+ render(r,write,read){this.u.tColor.value=read.texture;
+  r.setRenderTarget(this.half);this.pre.render(r);
+  r.setRenderTarget(this.blurRT);this.blur.render(r);
+  r.setRenderTarget(this.renderToScreen?null:write);this.comp.render(r);}}
+const dof=new MacroDOF();dof.u.tDepth.value=gtao.depthTexture;dof.enabled=false;
+composer.addPass(dof);
+composer.addPass(new OutputPass());
+renderer.shadowMap.autoUpdate=false;
+let camDirty=true,lastHourKey='';
+controls.addEventListener('change',()=>{camDirty=true;});
+addEventListener('resize',()=>{camera.aspect=innerWidth/innerHeight;camera.updateProjectionMatrix();
+ renderer.setSize(innerWidth,innerHeight);composer.setSize(innerWidth,innerHeight);measureCard();});
+
+// ---------- lights ----------
+scene.add(new THREE.HemisphereLight(0xbcd0ff,0x1a2418,1.15));
+const sun=new THREE.DirectionalLight(0xfff2dd,1.6);
+sun.castShadow=true;sun.shadow.mapSize.set(1024,1024);
+sun.shadow.camera.left=-90;sun.shadow.camera.right=90;sun.shadow.camera.top=90;sun.shadow.camera.bottom=-90;
+scene.add(sun);scene.add(sun.target);
+const hemi=scene.children[0];
+
+// ---------- ground + road ----------
+const townG=new THREE.Group();scene.add(townG);
+const groundMat=new THREE.MeshStandardMaterial({color:0x454a51,roughness:1});
+const ground=new THREE.Mesh(new THREE.BoxGeometry(420,2,380),groundMat);
+ground.position.y=-1;ground.receiveShadow=true;townG.add(ground);
+const roadMat=new THREE.MeshStandardMaterial({color:0x33373d,roughness:0.9});
+const road=new THREE.Mesh(new THREE.BoxGeometry(170,0.2,14),roadMat);
+road.position.y=0.12;road.receiveShadow=true;townG.add(road);
+for(const cx of [-48,48]){const cross=new THREE.Mesh(new THREE.BoxGeometry(10,0.2,120),roadMat);
+ cross.position.set(cx,0.12,0);cross.receiveShadow=true;townG.add(cross);}
+const vroad=new THREE.Mesh(new THREE.BoxGeometry(8,0.2,84),roadMat); // road splitting west/east heroes
+vroad.position.set(0,0.12,0);vroad.receiveShadow=true;townG.add(vroad);
+
+// ---------- shops: voxel block stacks, merged, zero GLB ----------
+// ponytail: sharp unit Box only (no rounded geo); windows = lit voxel grid on facades
+const bodyGeos=[],winGeos=[];
+function tinted(geo,hex){const g=geo.toNonIndexed();const c=new THREE.Color(hex);
+ const n=g.attributes.position.count,arr=new Float32Array(n*3);
+ for(let i=0;i<n;i++){arr[i*3]=c.r;arr[i*3+1]=c.g;arr[i*3+2]=c.b;}
+ g.setAttribute('color',new THREE.BufferAttribute(arr,3));return g;}
+function boxAt(list,geo,hex,x,y,z,sx,sy,sz,ry=0){const m=new THREE.Matrix4()
+ .makeRotationY(ry).scale(new THREE.Vector3(sx,sy,sz)).setPosition(x,y,z);
+ list.push(tinted(geo.clone().applyMatrix4(m),hex));}
+const VOX=new THREE.BoxGeometry(1,1,1);
+// ---------- canvas atlas: fascia signs per domain + brick courses (procedural-original) ----------
+// ponytail: one shared texture for all text/brick; window grids stay voxel geometry
+const signGeos=[],glassGeos=[];
+const glassMat=new THREE.MeshStandardMaterial({vertexColors:true,color:0x9fc4d8,transparent:true,opacity:0.32,roughness:0.1,metalness:0.4,depthWrite:false});
+const leafMat=new THREE.MeshStandardMaterial({color:0x2f3a4a,roughness:0.6,metalness:0.3});
+const glowMat=new THREE.MeshBasicMaterial({color:0xffd9a6});
+let fixtures=[]; // per-page dynamic meshes: door leaves, beacons, live boards
+let dayF=0;
+const ATLAS_COLS=4,ATLAS_RW=256,ATLAS_RH=64;
+const atlasC=document.createElement('canvas');
+atlasC.width=ATLAS_COLS*ATLAS_RW;atlasC.height=3*ATLAS_RH;
+{const c=atlasC.getContext('2d');
+ SNAPSHOT.domains.forEach((d,i)=>{
+  const ox=(i%ATLAS_COLS)*ATLAS_RW,oy=((i/ATLAS_COLS)|0)*ATLAS_RH;
+  c.fillStyle='#14181f';c.fillRect(ox,oy,ATLAS_RW,ATLAS_RH);
+  c.fillStyle='#'+d.color.toString(16).padStart(6,'0');c.fillRect(ox,oy+ATLAS_RH-10,ATLAS_RW,10);
+  c.fillStyle='#f2f4fa';c.font='700 34px "DM Sans",Arial,sans-serif';
+  c.textAlign='center';c.textBaseline='middle';
+  c.fillText(d.name.toUpperCase(),ox+ATLAS_RW/2,oy+ATLAS_RH/2-4);});}
+const atlasTex=new THREE.CanvasTexture(atlasC);
+atlasTex.colorSpace=THREE.SRGBColorSpace;atlasTex.anisotropy=4;
+const brickC=document.createElement('canvas');brickC.width=brickC.height=128;
+{const c=brickC.getContext('2d');c.fillStyle='#7e4636';c.fillRect(0,0,128,128);
+ for(let y=0,r=0;y<128;y+=16,r++)for(let x=-(r%2)*8;x<128;x+=16){
+  const v=((r*7+x)*13%17)-8;
+  c.fillStyle=`rgb(${158+v},${86+v*.6|0},${64+v*.5|0})`;
+  c.fillRect(x+1,y+1,14,14);}}
+const brickTex=new THREE.CanvasTexture(brickC);
+brickTex.colorSpace=THREE.SRGBColorSpace;
+brickTex.wrapS=brickTex.wrapT=THREE.RepeatWrapping;
+const signMat=new THREE.MeshStandardMaterial({vertexColors:true,map:atlasTex,
+ emissive:0xffffff,emissiveMap:atlasTex,emissiveIntensity:0,roughness:.8});
+const brickMat=new THREE.MeshStandardMaterial({vertexColors:true,map:brickTex,roughness:.9});
+function panelAt(di,x,y,z,w,h,ry=0){
+ const i=SNAPSHOT.domains.indexOf(di)>-1?SNAPSHOT.domains.indexOf(di):0;
+ const px=(i%ATLAS_COLS)*ATLAS_RW,py=((i/ATLAS_COLS)|0)*ATLAS_RH,W=atlasC.width,H=atlasC.height;
+ const g=new THREE.PlaneGeometry(w,h),uv=g.attributes.uv;
+ for(let k=0;k<uv.count;k++)
+  uv.setXY(k,(px+uv.getX(k)*ATLAS_RW)/W,1-(py+(1-uv.getY(k))*ATLAS_RH)/H);
+ const m=new THREE.Matrix4().makeRotationY(ry).setPosition(x,y,z);
+ signGeos.push(tinted(g.applyMatrix4(m),0xffffff));}
+const shops=[];
+const STYLES=['shop','studio','brick','gable','pavilion']; // town-era styles (heroes use HERO_STYLE)
+// honest units: 1 flat-top floor = FLOOR_UNIT real learns, 1 walker = WALKER_UNIT learns
+const FLOOR_UNIT=75,FLOOR_H=3,WALKER_UNIT=25;
+// ---------- building components: every shop assembles from these (own code) ----------
+function plinth(x,z){boxAt(bodyGeos,VOX,0x2b3138,x,0.5,z,10.6,1,8.6);}
+function cornice(x,y,z,hex){boxAt(bodyGeos,VOX,hex,x,y,z,10.5,0.5,8.5);}
+function parapet(x,y,z,hex){ // rim on flat roofs
+ boxAt(bodyGeos,VOX,hex,x,y,z-4.1,10.5,0.7,0.4);boxAt(bodyGeos,VOX,hex,x,y,z+4.1,10.5,0.7,0.4);
+ boxAt(bodyGeos,VOX,hex,x-5.05,y,z,0.4,0.7,8.5);boxAt(bodyGeos,VOX,hex,x+5.05,y,z,0.4,0.7,8.5);}
+function doorway(x,z,front){ // recessed entrance on the road facade + step + lintel
+ const fz=z+front*4.0;
+ boxAt(bodyGeos,VOX,0x14181f,x,1.5,fz,1.8,3,0.25);
+ boxAt(bodyGeos,VOX,0xd8d3c8,x,0.15,z+front*4.9,2.4,0.3,1.6);
+ boxAt(bodyGeos,VOX,0xf3eee8,x,3.15,fz,2.2,0.25,0.3);}
+function roofKit(x,y,z){ // stair bulkhead + AC box + guard rail on the roof cap
+ boxAt(bodyGeos,VOX,0x3a4149,x-2,y+1,z-1.5,2.4,2,2);
+ boxAt(bodyGeos,VOX,0x9aa2ad,x+2.2,y+0.5,z+1.2,1.2,1,1.2);
+ for(let px=-2.8;px<=2.8;px+=1.4)
+  boxAt(bodyGeos,VOX,0x2b3138,x+px,y+0.6,z+2.9,0.12,1.2,0.12);
+ boxAt(bodyGeos,VOX,0x2b3138,x,y+1.2,z+2.9,5.8,0.12,0.12);}
+// ---------- 4 hero buildings: the whole town in 4 physical shops, 12 infos rotate ----------
+// page p shows domains [4p..4p+3]; geometry rebuilds per page, data + camera keep flowing
+const HERO_N=4,HERO_P=[[-17,-17],[17,-17],[-17,17],[17,17]],HERO_STYLE='shop';
+// ---------- repo reuse: three-pathfinding (MIT) navmesh for cross-plaza strolls ----------
+// grid-tiled walkable quads (exact shared edges): lanes + crossing + door aprons, never walls
+function buildNavmesh(){
+ const v=[],idx=[];
+ const cell=(x0,z0)=>{
+  const b=v.length/3;
+  v.push(x0,0,z0, x0+1,0,z0, x0+1,0,z0+1, x0,0,z0+1);
+  idx.push(b,b+1,b+3, b+1,b+2,b+3);};
+ const rect=(x0,x1,z0,z1)=>{for(let x=x0;x<x1;x++)for(let z=z0;z<z1;z++)cell(x,z);};
+ rect(-30,-2,-10,-6);rect(2,30,-10,-6); // north lane, split at crossing
+ rect(-30,-2,6,10);rect(2,30,6,10); // south lane
+ rect(-2,2,-10,10); // crossing over the vertical road
+ for(const sx of [-17,17]){rect(sx-2,sx+2,-12,-10);rect(sx-2,sx+2,10,12);} // door aprons
+ const g=new THREE.BufferGeometry();
+ g.setAttribute('position',new THREE.BufferAttribute(new Float32Array(v),3));
+ g.setIndex(idx);
+ return g;}
+let PF=null;
+try{
+ const pfmod=await import('three-pathfinding');
+ PF=new pfmod.Pathfinding();
+ PF.setZoneData('town',pfmod.Pathfinding.createZone(buildNavmesh()));
+}catch(e){PF=null;} // offline fallback: straight strolls, building clamp still keeps walls safe
+function navPath(a,b){
+ try{
+  const g=PF.getGroup('town',new THREE.Vector3(a.x,0,a.z));
+  if(g===null||g===undefined||g<0)return null;
+  const p=PF.findPath(new THREE.Vector3(a.x,0,a.z),new THREE.Vector3(b.x,0,b.z),'town',g);
+  if(!p||!p.length)return null;
+  return p.map(q=>{const c=q.centroid||q;return {x:c.x,z:c.z};});
+ }catch(e){return null;}}
+let heroPage=-1;
+function heroDoors(s){const sz=Math.sign(s.z),dx=s.x,dz=s.z-sz*5;
+ s.front=s.z<0?1:-1;s.laneZ=s.z-Math.sign(s.z)*9; // sidewalk line in the road/walkway gap
+ s.door={x:dx,z:dz};s.inside={x:dx,z:s.z-sz*2};s.queue=[];s.doorBusy=false;
+ s.doorOpen=0;s.doorWant=false;
+ s.slot=k=>({x:dx,z:dz-sz*(1+k*0.95)});}
+function buildHeroPage(page){
+ heroPage=page;
+ bodyGeos.length=0;winGeos.length=0;signGeos.length=0;glassGeos.length=0;
+ for(const f of fixtures){townG.remove(f.m);f.m.geometry.dispose();if(f.mat)f.mat.dispose();if(f.tex)f.tex.dispose();}
+ fixtures=[];
+ shops.length=0;
+ for(let s=0;s<HERO_N;s++){
+  const d=SNAPSHOT.domains[page*HERO_N+s];
+  const x=HERO_P[s][0],z=HERO_P[s][1];
+  const hv=(typeof d.depth==='number'?d.depth:d.learns)+(d.live||0);
+  // flat-top floor stack: discrete floors from real learns + live learns, 1 lit window row per floor
+  const floors=Math.max(1,Math.round(hv/FLOOR_UNIT));
+  const h=floors*FLOOR_H;
+  const hex=d.color;
+  const front=z<0?1:-1,fry=z<0?0:Math.PI;
+  // main block + roof cap — ground floor split open (piers + header), lobby inside
+   boxAt(bodyGeos,VOX,0x2b3138,x-3.65,0.5,z,3.3,1,8.6);
+   boxAt(bodyGeos,VOX,0x2b3138,x+3.65,0.5,z,3.3,1,8.6);
+   const gy=Math.min(h,3.0);
+   boxAt(bodyGeos,VOX,hex,x-3.5,gy/2,z,3.0,gy,8);
+   boxAt(bodyGeos,VOX,hex,x+3.5,gy/2,z,3.0,gy,8);
+   if(h>3.0)boxAt(bodyGeos,VOX,hex,x,(3.0+h)/2,z,10,h-3.0,8);
+   else boxAt(bodyGeos,VOX,hex,x,h/2,z,10,h,8); // 1-floor stays solid
+   boxAt(bodyGeos,VOX,0xd8d3c8,x,0.12,z+front*4.9,2.6,0.24,1.8); // entry step
+   cornice(x,h+0.1,z,hex);
+   parapet(x,h+0.35,z,hex);
+   if(h>12)roofKit(x,h+0.7,z); // flat-top plant only, no fake extra floors
+ // ground-floor fascia sign (domain name, canvas atlas) on the road-facing facade
+ boxAt(bodyGeos,VOX,0x14181f,x,3.2,z+front*4.0,7.4,1.5,0.15);
+ panelAt(d,x,3.2,z+front*4.1,7,1.1,fry);
+  // voxel window grid: glass frames (day) + lit panes (night), one row per floor
+  const rows=floors;
+ for(let r=0;r<rows;r++)for(let c=0;c<4;c++){
+  const wy=2+r*3,wx=x-3.75+c*2.5;
+  if(wy>h-1.2)continue;
+  boxAt(bodyGeos,VOX,0xf3eee8,wx,wy,z+3.97,1.7,1.9,0.1);
+  boxAt(bodyGeos,VOX,0xf3eee8,wx,wy,z-3.97,1.7,1.9,0.1);
+  boxAt(winGeos,VOX,0xfff6c8,wx,wy,z+4.05,1.4,1.6,0.15);
+  boxAt(winGeos,VOX,0xfff6c8,wx,wy,z-4.05,1.4,1.6,0.15);}
+  // uniform single style for all 4 heroes: striped awning + glass entrance + blade sign
+  for(let q=0;q<6;q++)
+   boxAt(bodyGeos,VOX,q%2?0xf3eee8:hex,x-3.1+q*1.25,4.4,z+front*4.9,1.2,0.18,2.2);
+  // live marquee: building name board above the door, rewrites per domain
+  panelAt(d,x,5.6,z+front*4.06,6.4,1.0,fry);
+  // warm lobby back wall, seen through the open storefront + door
+  boxAt(winGeos,VOX,0xffd9a6,x,1.4,z+front*1.5,3.4,2.4,0.15);
+  // glass vestibule sides + roof (one transparent mesh for all heroes)
+  boxAt(glassGeos,VOX,0xdfeaf2,x-1.45,1.4,z+front*5.0,0.08,2.8,2.0);
+  boxAt(glassGeos,VOX,0xdfeaf2,x+1.45,1.4,z+front*5.0,0.08,2.8,2.0);
+  boxAt(glassGeos,VOX,0xdfeaf2,x,2.82,z+front*5.0,3.0,0.12,2.2);
+  // rooftop beacon pole (tip is dynamic) + live board posts
+  boxAt(bodyGeos,VOX,0x2b3138,x+3.5,h+1.8,z,0.14,2.2,0.14);
+  boxAt(bodyGeos,VOX,0x2b3138,x-2.0,h+1.65,z+front*4.4,0.14,1.9,0.14);
+  boxAt(bodyGeos,VOX,0x2b3138,x+2.0,h+1.65,z+front*4.4,0.14,1.9,0.14);
+  const shop={d,x,z,h,floors,front,focus:new THREE.Vector3(x,6,z)};
+  heroDoors(shop);shops.push(shop);
+  { // queue rope barriers: posts + sagging ropes flanking the 3 slots + door
+   const rp=[shop.door,shop.slot(0),shop.slot(1),shop.slot(2)];
+   for(let k=0;k<4;k++){const p=rp[k];
+    boxAt(bodyGeos,VOX,0x2b3138,x-1.1,0.5,p.z,0.09,1.0,0.09);
+    boxAt(bodyGeos,VOX,0x2b3138,x+1.1,0.5,p.z,0.09,1.0,0.09);
+    if(k<3){const q=rp[k+1],zm=(p.z+q.z)/2,ln=Math.abs(q.z-p.z);
+     boxAt(bodyGeos,VOX,0xc0392b,x-1.1,0.92,zm,0.06,0.06,ln);
+     boxAt(bodyGeos,VOX,0xc0392b,x+1.1,0.92,zm,0.06,0.06,ln);}}
+  }
+  { // dynamic fixtures: sliding door leaves, pulsing beacon tip, live name board
+   const dz=z+front*4.02;
+   const mkLeaf=(hx)=>{
+    const g=new THREE.BoxGeometry(1.9,2.6,0.1);
+    const m=new THREE.Mesh(g,leafMat);m.position.set(hx,1.3,dz);m.castShadow=true;townG.add(m);
+    fixtures.push({m});return m;};
+   shop.leafL=mkLeaf(x-0.95);shop.leafR=mkLeaf(x+0.95);
+   const tip=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.42,0.42),
+    new THREE.MeshBasicMaterial({color:hex}));
+   tip.position.set(x+3.5,h+0.7+2.2+0.3,z);townG.add(tip);
+   fixtures.push({m:tip,mat:tip.material,beacon:true,shop});
+   // landmark portal (with-vs-without test 2026-09-25: skill-guided build won
+   // over emissive-only — a scene needs real lights): Harness doorway gets an
+   // emissive surround (pulses live) + warm PointLight spilling onto the queue.
+   if(d.name==='Harness'){const pz=z+front*4.1;
+    for(const px of [x-2.0,x+2.0]){
+     const bar=new THREE.Mesh(new THREE.BoxGeometry(0.18,3.0,0.18),
+      new THREE.MeshBasicMaterial({color:hex}));
+     bar.position.set(px,1.5,pz);townG.add(bar);
+     fixtures.push({m:bar,mat:bar.material,beacon:true,shop});}
+    const lin=new THREE.Mesh(new THREE.BoxGeometry(4.2,0.18,0.18),
+     new THREE.MeshBasicMaterial({color:hex}));
+    lin.position.set(x,3.0,pz);townG.add(lin);
+    fixtures.push({m:lin,mat:lin.material,beacon:true,shop});
+    const glow=new THREE.PointLight(0xffd9a6,40,25,2);
+    glow.position.set(x,2.0,z+front*5.5);townG.add(glow);}
+   // ponytail: landmark cap — Harness is the #1 tower; a glowing roof slab
+   // in domain color so it reads from the wide intro frame. Unlit basic
+   // material = glow day and night. STATIC: the pulsing beacon tween made
+   // the whole roof visibly breathe (scale 1+0.3·sin+live bonus) — glow
+   // belongs to the beacon tip and doorway, the building must hold still.
+   if(d.name==='Harness'){
+    const cap=new THREE.Mesh(new THREE.BoxGeometry(10.4,0.45,8.4),
+     new THREE.MeshBasicMaterial({color:hex}));
+    cap.position.set(x,h+0.62,z);townG.add(cap);}
+   const cv=document.createElement('canvas');cv.width=256;cv.height=96;
+   const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;
+   drawBoard(cv,d);
+   const board=new THREE.Mesh(new THREE.PlaneGeometry(4.6,1.5),
+    new THREE.MeshBasicMaterial({map:tex,transparent:false}));
+   board.position.set(x,h+2.6,z+front*4.4);board.rotation.y=fry;townG.add(board);
+   fixtures.push({m:board,mat:board.material,tex,cv,board:true,shop});
+  }
+ } // end hero slots for this page
+ updateHeroMeshes();
+} // end buildHeroPage
+let bodyMesh=null,winMesh=null,signMesh=null,glassMesh=null;
+const heroWinMat=new THREE.MeshBasicMaterial({vertexColors:true});
+const heroBodyMat=new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.85});
+function updateHeroMeshes(){
+ const drop=m=>{if(m){townG.remove(m);m.geometry.dispose();}};
+ drop(bodyMesh);drop(winMesh);drop(signMesh);drop(glassMesh);
+ bodyMesh=new THREE.Mesh(mergeGeometries(bodyGeos),heroBodyMat);
+ bodyMesh.castShadow=true;bodyMesh.receiveShadow=true;townG.add(bodyMesh);
+ winMesh=new THREE.Mesh(mergeGeometries(winGeos),heroWinMat);
+ townG.add(winMesh);
+ signMesh=new THREE.Mesh(mergeGeometries(signGeos),signMat);
+ townG.add(signMesh);
+ if(glassGeos.length){glassMesh=new THREE.Mesh(mergeGeometries(glassGeos),glassMat);
+  glassMesh.renderOrder=5;townG.add(glassMesh);}
+}
+// ---------- blurred backdrop town: dark silhouette blocks, DOF + fog do the blur ----------
+{
+ const bg=[],bgw=[];
+ const rnd=(a,b)=>a+Math.random()*(b-a);
+ for(let i=0;i<40;i++){
+  const side=i%2?1:-1;
+  const x=rnd(-150,150),z=side>0?rnd(48,130):rnd(-130,-48);
+  const w=rnd(8,18),h=rnd(8,34),dp=rnd(9,14);
+  boxAt(bg,VOX,0x232b3a,x,h/2,z,w,h,dp);
+  if(Math.random()<0.6){const wy=rnd(3,Math.max(4,h-2));
+   boxAt(bgw,VOX,0x3a4356,x,wy,z-(dp/2+0.1),w*0.7,1.2,0.15);
+   boxAt(bgw,VOX,0x3a4356,x,wy,z+(dp/2+0.1),w*0.7,1.2,0.15);}
+ }
+ const bgMesh=new THREE.Mesh(mergeGeometries(bg),
+  new THREE.MeshStandardMaterial({vertexColors:true,roughness:1}));
+ townG.add(bgMesh);
+ if(bgw.length){const bgwMesh=new THREE.Mesh(mergeGeometries(bgw),
+  new THREE.MeshBasicMaterial({vertexColors:true}));
+  townG.add(bgwMesh);}
+}
+
+// ---------- street lights: dedicated static mesh (hero rebuilds must not wipe them) ----------
+const lampGeos=[],lampWin=[];
+const lampGlassMat=new THREE.MeshBasicMaterial({vertexColors:true});
+for(let lx=-75;lx<=75;lx+=15)for(const lz of [7.5,-7.5]){
+ const inlz=lz>0?lz-1:lz+1,headz=lz>0?lz-1.8:lz+1.8;
+ boxAt(lampGeos,VOX,0x22262c,lx,2.5,lz,0.5,5,0.5);            // pole
+ boxAt(lampGeos,VOX,0x22262c,lx,5.1,inlz,0.5,0.4,2.4);        // arm over road
+ boxAt(lampWin,VOX,0xffe9a8,lx,4.85,headz,0.9,0.35,0.9);}      // lamp head (night glow)
+for(let dx=-80;dx<=80;dx+=6)
+ boxAt(lampGeos,VOX,0xd8d3c8,dx,0.24,0,2.2,0.06,0.5);          // center dashes (day+night)
+for(let dz=-38;dz<=38;dz+=6)
+ boxAt(lampGeos,VOX,0xd8d3c8,0,0.24,dz,0.5,0.06,2.2);          // vertical-road dashes
+const lampMesh=new THREE.Mesh(mergeGeometries(lampGeos),
+ new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.9}));
+townG.add(lampMesh);
+const lampHeadMesh=new THREE.Mesh(mergeGeometries(lampWin),lampGlassMat);
+townG.add(lampHeadMesh);
+// ---------- central plaza + crosswalks + street props (merged once, static) ----------
+const propGeos=[];
+boxAt(propGeos,VOX,0x4a5158,0,0.0,0,44,0.08,44); // plaza slab, flush with ground
+for(const hx of [-17,17])for(let k=-2;k<=2;k++)
+ boxAt(propGeos,VOX,0xd8d3c8,hx+k*2.0,0.05,0,1.1,0.05,14); // crosswalk stripes to hero rows
+for(const hz of [-8,8])for(let k=-2;k<=2;k++)
+ boxAt(propGeos,VOX,0xd8d3c8,k*1.6,0.05,hz,1.0,0.05,3.2); // crosswalk over the vertical road
+for(let tx=-60;tx<=60;tx+=20){for(const tz of [-11.5,11.5]){
+ if(Math.abs(Math.abs(tx)-14)<9||Math.abs(Math.abs(tx)-48)<7)continue; // keep hero fronts + crossings clear
+ boxAt(propGeos,VOX,0x4a3a2b,tx,1.1,tz,0.5,2.2,0.5); // trunk
+ boxAt(propGeos,VOX,0x3f7a44,tx,3.0,tz,2.4,2.0,2.4); // crown
+ boxAt(propGeos,VOX,0x4c9153,tx,4.4,tz,1.6,1.2,1.6);}}
+for(const [bx,bz,ry] of [[-30,-11.5,0],[30,-11.5,0],[-30,11.5,Math.PI],[30,11.5,Math.PI]]){
+ boxAt(propGeos,VOX,0x6b5a44,bx,0.55,bz,2.0,0.15,0.6,ry); // bench seat
+ boxAt(propGeos,VOX,0x6b5a44,bx,0.95,bz+(ry?0.3:-0.3),2.0,0.7,0.12,ry); // back
+ boxAt(propGeos,VOX,0x2b3138,bx-0.8,0.25,bz,0.15,0.5,0.5);
+ boxAt(propGeos,VOX,0x2b3138,bx+0.8,0.25,bz,0.15,0.5,0.5);}
+const propMesh=new THREE.Mesh(mergeGeometries(propGeos),
+ new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.95}));
+propMesh.castShadow=true;propMesh.receiveShadow=true;townG.add(propMesh);
+
+// ---------- voxel people: ONE merged figure, ONE instanced draw, gait on GPU ----------
+// ponytail: ref technique (part/swing/pivot attrs + per-instance colors, shader swing); own measurements
+function pp(w,h,d,x,y,z,part,swing=0,pivot=0){
+ const g=new THREE.BoxGeometry(w,h,d).toNonIndexed().translate(x,y,z);
+ const n=g.attributes.position.count;
+ for(const [k,v] of [['aPart',part],['aSwing',swing],['aPivot',pivot]])
+  g.setAttribute(k,new THREE.BufferAttribute(new Float32Array(n).fill(v),1));
+ return g;}
+const personGeo=mergeGeometries([
+ pp(.42,.12,.2,.02,.06,.14,4),pp(.42,.12,.2,.02,.06,-.14,4),
+ pp(.26,.78,.24,0,.51,.14,0,1,.9),pp(.26,.78,.24,0,.51,-.14,0,1,.9),
+ pp(.4,.72,.62,0,1.26,0,1),
+ pp(.2,.66,.22,0,1.19,.44,1,-1,1.52),pp(.2,.66,.22,0,1.19,-.44,1,-1,1.52),
+ pp(.18,.18,.2,0,.82,.44,2,-1,1.52),pp(.18,.18,.2,0,.82,-.44,2,-1,1.52),
+ pp(.45,.45,.45,.02,1.845,0,2),
+ pp(.47,.14,.47,.02,2.12,0,3),pp(.28,.06,.4,.26,2.06,0,3),
+ pp(.03,.08,.07,.245,1.88,.1,5),pp(.03,.08,.07,.245,1.88,-.1,5)]);
+const crowdTime={value:0};
+const personMat=new THREE.MeshStandardMaterial({roughness:.8});
+personMat.onBeforeCompile=s=>{
+ s.uniforms.uTime=crowdTime;
+ s.vertexShader=s.vertexShader
+  .replace('#include <common>',`#include <common>
+attribute float aPart;attribute float aSwing;attribute float aPivot;
+attribute vec3 iShirt;attribute vec3 iPants;attribute vec3 iHair;attribute vec3 iSkin;
+attribute vec4 iAnim;uniform float uTime;varying vec3 vPCol;`)
+  .replace('#include <begin_vertex>',`#include <begin_vertex>
+float ph=uTime*iAnim.z+iAnim.x*6.2832;
+float sw=sin(ph)*.55*iAnim.y*aSwing;
+transformed.y-=aPivot;float cs=cos(sw),sn=sin(sw);
+transformed.xy=vec2(cs*transformed.x-sn*transformed.y,sn*transformed.x+cs*transformed.y);
+transformed.y+=aPivot+abs(cos(ph))*.05*iAnim.y;
+if(aPart>1.5&&aPart<2.5&&transformed.y>1.5){float idle=1.-min(iAnim.y,1.);float hy=sin(uTime*1.3+ph)*.07*(.25+.75*idle);float hx=sin(uTime*1.7+ph*1.3)*.035*(.25+.75*idle);
+transformed.x-=.02;float cy=cos(hy),sy2=sin(hy);transformed.xz=vec2(cy*transformed.x+sy2*transformed.z,-sy2*transformed.x+cy*transformed.z);transformed.x+=.02;
+transformed.y-=1.845;float cx=cos(hx),sx2=sin(hx);transformed.yz=vec2(cx*transformed.y-sx2*transformed.z,sx2*transformed.y+cx*transformed.z);transformed.y+=1.845;}
+vec3 pc=aPart<.5?iPants:aPart<1.5?iShirt:aPart<2.5?iSkin:aPart<3.5?iHair:aPart<4.5?vec3(.08):vec3(.01);
+vPCol=pc;`);
+ s.fragmentShader=s.fragmentShader
+  .replace('#include <common>','#include <common>\nvarying vec3 vPCol;')
+  .replace('#include <color_fragment>','#include <color_fragment>\ndiffuseColor.rgb=vPCol;');};
+const WMAX=400;
+const people=new THREE.InstancedMesh(personGeo,personMat,WMAX);
+people.castShadow=true;people.frustumCulled=false;townG.add(people);
+const SKIN=[0xc9a184,0x8d5a3b,0xe8b98a,0x6b4230],PANTS=[0x2b3138,0x3a4a5a,0x4a3a2b],
+ HAIR=[0x3a2a20,0x1d1b1a,0xd9b36a,0x4a3327];
+const walkSeed=[];let wCount=0;
+const animArr=new Float32Array(WMAX*4);
+// crowd follows the 4 heroes: rebuilt per page so counts/colors match the shown domains
+function seedCrowd(){walkSeed.length=0;wCount=0;
+const col=new THREE.Color(),sh=new Float32Array(WMAX*3),pa=new Float32Array(WMAX*3),
+  ha=new Float32Array(WMAX*3),sk=new Float32Array(WMAX*3);
+ for(const s of shops){const dd=s.d;
+   const n=typeof dd.depth==='number'?Math.min(40,4+Math.round(dd.depth/10)):Math.min(40,Math.round(dd.learns/WALKER_UNIT));
+  for(let i=0;i<n&&wCount<WMAX;i++,wCount++){
+   const px=s.x+(Math.random()-0.5)*20,pz=s.laneZ+(Math.random()-0.5)*1.5;
+   const flow=Math.min(8,MAXD/((s.d.daily&&s.d.daily[3])||1)); // real daily volume -> entry pace
+   const shirt=new THREE.Color(s.d.color).offsetHSL((Math.random()-0.5)*0.06,0,-0.15*Math.random());
+   walkSeed.push({x0:px,z:pz,laneZ:s.laneZ,px,pz,dir:Math.random()<0.5?1:-1,
+    ph:Math.random(),speed:2.2+Math.random()*1.6,shirt,
+    skin:SKIN[(Math.random()*SKIN.length)|0],pants:PANTS[(Math.random()*PANTS.length)|0],
+    hair:HAIR[(Math.random()*HAIR.length)|0],
+    shop:s,slot:shops.indexOf(s),flow,st:'patrol',timer:(4+Math.random()*12)*flow,tx:px,tz:pz,qslot:-1});
+   shirt.toArray(sh,wCount*3);col.setHex(walkSeed[wCount].pants).toArray(pa,wCount*3);
+   col.setHex(walkSeed[wCount].hair).toArray(ha,wCount*3);
+   col.setHex(walkSeed[wCount].skin).toArray(sk,wCount*3);}}
+ personGeo.setAttribute('iShirt',new THREE.InstancedBufferAttribute(sh,3));
+ personGeo.setAttribute('iPants',new THREE.InstancedBufferAttribute(pa,3));
+ personGeo.setAttribute('iHair',new THREE.InstancedBufferAttribute(ha,3));
+ personGeo.setAttribute('iSkin',new THREE.InstancedBufferAttribute(sk,3));
+ walkSeed.forEach((s,i)=>{animArr[i*4]=s.ph;animArr[i*4+1]=1;animArr[i*4+2]=s.speed;animArr[i*4+3]=0;});
+ personGeo.setAttribute('iAnim',new THREE.InstancedBufferAttribute(animArr,4).setUsage(THREE.DynamicDrawUsage));
+ people.count=wCount;}
+// page turn keeps every walker (no vanish-pop): repoint slots, retint shirts, reset trips
+function remapCrowd(){
+ for(const w of walkSeed){
+  const ns=shops[w.slot]||shops[0];
+  w.shop=ns;
+  w.shirt=new THREE.Color(ns.d.color).offsetHSL((Math.random()-0.5)*0.06,0,-0.15*Math.random());
+  if(w.st!=='patrol'){w.st='patrol';w.timer=(3+Math.random()*9)*(w.flow||1);setPath(w,w.px,ns.laneZ,1.0);}}
+ const sh=personGeo.getAttribute('iShirt');
+ walkSeed.forEach((w,i)=>{w.shirt.toArray(sh.array,i*3);});
+ sh.needsUpdate=true;
+ people.count=wCount;}
+const wDummy=new THREE.Object3D();
+// visitor circuit (ref-inspired, own code): patrol -> queue (3 slots) -> door -> inside -> exit -> patrol
+// queue/inside scale with live depth via per-shop counts (see seed n above)
+// visitor circuit doors/slots are set per hero inside buildHeroPage (heroDoors)
+// curved routes (§6/§7): CatmullRom with lateral midpoint, yaw from tangent
+function setPath(s,tx,tz,bend=1.2,via=null){
+ const a=new THREE.Vector3(s.px,0,s.pz),b=new THREE.Vector3(tx,0,tz);
+ const pts=[a];
+ if(via)for(const v of via)pts.push(new THREE.Vector3(v.x,0,v.z));
+ else{
+  const dx=b.x-a.x,dz=b.z-a.z,L=Math.hypot(dx,dz);
+  const mid=a.clone().add(b).multiplyScalar(.5);
+  if(L>0.01){const off=(Math.random()-0.5)*2*bend;mid.x+=-dz/L*off;mid.z+=dx/L*off;}
+  pts.push(mid);}
+ pts.push(b);
+ s.path=new THREE.CatmullRomCurve3(pts);s.prog=0;
+ s.plen=Math.max(s.path.getLength(),0.001);
+ s.tx=tx;s.tz=tz;}
+function wStep(s,dt,sp){
+ if(!s.path)return true;
+ s.prog=Math.min(1,s.prog+sp*dt/s.plen);
+ const p=s.path.getPoint(s.prog),ahead=s.path.getPoint(Math.min(1,s.prog+0.01));
+ s.px=p.x;s.pz=p.z;
+ s.targetYaw=Math.atan2(-(ahead.z-p.z),ahead.x-p.x);
+ return s.prog>=1;}
+function sibHero(S){const i=shops.indexOf(S);return shops[i^1];} // north pair 0-1, south pair 2-3
+function nextStrollLeg(s){
+ const w=s.wp.shift();
+ if(!w){
+  if(!s.home){s.home=true;s.st='gawk';s.timer=2+Math.random()*3;}
+  else{s.st='patrol';s.timer=(6+Math.random()*10)*(s.flow||1);}
+  return;}
+ setPath(s,w.x,w.z,0.8);}
+function beginStroll(s,S){
+ const T=sibHero(S);
+ const tgt={x:T.door.x,z:T.door.z+T.front*1.5};
+ let wp=navPath({x:s.px,z:s.pz},tgt);
+ if(!wp||!wp.length)wp=[tgt]; // offline fallback: straight stroll, clamp keeps walls safe
+ s.wp=wp;s.home=false;s.st='stroll';nextStrollLeg(s);}
+function dampAngle(cur,tgt,k,dt){let d=(tgt-cur)%(Math.PI*2);
+ if(d>Math.PI)d-=Math.PI*2;if(d<-Math.PI)d+=Math.PI*2;return cur+d*Math.min(1,k*dt);}
+function poseWalkers(advance,dt){
+ if(advance){crowdTime.value+=dt;for(const H of shops)H.doorWant=false;}
+ // separation: same-shop patrollers push apart, one relaxation pass (walkers share lanes)
+ if(advance)for(let i=0;i<wCount;i++){const a=walkSeed[i];
+  if(a.st!=='patrol')continue;
+  for(let j=i+1;j<wCount;j++){const b=walkSeed[j];
+   if(b.st!=='patrol'||b.shop!==a.shop)continue;
+   const dx=b.px-a.px,dz=b.pz-a.pz;
+   if(Math.abs(dx)>0.8||Math.abs(dz)>0.8)continue;
+   const d=Math.hypot(dx,dz);
+   if(d<0.7&&d>1e-4){const push=(0.7-d)*1.5*dt,ux=dx/d,uz=dz/d;
+    a.px-=ux*push;a.pz-=uz*push;b.px+=ux*push;b.pz+=uz*push;}}}
+ for(let i=0;i<wCount;i++){const s=walkSeed[i],S=s.shop;
+  let moving=0;
+  if(advance){
+   if(s.st==='patrol'){
+    moving=1;s.px+=s.dir*dt*s.speed*0.55;
+    if(s.px>S.x+12){s.px=S.x+12;s.dir=-1;}if(s.px<S.x-12){s.px=S.x-12;s.dir=1;}
+    s.pz+=(S.laneZ-s.pz)*Math.min(1,dt*3); // stay on the sidewalk, never through walls
+    s.yaw=s.dir>0?0:Math.PI;s.targetYaw=s.yaw;s.timer-=dt;
+     if(s.timer<=0){if(S.queue.length<3){s.qslot=S.queue.length;S.queue.push(s);
+       const p=S.slot(s.qslot);
+       setPath(s,p.x,p.z,1.2,[{x:(s.px+p.x)/2,z:S.laneZ}]);s.st='toQueue';}
+      else if(PF&&Math.random()<0.25){beginStroll(s,S);}
+      else s.timer=(4+Math.random()*8)*(s.flow||1);}
+    }else if(s.st==='stroll'){ // cross-plaza visit via repo navmesh, waits for gaps in traffic
+     let wait=false;
+     if(Math.abs(s.px)<8){for(const o of cars){if(o.line!=='z')continue;
+      const ox=o.g.position.x,oz=o.g.position.z;
+      if(Math.abs(ox)<8&&Math.abs(oz-s.pz)<13){wait=true;break;}}}
+     if(!wait){moving=1;
+      if(wStep(s,dt,s.speed))nextStrollLeg(s);}
+    }else if(s.st==='gawk'){s.timer-=dt; // take in the neighboring shop, then head home
+     if(s.timer<=0){
+      const S0=s.shop;
+      const home={x:Math.max(S0.x-12,Math.min(S0.x+12,s.px)),z:S0.laneZ};
+      let wp=navPath({x:s.px,z:s.pz},home);
+      if(!wp||!wp.length)wp=[home];
+      s.wp=wp;s.home=true;s.st='stroll';nextStrollLeg(s);}
+    }else if(s.st==='toQueue'){moving=1;
+     if(wStep(s,dt,s.speed*0.9)){s.st='queue';}
+    }else if(s.st==='queue'){
+     const p=S.slot(s.qslot);
+     if(p.x!==s.tx||p.z!==s.tz)setPath(s,p.x,p.z,0.3);
+     if(Math.hypot(s.tx-s.px,s.tz-s.pz)>0.1){moving=1;wStep(s,dt,s.speed*0.7);}
+     else if(s.qslot===0&&!S.doorBusy){S.doorBusy=true;
+      S.queue.shift();S.queue.forEach((w,j)=>{w.qslot=j;});
+      s.qslot=-1;setPath(s,S.door.x,S.door.z);s.st='toDoor';}
+    }else if(s.st==='toDoor'){moving=1;S.doorWant=true;
+     if(wStep(s,dt,s.speed*0.9)){s.st='inside';s.timer=4+Math.random()*5;
+      s.tx=S.inside.x;s.tz=S.inside.z;sessionLearns++;S.d.live=(S.d.live||0)+1;syncLive();}
+    }else if(s.st==='inside'){s.timer-=dt; // browse the lobby, visible through the entry
+     if(s.inTx===undefined||Math.hypot(s.inTx-s.px,s.inTz-s.pz)<0.2){
+      s.inTx=S.door.x+(Math.random()-0.5)*1.4;
+      s.inTz=S.door.z-S.front*0.2+(Math.random()-0.5)*0.3;}
+     {const dx=s.inTx-s.px,dz=s.inTz-s.pz,dd=Math.hypot(dx,dz);
+      if(dd>0.05){moving=1;const step=Math.min(s.speed*0.35*dt,dd);
+       s.px+=dx/dd*step;s.pz+=dz/dd*step;s.targetYaw=Math.atan2(-dz,dx);}}
+     if(s.timer<=0){S.doorBusy=false;
+      const ex=S.door.x+(s.px>=S.door.x?5:-5);
+      setPath(s,ex,S.laneZ,1.0,[{x:S.door.x,z:S.door.z}]);s.st='exit';}
+    }else if(s.st==='exit'){moving=1;S.doorWant=true;
+     if(wStep(s,dt,s.speed*0.9)){s.st='patrol';s.timer=(8+Math.random()*12)*(s.flow||1);
+      s.x0=s.px;s.dir=Math.random()<0.5?1:-1;}
+    }}
+   if(s.targetYaw!==undefined&&advance)s.yaw=dampAngle(s.yaw||0,s.targetYaw,4,dt);
+   for(const H of shops){ // hard guarantee: nobody walks through a building
+    const cdx=s.px-H.x,cdz=s.pz-H.z;
+    if(Math.abs(cdx)<5.6&&Math.abs(cdz)<4.6){
+     if(5.6-Math.abs(cdx)<4.6-Math.abs(cdz))s.px=H.x+(cdx>=0?5.6:-5.6);
+     else s.pz=H.z+(cdz>=0?4.6:-4.6);}}
+   wDummy.position.set(s.px,0,s.pz);
+  wDummy.rotation.set(0,s.yaw||0,0);
+  wDummy.updateMatrix();people.setMatrixAt(i,wDummy.matrix);
+  animArr[i*4+1]=moving;}
+  // door leaf drive: slide into piers while anyone enters/exits; beacons pulse with live
+  for(const H of shops){
+   H.doorOpen+=((H.doorWant?1:0)-H.doorOpen)*Math.min(1,dt*4);
+   H.doorOpen=Math.max(0,Math.min(1,H.doorOpen));
+   const off=H.doorOpen*1.7;
+   if(H.leafL){H.leafL.position.x=(H.x-0.95)-off;H.leafR.position.x=(H.x+0.95)+off;}
+  }
+  for(const f of fixtures){
+   if(f.beacon)f.m.scale.setScalar(1+0.3*Math.sin(crowdTime.value*4+f.shop.x)+Math.min(0.6,(f.shop.d.live||0)/40));
+  }
+  people.instanceMatrix.needsUpdate=true;
+ if(personGeo.attributes.iAnim)personGeo.attributes.iAnim.needsUpdate=true;}
+poseWalkers(false,0);
+
+// ---------- loop-road visuals (static, merged): grid perimeter, sharp corners ----------
+// ponytail: straights overlap at corners; dashes extended to meet them
+const roadGeos=[];
+const HX=70,HZ=34;
+for(const sz of [-1,1]){
+ boxAt(roadGeos,VOX,0x33373d,0,0.12,sz*HZ,140,0.2,4);
+ for(let dx=-68;dx<=68;dx+=6)
+  boxAt(roadGeos,VOX,0xd8d3c8,dx,0.24,sz*HZ,2.2,0.06,0.5);}
+for(const sx of [-1,1]){
+ boxAt(roadGeos,VOX,0x33373d,sx*HX,0.12,0,4,0.2,68);
+ for(let dz=-32;dz<=32;dz+=6)
+  boxAt(roadGeos,VOX,0xd8d3c8,sx*HX,0.24,dz,0.5,0.06,2.2);}
+const roadMesh=new THREE.Mesh(mergeGeometries(roadGeos),
+ new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.9}));
+roadMesh.receiveShadow=true;townG.add(roadMesh);
+
+// ---------- voxel traffic on a grid-loop perimeter (ref technique, own code) ----------
+// ---------- loop-road visuals: grid perimeter, sharp corners, free flow ----------
+const LOOP_A=HX,LOOP_B=HZ;
+const SEG_F=2*LOOP_A,SEG_S=2*LOOP_B,LOOP_L=2*(SEG_F+SEG_S);
+function loopPose(s){
+ s=((s%LOOP_L)+LOOP_L)%LOOP_L;
+ if(s<SEG_F)return {x:-LOOP_A+s,z:-LOOP_B,h:0,corner:false,dEnd:Math.min(s,SEG_F-s)};
+ s-=SEG_F;
+ if(s<SEG_S)return {x:LOOP_A,z:-LOOP_B+s,h:-Math.PI/2,corner:false,dEnd:Math.min(s,SEG_S-s)};
+ s-=SEG_S;
+ if(s<SEG_F)return {x:LOOP_A-s,z:LOOP_B,h:Math.PI,corner:false,dEnd:Math.min(s,SEG_F-s)};
+ s-=SEG_F;
+ return {x:-LOOP_A,z:LOOP_B-s,h:Math.PI/2,corner:false,dEnd:Math.min(s,SEG_S-s)};}
+const sstep=(d,a,b)=>{const t=Math.min(1,Math.max(0,(d-a)/(b-a)));return t*t*(3-2*t);};
+const loopV=(s,base)=>base*(0.45+0.55*sstep(loopPose(s).dEnd,1.5,8));
+// ---------- loop-road visuals: grid perimeter, sharp corners, free flow ----------
+const cars=[];
+const carCols=[0x3f6fe0,0xd84a4a,0x7dffb0,0xffd24a];
+const wheelMat=new THREE.MeshStandardMaterial({color:0x1a1d22,roughness:0.9});
+const headLampMat=new THREE.MeshBasicMaterial({color:0xfff6dd});
+const lampG=new THREE.BoxGeometry(0.14,0.16,0.3);
+for(let i=0;i<10;i++){const g=new THREE.Group();
+ const mat=new THREE.MeshStandardMaterial({color:carCols[i%4],roughness:0.5,metalness:0.4});
+ const b=new THREE.Mesh(new THREE.BoxGeometry(3.6,0.7,1.7),mat);
+ b.position.y=0.75;b.castShadow=true;g.add(b);
+  const cab=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.65,1.5),mat);
+  cab.position.set(-0.2,1.35,0);cab.castShadow=true;g.add(cab);
+  const wh=[];
+  for(const wx of [-1.2,1.2])for(const wz of [-0.95,0.95]){
+   const w=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.55,0.4),wheelMat);
+   w.position.set(wx,0.28,wz);g.add(w);wh.push(w);}
+  for(const lz of [-0.55,0.55]){ // head lamp cubes (shared mat, night-scaled in animate)
+  const hl=new THREE.Mesh(lampG,headLampMat);hl.position.set(1.85,0.75,lz);g.add(hl);}
+ const tailMat=new THREE.MeshBasicMaterial({color:0xff2b1a});
+ for(const lz of [-0.55,0.55]){
+  const tl=new THREE.Mesh(lampG,tailMat);tl.position.set(-1.85,0.75,lz);g.add(tl);}
+ const dir=i%2?1:-1;
+ const s0=(i/10)*LOOP_L;
+ townG.add(g);
+  cars.push({g,tailMat,dir,s:s0,base:7+Math.random()*5,hist:[],held:false,wheels:wh,line:0});}
+// through-traffic between heroes: straight runs on the central road + cross streets
+for(const ld of [{line:'x',lz:-1.8,dir:1},{line:'x',lz:1.8,dir:-1},{line:'x',lz:-1.8,dir:1},{line:'z',lx:-48,dir:1},{line:'z',lx:48,dir:-1},{line:'z',lx:-2,dir:1},{line:'z',lx:2,dir:-1}]){
+ const g=new THREE.Group();
+ const mat=new THREE.MeshStandardMaterial({color:carCols[(Math.random()*4)|0],roughness:0.5,metalness:0.4});
+ const b=new THREE.Mesh(new THREE.BoxGeometry(3.6,0.7,1.7),mat);
+ b.position.y=0.75;b.castShadow=true;g.add(b);
+ const cab2=new THREE.Mesh(new THREE.BoxGeometry(1.9,0.65,1.5),mat);
+ cab2.position.set(-0.2,1.35,0);cab2.castShadow=true;g.add(cab2);
+ const wh2=[];
+ for(const wx of [-1.2,1.2])for(const wz of [-0.95,0.95]){
+  const w=new THREE.Mesh(new THREE.BoxGeometry(0.55,0.55,0.4),wheelMat);
+  w.position.set(wx,0.28,wz);g.add(w);wh2.push(w);}
+ for(const lz of [-0.55,0.55]){
+  const hl=new THREE.Mesh(lampG,headLampMat);hl.position.set(1.85,0.75,lz);g.add(hl);}
+ const tailMat2=new THREE.MeshBasicMaterial({color:0xff2b1a});
+ for(const lz of [-0.55,0.55]){
+  const tl=new THREE.Mesh(lampG,tailMat2);tl.position.set(-1.85,0.75,lz);g.add(tl);}
+ townG.add(g);
+ cars.push({g,tailMat:tailMat2,dir:ld.dir,s:Math.random()*160-80,base:6+Math.random()*4,hist:[],held:false,wheels:wh2,line:ld.line,lz:ld.lz||0,lx:ld.lx||0});}
+// ribbon trails: 4 lamp ribbons per car (2 head white + 2 tail red, brake-boosted), own code
+const TRAIL_S=20,LAMPS=[{lx:1.85,lz:-0.55,head:true},{lx:1.85,lz:0.55,head:true},
+ {lx:-1.85,lz:-0.55,head:false},{lx:-1.85,lz:0.55,head:false}];
+const RIB_N=cars.length*LAMPS.length*(TRAIL_S+1)*2;
+const ribPos=new Float32Array(RIB_N*3),ribCol=new Float32Array(RIB_N*3);
+const ribIdx=[];
+{let r=0;
+ for(let c=0;c<cars.length;c++)for(let l=0;l<LAMPS.length;l++){
+  const base=(r++*(TRAIL_S+1))*2;
+  for(let k=0;k<TRAIL_S;k++){const a=base+k*2;
+   ribIdx.push(a,a+1,a+2,a+1,a+3,a+2);}}}
+const ribGeo=new THREE.BufferGeometry();
+ribGeo.setIndex(ribIdx);
+ribGeo.setAttribute('position',new THREE.BufferAttribute(ribPos,3).setUsage(THREE.DynamicDrawUsage));
+ribGeo.setAttribute('color',new THREE.BufferAttribute(ribCol,3).setUsage(THREE.DynamicDrawUsage));
+const ribbons=new THREE.Mesh(ribGeo,new THREE.MeshBasicMaterial({vertexColors:true,
+ transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,side:THREE.DoubleSide}));
+ribbons.frustumCulled=false;ribbons.renderOrder=3;townG.add(ribbons);
+// walker smears: one short history ribbon per pedestrian, shutter-gated like car trails
+const PW_N=8;
+const pwPos=new Float32Array(WMAX*(PW_N+1)*2*3),pwCol=new Float32Array(WMAX*(PW_N+1)*2*3);
+const pwIdx=[];
+{let r=0;
+ for(let c=0;c<WMAX;c++){
+  const base=(r++*(PW_N+1))*2;
+  for(let k=0;k<PW_N;k++){const a=base+k*2;
+   pwIdx.push(a,a+1,a+2,a+1,a+3,a+2);}}}
+const pwGeo=new THREE.BufferGeometry();
+pwGeo.setIndex(pwIdx);
+pwGeo.setAttribute('position',new THREE.BufferAttribute(pwPos,3).setUsage(THREE.DynamicDrawUsage));
+pwGeo.setAttribute('color',new THREE.BufferAttribute(pwCol,3).setUsage(THREE.DynamicDrawUsage));
+const pwMesh=new THREE.Mesh(pwGeo,new THREE.MeshBasicMaterial({vertexColors:true,
+ transparent:true,blending:THREE.AdditiveBlending,depthWrite:false,fog:false,side:THREE.DoubleSide}));
+pwMesh.frustumCulled=false;pwMesh.renderOrder=3;townG.add(pwMesh);
+function updateWalkerSmears(len){
+ pwMesh.visible=len>0;
+ for(let i=0;i<wCount;i++){const s=walkSeed[i];
+  const H=s.hist||(s.hist=[]);
+  H.unshift({x:s.px,z:s.pz,h:s.yaw||0});if(H.length>PW_N+1)H.pop();
+  for(let k=0;k<=PW_N;k++){
+   const o=k<H.length?H[k]:(H.length?H[H.length-1]:{x:s.px,z:s.pz,h:s.yaw||0});
+   const ox=Math.cos(o.h),oz=-Math.sin(o.h);
+   const fade=k<=len?Math.pow(1-k/PW_N,1.5)*0.45:0;
+   const a=(i*(PW_N+1)+k)*2;
+   pwPos[a*3]=o.x+(-oz)*0.17;pwPos[a*3+1]=0.9;pwPos[a*3+2]=o.z+ox*0.17;
+   pwPos[a*3+3]=o.x-(-oz)*0.17;pwPos[a*3+4]=0.9;pwPos[a*3+5]=o.z-ox*0.17;
+   const cr=s.shirt.r*fade,cg=s.shirt.g*fade,cb=s.shirt.b*fade;
+   pwCol[a*3]=cr;pwCol[a*3+1]=cg;pwCol[a*3+2]=cb;
+   pwCol[a*3+3]=cr;pwCol[a*3+4]=cg;pwCol[a*3+5]=cb;}}
+ pwGeo.attributes.position.needsUpdate=true;
+ pwGeo.attributes.color.needsUpdate=true;}
+function updateTraffic(dt,night){
+ // shutter->trail wiring (Jim st-24: exposure=min(shutter*speed,30), mapped to samples)
+ const trailLen=Math.round(Math.min(shutter*SPEEDS[speedIdx]*3,TRAIL_S));
+ ribbons.visible=trailLen>0;
+   cars.forEach((c,ci)=>{
+    let v=c.line?c.base:loopV(c.s,c.base); // free run: corner slowdown + car-ahead gap only
+    let gap=Infinity; // no rear-ending: clamp to the car ahead in the same lane
+    for(const o of cars){if(o===c||o.dir!==c.dir||(o.line||0)!==(c.line||0))continue;
+     const L=c.line?170:LOOP_L;
+     const dd=c.dir>0?(o.s-c.s+L)%L:(c.s-o.s+L)%L;
+     if(dd<gap)gap=dd;}
+   if(gap<7)v=Math.min(v,Math.max(0,gap-4)*2);
+   c.held=v<0.01;
+   c.brake=Math.min(1,Math.max(0,((c.pv===undefined?v:c.pv)-v)/3)); // brake light from real decel
+   c.pv=v;
+   c.s+=c.dir*v*dt*(1+SPEEDS[speedIdx]*0.15);
+   let px,pz,yaw;
+   if(c.line==='x'){if(c.s>85)c.s=-85;if(c.s<-85)c.s=85;px=c.s;pz=c.lz;yaw=c.dir>0?0:Math.PI;}
+   else if(c.line==='z'){if(c.s>40)c.s=-40;if(c.s<-40)c.s=40;px=c.lx;pz=c.s;yaw=c.dir>0?-Math.PI/2:Math.PI/2;}
+   else{const p=loopPose(c.s);yaw=p.h+(c.dir<0?Math.PI:0);
+    const fx=Math.cos(yaw),fz2=-Math.sin(yaw);px=p.x+(-fz2)*1.8;pz=p.z+fx*1.8;}
+   c.g.position.set(px,0.2,pz);c.g.rotation.y=yaw;
+   for(const w of c.wheels)w.rotation.z-=c.dir*v*dt/0.28;
+  c.tailMat.color.setRGB(0.35+0.65*night+c.brake,0.04,0.03);
+  if(playing){c.hist.unshift({x:px,z:pz,h:yaw});if(c.hist.length>TRAIL_S+1)c.hist.pop();}
+  const H=c.hist;
+  for(let l=0;l<LAMPS.length;l++){const L=LAMPS[l];
+   for(let k=0;k<=TRAIL_S;k++){
+    const o=k<H.length?H[k]:(H.length?H[H.length-1]:{x:px,z:pz,h:yaw});
+    const ox=Math.cos(o.h),oz=-Math.sin(o.h);
+    const qx=o.x+ox*L.lx+oz*L.lz,qz=o.z+oz*L.lx-ox*L.lz;
+    const fade=k<=trailLen?Math.pow(1-k/TRAIL_S,1.5):0;
+    const a=((ci*LAMPS.length+l)*(TRAIL_S+1)+k)*2;
+    ribPos[a*3]=qx+(-oz)*0.28;ribPos[a*3+1]=0.5;ribPos[a*3+2]=qz+ox*0.28;
+    ribPos[a*3+3]=qx-(-oz)*0.28;ribPos[a*3+4]=0.5;ribPos[a*3+5]=qz-ox*0.28;
+    let r=0,g=0,b=0;
+    if(L.head){r=fade;g=fade*0.9;b=fade*0.7;}
+    else{r=fade*(0.5+1.8*c.brake)*(0.35+0.65*night);g=fade*0.07;b=fade*0.05;}
+    ribCol[a*3]=r;ribCol[a*3+1]=g;ribCol[a*3+2]=b;
+    ribCol[a*3+3]=r;ribCol[a*3+4]=g;ribCol[a*3+5]=b;}}});
+ ribGeo.attributes.position.needsUpdate=true;
+ ribGeo.attributes.color.needsUpdate=true;}
+
+// ---------- live learning counter: +1 per door entry, per-shop + session ----------
+let sessionLearns=0;
+const liveEl=document.createElement('div');
+liveEl.className='hud';liveEl.id='livelearns';
+liveEl.style.cssText='right:30px;top:96px;text-align:right;font-size:15px;color:#7dffb0';
+app.appendChild(liveEl);
+const LEARN_BASE=SNAPSHOT.domains.reduce((a,d)=>a+d.learns,0);
+function fmtLive(){return 'LIVE LEARNS '+sessionLearns.toLocaleString()+' · TOTAL '+(LEARN_BASE+sessionLearns).toLocaleString();}
+function drawBoard(cv,d){
+ const c=cv.getContext('2d');
+ c.fillStyle='#141b29';c.fillRect(0,0,256,96);
+ c.fillStyle='#'+d.color.toString(16).padStart(6,'0');c.fillRect(0,0,256,10);
+ c.fillStyle='#f2f4fa';c.font='700 30px "DM Sans",Arial,sans-serif';c.textAlign='center';
+ c.fillText(d.name.toUpperCase().slice(0,12),128,46);
+ c.fillStyle='#7dffb0';c.font='700 26px "DM Sans",Arial,sans-serif';
+ c.fillText('LIVE '+(d.live||0),128,80);}
+let boardLive=-1;
+function syncLive(){liveEl.textContent=fmtLive();syncCard();
+ if(sessionLearns!==boardLive){boardLive=sessionLearns;
+  for(const f of fixtures)if(f.board){drawBoard(f.cv,f.shop.d);f.tex.needsUpdate=true;}}}
+// (no eager call: syncCard runs at startup after all blocks are initialized)
+
+// ---------- state + HUD ----------
+// ponytail: doubled speed table, full shutter default; all user-adjustable
+let sel=0,hour=21,shutter=1,speedIdx=3,playing=!reduceMotion,macro=true;
+const SPEEDS=[2,16,48,96];
+const navCount=document.getElementById('navCount'),avatarEl=document.getElementById('avatar'),
+ shopEl=document.getElementById('shop'),descEl=document.getElementById('shopdesc'),
+  metaEl=document.getElementById('shopmeta'),spark=document.getElementById('spark'),
+  cardEl=document.getElementById('card'),
+ hourEl=document.getElementById('hour'),shutEl=document.getElementById('shutter'),
+  speedEl=document.getElementById('speed'),macroBtn=document.getElementById('macro'),
+   pauseBtn=document.getElementById('pause');
+speedEl.value=3;shutEl.value=1; // defaults: max speed, full shutter, all adjustable
+if(reduceMotion){playing=false;pauseBtn.textContent='Play';}
+// ---------- floating card: anchored above the selected building ----------
+// ponytail: the HUD follows the 3D selection — the roof anchor is projected to
+// screen space every frame, so the card rides the camera angle while it orbits
+// (macro rotation, user drag). During a flight to/between buildings the card
+// disappears — it fades back in the moment the camera settles on the target.
+let cardW=480,cardH=180;
+function measureCard(){cardW=cardEl.offsetWidth;cardH=cardEl.offsetHeight;}
+const cardAnchor=new THREE.Vector3();
+function placeCard(){
+ const S=shops[sel];
+ if(!S||camAnim){cardEl.style.opacity='0';return;} // in transit between buildings: hidden
+ cardAnchor.set(S.x,S.h+2.6,S.z).project(camera);
+ if(cardAnchor.z>1||!isFinite(cardAnchor.x)){cardEl.style.opacity='0';return;} // behind camera
+ cardEl.style.opacity='';
+ const sx=(cardAnchor.x*0.5+0.5)*innerWidth,sy=(-cardAnchor.y*0.5+0.5)*innerHeight;
+ const M=12,TOP=96; // margins; TOP keeps the card clear of the brand/nav strip
+ let x,y;
+ if(sy-cardH-M>=TOP){ // headroom: float on top of the building
+  x=sx-cardW/2;y=sy-cardH-M;cardEl.classList.remove('side');
+ }else{ // no headroom: float beside the building, never covering it
+  cardEl.classList.add('side');
+  y=Math.max(TOP,Math.min(sy-cardH/2,innerHeight-cardH-M));
+  x=(sx<=innerWidth/2)?sx+M:sx-cardW-M; // building on the left half → card to its right
+ }
+ x=Math.max(M,Math.min(x,innerWidth-cardW-M));
+ cardEl.style.transform=`translate(${x|0}px,${y|0}px)`;
+}
+function sparkline(){const c=spark.getContext('2d'),W=spark.width,H=spark.height;
+ c.clearRect(0,0,W,H);const d=SNAPSHOT.domains[infoIdx].daily,mx=Math.max(...d,1);
+ // bar chart (not a line): one column per day, domain color, gap between bars
+ const n=d.length,gap=Math.min(8,W*0.04),bw=(W-16-gap*(n-1))/n;
+ const col='#'+SNAPSHOT.domains[infoIdx].color.toString(16).padStart(6,'0');
+ d.forEach((v,i)=>{const h=Math.max(2,(v/mx)*(H-12)),x=8+i*(bw+gap),y=H-6-h;
+  c.fillStyle=col;c.globalAlpha=0.85;c.fillRect(x,y,bw,h);
+  c.globalAlpha=1;c.fillStyle='#f2f4fa';c.fillRect(x,y-1,bw,2); // light cap on top
+  c.fillStyle='rgba(255,255,255,.55)';
+  c.font='9px DM Sans,Arial';c.textAlign='center';c.fillText(String(v),x+bw/2,y-4);});}
+function growth(d){const a=d.daily,d4=a[a.length-1],d3=a[a.length-2];
+ if(!d3)return 'n/a';const g=(d4-d3)/d3*100;return (g>=0?'+':'')+g.toFixed(0)+'%';}
+function syncCard(){const d=SNAPSHOT.domains[infoIdx];
+  navCount.textContent=(infoIdx+1)+' / '+SNAPSHOT.domains.length+' · '+showWindow();
+ avatarEl.style.background='#'+d.color.toString(16).padStart(6,'0');
+ shopEl.textContent=(infoIdx+1)+'. '+d.name;
+  descEl.textContent=d.learns.toLocaleString()+' learns served · snapshot '+SNAPSHOT.date+'. '+
+   (typeof d.depth==='number'?'Depth '+d.depth+' sizes this tower and its crowd. ':
+   'Flat-top floor stack, 1 floor ~ '+FLOOR_UNIT+' learns · 1 walker ~ '+WALKER_UNIT+' learns; long-tail skills unmapped.');
+  document.getElementById('foot').textContent=
+   'SHOWCASE '+showWindow()+': '+SNAPSHOT.date+' (served log 09-20…09-23) · corrections live-count · flat tops grow floors with learns';  metaEl.textContent='corrections '+(d.corrections===null||d.corrections===undefined?'—':d.corrections)+' · shared rules '+(d.shared===null||d.shared===undefined?'—':d.shared)+' · depth '+(d.depth===null||d.depth===undefined?'—':d.depth)+' · floors '+shops[sel].floors+' (~'+FLOOR_UNIT+'/floor) · learns live '+(d.live||0)+' · day growth '+growth(d)+' · daily on the rail';
+ liveEl.textContent=fmtLive();
+ document.getElementById('credits').textContent=SOURCE==='fallback'
+  ?'Data: served-log counts · 4 heroes carry 12 infos · Scene: voxel procedural, no models'
+  :'Data: live served-log · '+SNAPSHOT.date+' · 4 heroes carry 12 infos · Scene: voxel procedural, no models';
+ measureCard();placeCard();
+ sparkline();
+ [...document.querySelectorAll('#tabs button')].forEach((b,i)=>b.classList.toggle('on',i===sel));}
+const tabsEl=document.getElementById('tabs');
+SNAPSHOT.domains.forEach((d,i)=>{const b=document.createElement('button');
+ b.textContent=(i+1)+'. '+d.name;b.onclick=()=>select(i);tabsEl.appendChild(b);});
+// ---------- rotating 4-showcase: camera tours 4, window slides through all 12 ----------
+// window leads from the current shop: 1–4 … 11·12·1·2 … so "after the 4th comes the 5th"
+const SHOW_N=4;
+let showTimer=0;
+const SHOW_DWELL=14; // wall-seconds per shop before the tour auto-advances
+// infoIdx = domain 0..11 on display; sel = hero slot 0..3; page = infoIdx/4 rebuilds heroes
+let infoIdx=0;
+function showIds(){return [0,1,2,3].map(k=>heroPage*4+k);}
+function showWindow(){const a=heroPage*4+1;return a+'–'+(a+3)+' of '+SNAPSHOT.domains.length;}
+function select(i,user){const ni=(i+SNAPSHOT.domains.length)%SNAPSHOT.domains.length;
+ cardEl.classList.add('out');
+ setTimeout(()=>{
+  infoIdx=ni;
+  const pg=(infoIdx/4)|0;
+  if(pg!==heroPage){buildHeroPage(pg);remapCrowd();}
+  sel=infoIdx%4;syncCard();
+  flyTo(frameShop(shops[sel]),shops[sel].focus.clone(),user?1.4:1.8);
+  // reveal is owned by placeCard: the card stays hidden through the flight and
+  // fades in only when the camera settles on the building.
+  cardEl.classList.remove('out');
+ },user?110:170);}
+function nextInShow(){select(infoIdx+1);}
+document.getElementById('prev').onclick=()=>{tourTimer=0;select(sel-1,true);};
+document.getElementById('next').onclick=()=>{tourTimer=0;select(sel+1,true);};
+let tourTimer=0;
+let macroT=0;
+let growT=0; // live floor growth check runs every 2s wall-clock
+const TOUR_RESUME=25; // user click pauses the tour; resumes after 25s idle
+// live growth: a hero gains a floor when its snapshot learns + live learns cross the next unit
+function growCheck(){
+ for(const s of shops){const d=s.d;
+  const need=Math.max(1,Math.round(((typeof d.depth==='number'?d.depth:d.learns)+(d.live||0))/FLOOR_UNIT));
+  if(need>s.floors){
+   buildHeroPage(heroPage);
+   for(const w of walkSeed){const ns=shops[w.slot]||shops[0];
+    if(ns!==w.shop){w.shop=ns;
+     if(w.st!=='patrol'){w.st='patrol';w.timer=2+Math.random()*4;setPath(w,w.px,ns.laneZ,1.0);}}}
+   syncCard();return;}}}
+hourEl.oninput=()=>{hour=+hourEl.value;clockMin=hour*60;};
+shutEl.oninput=()=>{shutter=+shutEl.value;};
+speedEl.oninput=()=>{speedIdx=+speedEl.value;
+ speedEl.title=SPEEDS[speedIdx]+'×';};
+function setMacro(b){macro=b;macroBtn.textContent='Macro: '+(macro?'on':'off');
+ macroBtn.classList.toggle('on',macro);}
+macroBtn.onclick=()=>setMacro(!macro);
+pauseBtn.onclick=()=>{playing=!playing;pauseBtn.textContent=playing?'Pause':'Play';};
+const helpEl=document.getElementById('help');
+const infoEl=document.getElementById('info');
+function buildInfo(){const tot=SNAPSHOT.domains.reduce((a,d)=>a+d.learns,0);
+ // total shared = the hub's own count (ticker chip's source) so the panel and
+ // chip agree even when a rule's skill maps to no display domain (e.g. misc).
+ const totShared=GLOBAL?(GLOBAL.shared_rules||[]).length:SNAPSHOT.domains.reduce((a,d)=>a+(d.shared||0),0);
+ const rows=[...SNAPSHOT.domains].sort((a,b)=>b.learns-a.learns)
+  .map((d,ri)=>`<tr><td>${ri+1}. ${d.name}</td><td class="n">${d.learns.toLocaleString()}</td><td class="n">${(d.learns/tot*100).toFixed(0)}%</td><td class="n">${d.shared||0}</td></tr>`).join('');
+ document.getElementById('infobody').innerHTML=
+  '<p>A knowledge town: <b>4 hero buildings</b> carry all 12 domains in rotation (3 pages of 4), with <b>flat-top floor stacks</b> (1 floor ~ '+FLOOR_UNIT+' learns, 1 walker ~ '+WALKER_UNIT+' learns) sized by <b>real</b> served-log routing counts, snapshot '+SNAPSHOT.date+'. '+
+  tot.toLocaleString()+' learns in snapshot · <b>'+sessionLearns.toLocaleString()+' learns served live</b> since load (1 door entry = 1 learn). The tour rotates the 4 heroes through all 12 infos — click (or ←/→) to take over.</p>'+
+  '<p><b>'+totShared+' shared routing rules</b> earned at the hub: trigger clusters corrected by 3+ users on 3+ distinct days, merged add-only into every router (shared column).</p>'+
+  '<table><tr><th>domain</th><th class="n">learns</th><th class="n">%</th><th class="n">shared</th></tr>'+rows+'</table>'+
+  '<p class="fine">Honesty ledger: floor stacks and crowds computed from routing counts (77% mapped, 23% long-tail skills unmapped); '+
+  'live counter counts door entries this session only. Traffic: 10 cars on the grid loop with 4-way stops · walkers patrol, queue, visit. '+
+  'Speed 96× max · shutter full, both adjustable · drag to orbit · scroll to zoom · H for keys.</p>';}
+document.getElementById('about').onclick=()=>helpEl.classList.toggle('on');
+document.getElementById('moreinfo').onclick=()=>{buildInfo();infoEl.classList.add('on');};
+document.getElementById('infoclose').onclick=()=>infoEl.classList.remove('on');
+
+// ---------- global live ticker (everyone's learning, merged at the hub) ----------
+if(GLOBAL){
+ const wrap=document.getElementById('global'),numEl=document.getElementById('globalNum');
+ wrap.style.display='block';
+ // shared-rules chip: hub-earned clusters everyone's router now knows.
+ const sr=(GLOBAL.shared_rules||[]).length;
+ if(sr>0){let c=document.getElementById('sharedRules');
+  if(!c){c=document.createElement('span');c.id='sharedRules';
+   c.style.cssText='display:block;font-size:12px;color:#8fc2ff;margin-top:2px';
+   wrap.appendChild(c);}
+  c.textContent=sr+' SHARED RULE'+(sr===1?'':'S')+' LEARNED WORLDWIDE';}
+ const target=(GLOBAL.totals.serves||0)+(GLOBAL.totals.accepts||0);
+ const reduce=reduceMotion; // respect the same motion setting as the camera
+ if(reduce){numEl.textContent=target.toLocaleString();}
+ else{
+  let shown=0;const t0=performance.now();
+  const tick=()=>{const p=Math.min(1,(performance.now()-t0)/1800);
+   shown=Math.round(target*(p*(2-p))); // ease-out
+   numEl.textContent=shown.toLocaleString();
+   if(p<1)requestAnimationFrame(tick);};
+  requestAnimationFrame(tick);
+ }
+ const when=(GLOBAL.generated_at||'').slice(0,10);
+ document.getElementById('globalLabel').textContent=
+  'LEARNS WORLDWIDE · ALL USERS · '+(when||'LIVE');
+}
+addEventListener('keydown',e=>{
+  if(e.code==='Space'){pauseBtn.onclick();e.preventDefault();}
+  else if(e.key==='ArrowRight'){tourTimer=0;select(sel+1,true);}
+  else if(e.key==='ArrowLeft'){tourTimer=0;select(sel-1,true);}
+  else if(e.key==='t'||e.key==='T'){speedIdx=(speedIdx+1)%4;speedEl.value=speedIdx;}
+  else if(e.key==='d'||e.key==='D')setMacro(!macro);
+  else if(e.key==='['){shutter=Math.max(0,shutter-0.1);shutEl.value=shutter;}
+  else if(e.key===']'){shutter=Math.min(1,shutter+0.1);shutEl.value=shutter;}
+ else if(e.key==='h'||e.key==='H')helpEl.classList.toggle('on');
+ else{const n={'1':0,'2':1,'3':2,'4':3,'5':4,'6':5,'7':6,'8':7,'9':8,'0':9,'-':10,'=':11}[e.key];
+  if(n!==undefined)select(n);}});
+
+// ---------- day/night + loop ----------
+const clock=new THREE.Clock();
+const dayBg=new THREE.Color(0x3d4552),nightBg=new THREE.Color(0x333b49);
+const tmpC=new THREE.Color(),tgt=new THREE.Vector3();
+const tmpV=new THREE.Vector3(),macroOff=new THREE.Vector3(16,9,24);
+let clockMin=21*60;
+// ---------- day-night rig (Jim st-24 10-key table, ref values as spec) ----------
+// hour, sky, fog, hemi sky, hemi ground, hemi, sun colour, sun, exposure, night, bloom, bloom threshold
+const DAY=[
+ [0,'#0c111d','#141a28','#46557e','#28242c',.5,'#8ea6ff',.32,1.22,1,.62,.95],
+ [5,'#121828','#1c2234','#56648e','#302a30',.52,'#9fb0ff',.34,1.2,1,.6,.95],
+ [6.5,'#51566f','#6f6a7e','#b8a8c8','#5e5048',.78,'#ffae84',1.1,1.1,.45,.45,1.1],
+ [8.5,'#8aa3c2','#9eafc3','#c6d6ef','#7a6c5c',1.05,'#ffe6c8',2.1,1.02,0,.3,1.4],
+ [13,'#9bb4d2','#afbfd2','#d2e2ff','#857563',1.15,'#fff4e4',2.4,1,0,.28,1.45],
+ [17,'#8b98b2','#a39fa8','#cdc6d4','#7b6a58',1,'#ffc890',2,1.04,.12,.35,1.3],
+ [19,'#333b49','#454d5d','#a3b6da','#564840',.82,'#ffd2a6',1.25,1.12,1,.55,.95],
+ [20.5,'#1d2435','#2a3144','#7486b6','#3c3538',.64,'#b4c2ff',.55,1.16,1,.6,.95],
+ [22,'#0f1422','#171d2c','#4c5b84','#2a262e',.52,'#94aaff',.34,1.2,1,.62,.95],
+ [24,'#0c111d','#141a28','#46557e','#28242c',.5,'#8ea6ff',.32,1.22,1,.62,.95]
+].map(r=>{const o=r.slice();for(const k of [1,2,3,4,6])o[k]=new THREE.Color(o[k]);return o;});
+let nightF=1;
+function applyHour(){
+ let i=0;while(hour>=DAY[i+1][0])i++;
+ const a=DAY[i],b=DAY[i+1],f=sstep(hour,a[0],b[0]);
+ const lc=(k,c)=>c.copy(a[k]).lerp(b[k],f),nm=k=>a[k]+(b[k]-a[k])*f;
+ lc(1,scene.background);lc(2,scene.fog.color);lc(3,hemi.color);lc(4,hemi.groundColor);
+ hemi.intensity=nm(5);lc(6,sun.color);sun.intensity=nm(7);
+ renderer.toneMappingExposure=nm(8);
+ const n=nightF=nm(9);
+ bloom.strength=nm(10);bloom.threshold=nm(11);
+ scene.fog.density=.0022+.0012*n;
+  winMesh.material.color.setHex(n>0.4?0xffffff:0x7e93b5);dayF=1-n; // panes glow at night, read as glass by day
+ lampGlassMat.color.setHex(n>0.4?0xffffff:0x55607a); // street lamp heads off by day
+ signMat.emissiveIntensity=n*0.75;
+ headLampMat.color.setScalar(0.35+0.65*n);
+ const sa=(hour-6)/12*Math.PI,dd=Math.max(0,Math.sin(sa));
+ sun.position.set(Math.cos(sa)*120,20+dd*100,40);
+}
+// fixed-step sim (FPS-independent): accumulator feeds 1/60 substeps; camera stays wall-clock
+const FIXED_STEP=1/60;
+let simAcc=0;
+function stepSim(dt){
+ clockMin=(clockMin+dt*SPEEDS[speedIdx]*2)%1440;
+ hour=clockMin/60;hourEl.value=hour;
+ poseWalkers(true,dt);
+ updateTraffic(dt,nightF);}
+function animate(){window.__townBooted=true;requestAnimationFrame(animate);
+ const dt=Math.min(clock.getDelta(),1.0);
+  if(playing){simAcc+=dt;
+  let n=0;
+  while(simAcc>=FIXED_STEP&&n<60){stepSim(FIXED_STEP);simAcc-=FIXED_STEP;n++;}
+  if(n===60)simAcc=0; // hitch backlog: drop rather than spiral (bounded slow-mo <1fps only)
+  tourTimer+=dt; // wall-clock: tour walks 1→12 through the sliding 4-window, pauses 25s after a click
+  if(tourTimer>=TOUR_RESUME){showTimer+=dt;if(showTimer>=SHOW_DWELL){showTimer=0;nextInShow();}}
+  updateWalkerSmears(Math.round(Math.min(shutter*SPEEDS[speedIdx]*3,PW_N)));
+  growT+=dt;if(growT>2){growT=0;growCheck();}
+ }
+ applyHour();
+ applyHour();
+ stepFlight(dt);
+ if(!camAnim){tgt.copy(shops[sel].focus);controls.target.lerp(tgt,Math.min(1,dt*2));}
+  macroT+=dt; // wall-clock: macro keeps a slow front-side orbit even when paused
+  if(macro&&!camAnim){ // honest macro: slow orbit of the selected shop, face side only
+   const S=shops[sel],base=S.front>0?0:Math.PI;
+   const a=base+Math.sin(macroT*0.09)*0.6;
+   tmpV.copy(S.focus);tmpV.x+=Math.sin(a)*30;tmpV.z+=Math.cos(a)*30;tmpV.y=S.focus.y+13;
+   camera.position.lerp(tmpV,Math.min(1,dt*1.6));}
+ controls.update();
+ // Jim st-24 rig: DOF focus tracks selection (macro only), manual shadows, skip settled frames
+ dof.enabled=macro;
+ if(macro){const fd=camera.position.distanceTo(shops[sel].focus); // focus pulls during flights
+  dof.u.focus.value+=(fd-dof.u.focus.value)*Math.min(1,dt*3);}
+ const hourKey=hour.toFixed(2);
+ renderer.shadowMap.needsUpdate=playing||hourKey!==lastHourKey;
+ if(playing||camDirty||macro||hourKey!==lastHourKey){composer.render();camDirty=false;}
+ placeCard(); // card tracks the selected building every frame
+ lastHourKey=hourKey;}
+ buildHeroPage(0);seedCrowd();syncCard();setMacro(true);tourTimer=TOUR_RESUME;flyTo(HERO_POS,HERO_TGT,3.2);animate();
+
+// test hooks (proof + future cards)
+window.__town={select,setHour:h=>{hour=h;clockMin=h*60;hourEl.value=h;},
+ cam:()=> [+camera.position.x.toFixed(1),+camera.position.y.toFixed(1),+camera.position.z.toFixed(1)],
+ setShutter:s=>{shutter=s;shutEl.value=s;},setMacro,setSpeed:i=>{speedIdx=i;speedEl.value=i;},
+ show:()=>({showTimer,tourTimer,win:showWindow(),ids:showIds()}),
+ floors:()=>shops.map(s=>s.floors),
+ live:()=>({session:sessionLearns,perShop:SNAPSHOT.domains.map(d=>d.live||0)}),
+  state:()=>({sel,info:infoIdx,page:heroPage,hour,shutter,macro,playing,source:SOURCE,stopped:cars.reduce((a,c)=>a+(c.held?1:0),0),
+  walkers:wCount,queued:walkSeed.reduce((a,s)=>a+(s.st==='queue'||s.st==='toQueue'||s.st==='toDoor'||s.st==='inside'?1:0),0)})};
+</script>
+</body>
+</html>
