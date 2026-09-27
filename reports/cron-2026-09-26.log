@@ -1,0 +1,37 @@
+commit: 5d2057d0e5b0  dirty_paths: 2
+blind149   n=149  P@1=0.993  P@3=1.000  MRR=0.997  leaks=0
+second315  n=315  P@1=0.898  P@3=0.959  MRR=0.933  leaks=0
+live16     n=16   P@1=1.000  P@3=1.000  MRR=1.000  leaks=0
+# Nightly router report — 2026-09-26
+
+bench @ `5d2057d0e5b0` (dirty paths: 2)
+
+| set | n | P@1 | P@3 | MRR | leaks |
+|-----|---|-----|-----|-----|-------|
+| blind149 | 149 | 0.993 | 1.000 | 0.997 | 0 |
+| second315 | 315 | 0.898 | 0.959 | 0.933 | 0 |
+| live16 | 16 | 1.000 | 1.000 | 1.000 | 0 |
+
+## traffic (today, 40 serves)
+- distinct queries: 38, abstentions: 1 (2.5%), unstable repeats: 0
+- top skills: steroids 14, asset-fetch 3, i-have-adhd 3, academy-guide 3, daily-meeting-update 3, systematic-debugging 3, grilling 3, session-handoff 2
+
+... wrote /home/TWIG/steroids/reports/nightly-2026-09-26.md
+clusters=3 proposals=1
+wrote /home/TWIG/steroids/reports/miss-goldens-2026-09-26.md
+{"ok": true, "added": 0, "pruned": 0, "total": 1}
+# Steroids router — trust report (1st edition)
+
+_Published 2026-09-26 · bench commit `5d2057d0e5b0` · sources: `nightly-2026-09-26.md`, `lint-2026-09-23.md`_
+
+## Precision (labeled sets, 480 queries)
+| set | n | P@1 | P@3 | MRR | leaks |
+|-----|---|-----|-----|-----|-------|
+| blind149 | 149 | 0.993 | 1.000 | 0.997 | 0 |
+| second315 | 315 | 0.898 | 0.959 | 0.933 | 0 |
+| live16 | 16 | 1.000 | 1.000 | 1.000 | 0 |
+
+## Live traffic health (unlabeled — prompts are hash-only by design)
+- today: 40 serves, 38 distinct queries, abstentions 1 (2.5%), unstable repeats 0
+- all: 1815 serves, 1555 distinct
+... wrote /home/TWIG/steroids/docs/TRUST.md
