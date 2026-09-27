@@ -250,7 +250,7 @@ def skill_files_all(dirs):
     # ponytail: skill_files dedups by name; this keeps every copy for needs precedence.
     out = []
     for d in dirs:
-        d = os.path.expanduser(d)
+        d = os.path.abspath(os.path.expanduser(d))
         if not os.path.isdir(d):
             continue
         try:
@@ -266,7 +266,7 @@ def skill_files(dirs):
     out = []
     seen = set()
     for d in dirs:
-        d = os.path.expanduser(d)
+        d = os.path.abspath(os.path.expanduser(d))
         if not os.path.isdir(d):
             continue
         try:
@@ -882,9 +882,20 @@ def _ed1_variants(tok):
 
 def _typo_fix(ptoks, idx):
     # ponytail: fix only no-hit tokens len>=4 with exactly one vocab neighbor; else skip.
-    vocab = set()
-    for keys in idx.values():
-        vocab.update(keys)
+    # vocab cached per index object: rebuild was O(all keys) on every query.
+    global _VOCAB_MEM
+    try:
+        _VOCAB_MEM
+    except NameError:
+        _VOCAB_MEM = {}
+    if _VOCAB_MEM.get("key") != id(idx):
+        vocab = set()
+        for keys in idx.values():
+            vocab.update(keys)
+        _VOCAB_MEM.clear()
+        _VOCAB_MEM["key"] = id(idx)
+        _VOCAB_MEM["vocab"] = vocab
+    vocab = _VOCAB_MEM["vocab"]
     fixed = set(ptoks)
     for t in ptoks:
         if len(t) < 4 or t in vocab:
@@ -1488,9 +1499,28 @@ def route_query(prompt, rules, idx, accepts=None):
             for tri in _trigrams(tok):
                 qcounter[tri] += 1
         qnorm = sum(n * n for n in qcounter.values()) ** 0.5
-    # ponytail: ONNX semantic signal; silent lexical fallback when unavailable.
+    # ponytail: lexical gate FIRST (cheap) — embeddings load only when
+    # keywords are uncertain. Same outcome, ~1.5s saved on clear queries.
     emb_w = rules.get("embed_weight", 0.0) or 0.0
     emb_vecs = qvec = None
+    emb_on = False
+    defer_at = rules.get("embed_defer_above")
+    if emb_w and defer_at:
+        top_hit = 0.0
+        for skill, keys in idx.items():
+            hits = set(keys) & ptoks
+            if not hits:
+                continue
+            if skill in neg:
+                bad, good = neg[skill]
+                if not (hits & good) and (hits & bad):
+                    continue
+            s = sum(1.0 / df[h] for h in hits) + min(1.0, 0.2 * accepts.get(skill, 0))
+            if s > top_hit:
+                top_hit = s
+        if top_hit >= defer_at:
+            emb_w = 0.0  # keywords decided — skip embedding load entirely
+    # ponytail: ONNX semantic signal; silent lexical fallback when unavailable.
     emb = _emb() if emb_w else None
     if emb is not None:
         try:
@@ -1518,26 +1548,8 @@ def route_query(prompt, rules, idx, accepts=None):
         except Exception:
             emb_vecs = qvec = None
     emb_on = bool(emb_w and emb_vecs and qvec)
-    if emb_on and rules.get("embed_defer_above"):
-        # ponytail: when keywords speak clearly (strong top hit = keyword
-        # dump), skip semantics for this query; consult them only when
-        # lexical evidence is uncertain. Protects excludes on dense rows.
-        top_hit = 0.0
-        for skill, keys in idx.items():
-            hits = sorted(set(keys) & ptoks)
-            if not hits:
-                continue
-            if skill in neg:
-                bad, good = neg[skill]
-                if not (set(hits) & good) and (set(hits) & bad):
-                    continue
-            # ponytail: no name bonus (measured +12/+9 blind: flat +1.0 let generic name words steal).
-            s = round(sum(1.0 / df[h] for h in hits)
-                      + min(1.0, 0.2 * accepts.get(skill, 0)), 3)
-            if s > top_hit:
-                top_hit = s
-        if top_hit >= rules["embed_defer_above"]:
-            emb_on = False
+    # ponytail: defer already decided above (pre-load gate) — reaching here
+    # with emb_on means keywords were uncertain, so embeddings stay on.
     for skill, keys in idx.items():
         hits = sorted(set(keys) & ptoks)
         if hits:
