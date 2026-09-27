@@ -36,6 +36,14 @@ import json
 import os
 import sys
 import time
+import re
+
+
+def canon(sid):
+    # gt/mesh-analysis == mesh-analysis-31447b9e (materialized pool name):
+    # strip source prefix + 8-hex materialization suffix.
+    s = re.sub(r"^[a-z]+/", "", sid or "")
+    return re.sub(r"-[0-9a-f]{8}$", "", s).lower()
 
 _HERE = os.path.dirname(os.path.abspath(__file__))
 _ROOT = os.path.normpath(os.path.join(_HERE, "..", ".."))
@@ -77,9 +85,9 @@ def main():
         if v.get("task_type") == "generic_only" or t.get("excluded"):
             skipped += 1
             continue
-        core = set(v["core_gt_ids"])
+        core = {canon(g) for g in v["core_gt_ids"]}
         t0 = time.perf_counter()
-        ranked = [s for _, s, _ in router.route_query(t["instruction_text"], rules, idx)]
+        ranked = [canon(s) for _, s, _ in router.route_query(t["instruction_text"], rules, idx)]
         lat.append((time.perf_counter() - t0) * 1000)
         hit = ranked and ranked[0] in core
         first_rel = next((i for i, s in enumerate(ranked) if s in core), None)
