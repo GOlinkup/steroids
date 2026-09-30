@@ -1,0 +1,173 @@
+"""Stdlib unittest for tasks (P2-2). No install."""
+import importlib.util
+import os
+import unittest
+
+_HERE = os.path.dirname(os.path.abspath(__file__))
+_SRC = os.path.normpath(os.path.join(_HERE, "..", "src", "steroids"))
+
+
+def _load(name):
+    spec = importlib.util.spec_from_file_location(
+        "st_" + name, os.path.join(_SRC, name + ".py"))
+    m = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(m)
+    return m
+
+
+tasks = _load("tasks")
+
+
+def _t(status="pending", **kw):
+    d = {"id": "T", "title": "t", "status": status, "goal": "g"}
+    d.update(kw)
+    return d
+
+
+class TestMachine(unittest.TestCase):
+    def test_exhaustive_pairs(self):
+        n_legal = 0
+        for old in tasks.STATUSES:
+            for new in tasks.STATUSES:
+                if new in tasks.TRANSITIONS[old]:
+                    n_legal += 1
+                    self.assertEqual(tasks.transition(_t(old), new)["status"], new)
+                else:
+                    with self.assertRaises(ValueError, msg=f"{old}->{new}"):
+                        tasks.transition(_t(old), new)
+        self.assertGreater(n_legal, 10)  # table is not a stub
+
+    def test_adversarial_jumps(self):
+        for old, new in [("pending", "completed"), ("running", "completed"),
+                         ("verifying", "running"), ("completed", "running"),
+                         ("cancelled", "pending"), ("failed", "completed")]:
+            with self.assertRaises(ValueError, msg=f"{old}->{new}"):
+                tasks.transition(_t(old), new)
+
+    def test_block_records_missing(self):
+        t = tasks.block(_t("ready"), "P0-3 bank")
+        self.assertEqual(t["status"], "blocked")
+        self.assertIn("P0-3 bank", t["unknowns"])
+        with self.assertRaises(ValueError):
+            tasks.block(_t("ready"), "  ")
+
+    def test_block_respects_machine(self):
+        for s in ("planned", "running"):
+            self.assertEqual(tasks.block(_t(s), "x")["status"], "blocked")
+        for s in ("pending", "completed", "cancelled", "verifying", "failed"):
+            with self.assertRaises(ValueError, msg=f"block from {s}"):
+                tasks.block(_t(s), "x")
+
+    def test_cycles(self):
+        ok = [_t("pending", id="a"), _t("pending", id="b", dependencies=["a"]),
+              _t("pending", id="c", dependencies=["a", "b"])]
+        tasks.check_cycles(ok)  # diamond, no raise
+        with self.assertRaises(ValueError):
+            tasks.check_cycles([_t("pending", id="a", dependencies=["a"])])
+        with self.assertRaises(ValueError):
+            tasks.check_cycles([_t("pending", id="a", dependencies=["b"]),
+                                _t("pending", id="b", dependencies=["a"])])
+        with self.assertRaises(ValueError):
+            tasks.check_cycles([_t("pending", id="a", dependencies=["ghost"])])
+
+    def test_children(self):
+        ts = [_t("pending", id="a"), _t("pending", id="b", parent="a"),
+              _t("pending", id="c", parent="a")]
+        self.assertEqual(sorted(tasks.children("a", ts)), ["b", "c"])
+
+    def test_contract_gate(self):
+        seen = []
+        emit = lambda *a: seen.append(a)
+        t = _t("verifying", id="C/1")
+        with self.assertRaises(ValueError):  # no contract, no done
+            tasks.complete(t, emit=emit)
+        tasks.set_contract(t, ["tests-green", "report-written"])
+        with self.assertRaises(ValueError) as cm:  # premature done
+            tasks.complete(t, emit=emit)
+        self.assertIn("tests-green", str(cm.exception))
+        tasks.add_evidence(t, "10/10 pass", "unittest", kind="fact")["check"] = "tests-green"
+        with self.assertRaises(ValueError) as cm:
+            tasks.complete(t, emit=emit)
+        self.assertNotIn("tests-green", str(cm.exception))
+        self.assertIn("report-written", str(cm.exception))
+        tasks.add_evidence(t, "handover noted", "retro.md")["check"] = "report-written"
+        self.assertEqual(tasks.complete(t, emit=emit)["status"], "completed")
+        self.assertEqual(seen[-1][2], {"from": "verifying", "to": "completed"})
+        with self.assertRaises(ValueError):  # done from running, not verifying
+            tasks.complete(_t("running", id="C/2"), emit=emit)
+        with self.assertRaises(ValueError):
+            tasks.set_contract(_t("ready"), [])
+        with self.assertRaises(ValueError):
+            tasks.set_contract(_t("ready"), ["a", "a"])
+
+    def test_force_complete(self):
+        seen = []
+        emit = lambda *a: seen.append(a)
+        t = _t("failed", id="F/1")
+        with self.assertRaises(ValueError):
+            tasks.force_complete(t, "  ", emit=emit)
+        tasks.force_complete(t, "human accepts residual risk", emit=emit)
+        self.assertEqual(t["status"], "completed")
+        self.assertTrue(any("FORCE-COMPLETE" in d for d in t["decisions"]))
+        self.assertTrue(seen[-1][2].get("forced"))
+        with self.assertRaises(ValueError):
+            tasks.force_complete(_t("completed"), "again")
+
+    def test_seed_queries(self):
+        t = _t("ready", title="Build harness",
+               unknowns=["bank missing"],
+               questions=[{"question": "which 2 tasks?", "answer": None},
+                          {"question": "done?", "answer": "yes"}])
+        self.assertEqual(tasks.seed_queries(t),
+                         ["Build harness", "bank missing", "which 2 tasks?"])
+        self.assertEqual(tasks.seed_queries(_t("ready", title="Solo")),
+                         ["Solo"])
+
+    def test_assumption_lifecycle(self):
+        t = _t("ready")
+        a = tasks.assume(t, "clean env prevents leakage", "high")
+        self.assertEqual(a["status"], "unverified")
+        with self.assertRaises(ValueError):
+            tasks.assume(t, "clean env prevents leakage")  # dup
+        with self.assertRaises(ValueError):
+            tasks.assume(t, "  ")
+        r = tasks.resolve_assumption(t, "clean env prevents leakage", True, "bench.py")
+        self.assertEqual(r["status"], "verified")
+        self.assertEqual(t["evidence"][-1]["kind"], "verified-fact")
+        tasks.assume(t, "2 tasks predict bank", "medium")
+        tasks.resolve_assumption(t, "2 tasks predict bank", False, "M4 review")
+        self.assertEqual(t["assumptions"][-1]["status"], "invalidated")
+        with self.assertRaises(ValueError):
+            tasks.resolve_assumption(t, "clean env prevents leakage", True, "x")
+        with self.assertRaises(ValueError):
+            tasks.resolve_assumption(t, "ghost", True, "x")
+        with self.assertRaises(ValueError):
+            tasks.resolve_assumption(t, "2 tasks predict bank", True, "  ")
+
+    def test_add_evidence(self):
+        t = _t("ready")
+        tasks.add_evidence(t, "P@1 0.799", "trial-stats.json")
+        self.assertEqual(t["evidence"][0]["kind"], "fact")
+        with self.assertRaises(ValueError):
+            tasks.add_evidence(t, "c", "s", "rumor")
+        with self.assertRaises(ValueError):
+            tasks.add_evidence(t, " ", "s")
+
+    def test_emit_hook(self):
+        seen = []
+        t = _t("ready", id="R/T1")
+        tasks.transition(t, "running", emit=lambda *a: seen.append(a))
+        self.assertEqual(seen, [("task.state", "R/T1",
+                                 {"from": "ready", "to": "running"})])
+        tasks.block(_t("ready", id="R/T2"), "bank", emit=lambda *a: seen.append(a))
+        self.assertEqual(seen[1][0], "task.state")
+        self.assertEqual(seen[1][2]["missing"], "bank")
+        n = len(seen)
+        with self.assertRaises(ValueError):
+            tasks.transition(_t("pending", id="R/T3"), "completed",
+                             emit=lambda *a: seen.append(a))
+        self.assertEqual(len(seen), n)  # illegal jumps emit nothing
+
+
+if __name__ == "__main__":
+    unittest.main()

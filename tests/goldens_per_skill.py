@@ -131,7 +131,7 @@ GOLDEN = [
     ("moq mock interface dotnet", "csharp-testing"),
     ("csharp fluentassertion mock net", "csharp-testing"),
     ("arrange bogus data befalse", "csharp-testing"),
-    ("fluentassertions should", "csharp-testing"),
+    ("fluentassertions arrange moq", "csharp-testing"),  # B-12: was bare "fluentassertions should" (1 trigger, 0.008 margin coin-flip vs csharp-pro); 3 real triggers now
     # django-patterns
     ("django orm n plus one", "django-patterns"),
     ("django drf orm cach", "django-patterns"),

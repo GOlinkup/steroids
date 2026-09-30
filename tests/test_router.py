@@ -1,6 +1,8 @@
 """Stdlib unittest for steroids router; loads router.py directly, no install."""
 import importlib.util
 import os
+import tempfile
+import time
 import unittest
 
 _ROUTER_PATH = os.path.join(os.path.dirname(__file__), "..", "src", "steroids", "router.py")
@@ -13,6 +15,72 @@ RULES = {"glue": ["onto", "main", "file", "files", "folder", "folders", "repo", 
 
 
 class TestRouter(unittest.TestCase):
+    def test_sticky_champion_prevents_flip_on_near_tie(self):
+        # ponytail: C31 — same prompt, near-tied top-2: the previous winner
+        # stays top-1 instead of oscillating with the served-count downvote.
+        idx = {
+            "code-review": ["branch", "rebase"],
+            "git-workflow": ["branch", "rebase"],
+        }
+        rules = dict(RULES, max_recommendations=3)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "sticky.json")
+            sticky = {router._qkey("branch rebase"): {"skill": "git-workflow", "t": int(time.time())}}
+            top = router.route_query("branch rebase", rules, idx)
+            self.assertEqual(top[0][1], "code-review")  # alphabetical without memory
+            top = router.apply_sticky(top, "branch rebase", sticky, path=path)
+            self.assertEqual(top[0][1], "git-workflow")
+
+    def test_sticky_never_resurrects_downvoted_champion(self):
+        # champion absent from the live top = gone, memory must not revive it.
+        idx = {
+            "code-review": ["branch", "rebase"],
+            "git-workflow": ["branch", "rebase"],
+        }
+        rules = dict(RULES, max_recommendations=1)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "sticky.json")
+            sticky = {router._qkey("branch rebase"): {"skill": "git-workflow", "t": int(time.time())}}
+            top = router.route_query("branch rebase", rules, idx)
+            self.assertEqual([s for _, s, _ in top], ["code-review"])  # git-workflow cut by max_recommendations=1
+            top = router.apply_sticky(top, "branch rebase", sticky, path=path)
+            self.assertEqual(top[0][1], "code-review")
+
+    def test_sticky_ignores_clear_winner(self):
+        # a live top-1 that beats runner-up by >= margin wins over memory.
+        idx = {
+            "strong-skill": ["branch", "rebase"],
+            "code-review": ["branch"],
+            "git-workflow": ["branch"],
+        }
+        rules = dict(RULES, max_recommendations=3)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "sticky.json")
+            sticky = {router._qkey("branch rebase"): {"skill": "code-review", "t": int(time.time())}}
+            top = router.route_query("branch rebase", rules, idx)
+            top = router.apply_sticky(top, "branch rebase", sticky, path=path, margin=0.1)
+            self.assertEqual(top[0][1], "strong-skill")
+
+    def test_sticky_respects_ttl_expiry(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "sticky.json")
+            sticky = {router._qkey("branch rebase"): {"skill": "code-review", "t": int(time.time())}}
+            top = [(0.5, "git-workflow", ["branch"]), (0.49, "code-review", ["branch"])]
+            top = router.apply_sticky(top, "branch rebase", sticky, path=path,
+                                      now=time.time() + 15 * 86400, ttl_days=14)
+            self.assertEqual(top[0][1], "git-workflow")  # record expired: live order stands
+
+    def test_record_sticky_writes_and_clears(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "sticky.json")
+            tied = [(0.5, "code-review", ["branch"]), (0.49, "git-workflow", ["branch"])]
+            self.assertTrue(router.record_sticky(tied, "branch rebase", path=path))
+            saved = router.load_sticky(path)
+            self.assertEqual(saved[router._qkey("branch rebase")]["skill"], "code-review")
+            clear = [(0.9, "code-review", ["branch"]), (0.1, "git-workflow", ["branch"])]
+            self.assertFalse(router.record_sticky(clear, "branch rebase", path=path))
+            self.assertNotIn(router._qkey("branch rebase"), router.load_sticky(path))
+
     def test_neg_filter_blocks_wireguard_on_mobile_payments(self):
         idx = {
             "homelab-wireguard-vpn": ["flutter", "mobile", "payment"],
@@ -129,6 +197,7 @@ class TestRouter(unittest.TestCase):
             self.assertEqual(out2["missing"], ["source-file-or-url"])
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_thin_evidence_counts_as_unfetched(self):
         import threading
@@ -155,6 +224,7 @@ class TestRouter(unittest.TestCase):
             self.assertIn(url, out["unfetched"])
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_resolve_mcp_first(self):
         rules = {"mcp_needs": {"query-or-url": {"server": "exa-web-search", "tool": "web_search"}}}
@@ -308,6 +378,7 @@ class TestRouter(unittest.TestCase):
             self.assertEqual(step2["unbacked"], [])
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_propose_clusters_unmet(self):
         import tempfile, json
@@ -409,6 +480,7 @@ class TestRouter(unittest.TestCase):
             self.assertIsNone(router._fetch_bytes("http://127.0.0.1:1/nope", timeout=1))
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_autoinject_fires_above_threshold(self):
         import tempfile, os
@@ -590,6 +662,7 @@ class TestRouter(unittest.TestCase):
                 shutil.rmtree(tmp, ignore_errors=True)
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_b16_openapi_skew(self):
         import threading, json as _json
@@ -627,6 +700,7 @@ class TestRouter(unittest.TestCase):
                 shutil.rmtree(tmp, ignore_errors=True)
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_b17_figma_node_gated_and_fetched(self):
         self.assertFalse(router.figma_node(
@@ -656,6 +730,7 @@ class TestRouter(unittest.TestCase):
             self.assertFalse(router.figma_node("https://example.com/x", token="t")["ok"])
         finally:
             srv.shutdown()
+            srv.server_close()
 
     def test_c21_learn_parses_three_harness_shapes(self):
         import tempfile, os, json as _json
@@ -863,8 +938,10 @@ class TestRouter(unittest.TestCase):
             py = os.path.join(tmp, "pyapp")
             os.makedirs(node)
             os.makedirs(py)
-            open(os.path.join(node, "package.json"), "w").write('{}')
-            open(os.path.join(py, "requirements.txt"), "w").write('x\n')
+            with open(os.path.join(node, "package.json"), "w") as f:
+                f.write('{}')
+            with open(os.path.join(py, "requirements.txt"), "w") as f:
+                f.write('x\n')
             self.assertEqual(router.detect_stack(node), ["node"])
             self.assertEqual(router.detect_stack(py), ["python"])
             self.assertEqual(router.detect_stack(tmp), [])

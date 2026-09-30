@@ -1,0 +1,11 @@
+task_id,arm,trial,tokens_in,tokens_out,cost_usd,wall_s,interventions,rework,grader_pass,notes
+B-01,model-only,1,,,,0.09,0,0,1,dry-run: no model calls; grader-only
+B-01,model+steroids,1,,,,0.07,0,0,1,dry-run: no model calls; grader-only
+B-02,model-only,1,,,,0.03,0,0,1,dry-run: no model calls; grader-only
+B-02,model+steroids,1,,,,0.03,0,0,1,dry-run: no model calls; grader-only
+B-03,model-only,1,,,,0.04,0,0,1,dry-run: no model calls; grader-only
+B-03,model+steroids,1,,,,0.04,0,0,1,dry-run: no model calls; grader-only
+B-04,model-only,1,,,,0.0,0,0,1,dry-run: no model calls; grader-only
+B-04,model+steroids,1,,,,0.0,0,0,1,dry-run: no model calls; grader-only
+B-05,model-only,1,,,,0.0,0,0,,grader-skipped-not-allowlisted
+B-05,model+steroids,1,,,,0.0,0,0,,grader-skipped-not-allowlisted

@@ -1,0 +1,140 @@
+{
+ "generated_at": "2026-09-24",
+ "commit": "eb51006b97ba227675f3ff0978c9c8061cc50302",
+ "index_size": 1265,
+ "fallback": "live-then-snapshot",
+ "depth_formula": "depth = routes + 3*learns + 2*corrections: routed volume plus learning weight (accepts map to domains via domain_of; correction rows likewise). fails-fixed excluded: no per-domain origin data.",
+ "fails_fixed": null,
+ "fails_fixed_source": "unmeasured, not zero: STORIES.md ticks are lane-shared prose with no per-domain fail attribution, and the served log carries no fail rows.",
+ "usage": "Page reads live served counts first; this dated file is the baked fallback when live is unreachable (Sael pattern). Regenerate: python3 export-snapshot.py [served-log-path].",
+ "totals": {
+  "routes": 1670,
+  "hits": 1647,
+  "abstentions": 23,
+  "tokens_saved": 4936429827,
+  "corrections": 0,
+  "learned_skills": 1,
+  "learned_accepts": 1,
+  "misses_turned_skills": 0
+ },
+ "notes": "misses_turned_skills=0: the only mined proposals to date were both REJECTed (keyboard mash, gibberish); no G61 adoption yet. learned_* from closed-loop accepts in memory.json.",
+ "domains": [
+  {
+   "name": "frontend",
+   "skills": 74,
+   "routes": 27,
+   "tokens_saved": 80908485,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 27
+  },
+  {
+   "name": "mobile",
+   "skills": 25,
+   "routes": 80,
+   "tokens_saved": 239776086,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 80
+  },
+  {
+   "name": "backend",
+   "skills": 175,
+   "routes": 313,
+   "tokens_saved": 938065609,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 313
+  },
+  {
+   "name": "data",
+   "skills": 102,
+   "routes": 70,
+   "tokens_saved": 209873036,
+   "learns": 1,
+   "corrections": 0,
+   "depth": 73
+  },
+  {
+   "name": "ai-ml",
+   "skills": 187,
+   "routes": 199,
+   "tokens_saved": 596579240,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 199
+  },
+  {
+   "name": "devops",
+   "skills": 109,
+   "routes": 81,
+   "tokens_saved": 242826155,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 81
+  },
+  {
+   "name": "security",
+   "skills": 29,
+   "routes": 12,
+   "tokens_saved": 35967949,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 12
+  },
+  {
+   "name": "testing",
+   "skills": 34,
+   "routes": 18,
+   "tokens_saved": 53962516,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 18
+  },
+  {
+   "name": "design-media",
+   "skills": 41,
+   "routes": 63,
+   "tokens_saved": 188855533,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 63
+  },
+  {
+   "name": "business",
+   "skills": 102,
+   "routes": 327,
+   "tokens_saved": 979564520,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 327
+  },
+  {
+   "name": "docs-writing",
+   "skills": 62,
+   "routes": 60,
+   "tokens_saved": 179904683,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 60
+  },
+  {
+   "name": "science",
+   "skills": 17,
+   "routes": 0,
+   "tokens_saved": 0,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 0
+  },
+  {
+   "name": "general",
+   "skills": 308,
+   "routes": 397,
+   "tokens_saved": 1190146015,
+   "learns": 0,
+   "corrections": 0,
+   "depth": 397
+  }
+ ]
+}

@@ -13,3 +13,6 @@ node_modules/
 skill-index.json
 served.jsonl
 memory.json
+
+# graft's local graph cache — regenerable, not committed (run `graft build`).
+/graft/
