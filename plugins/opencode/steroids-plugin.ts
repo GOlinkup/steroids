@@ -1,8 +1,10 @@
 /**
  * Steroids OpenCode plugin (server side).
  *
- * ponytail: console.log is the visible channel (client.app.log goes to
- * the log file only). Per-prompt routing reuses steroids/hook.sh.
+ * ponytail: NEVER console.log here — plugin stdout corrupts the opencode TUI
+ * (dark screen / blank first message, upstream #19108). Visible channel is
+ * client.tui.showToast; diagnostics go to client.app.log (log file only).
+ * Per-prompt routing reuses steroids/hook.sh.
  * Ceiling: keyword overlap, not semantic search.
  */
 
@@ -24,33 +26,65 @@ function skillCount(): number {
 }
 
 const N = skillCount()
-console.log(`[Steroids] router live: ${N > 0 ? `${N} indexed skills` : "index unavailable"}`)
+// ponytail: zero console.* in this file — stdout breaks the TUI.
 
 function route(prompt: string): string {
-  // ponytail: shell out to the tested router; inline port if spawn proves slow.
+  // ponytail: return skills[] joined — if 3 match, show 3. Hint sentence is log-only chrome.
   try {
-    const r = spawnSync("bash", [HOOK], {
+    const r = spawnSync("bash", [HOOK, "--json"], {
       input: JSON.stringify({ prompt }),
       encoding: "utf-8",
     })
-    return (r.stdout || "").trim()
+    const out = (r.stdout || "").trim()
+    try {
+      const j = JSON.parse(out) as any
+      const skills = (j.skills || []) as string[]
+      if (skills.length) return skills.slice(0, 4).join(" · ")
+      return ((j.hint || "") as string).replace(/\s+/g, " ").slice(0, 120).trim()
+    } catch {
+      return out.split("\n")[0].replace(/\s+/g, " ").slice(0, 120).trim()
+    }
   } catch {
     return ""
   }
 }
 
-export const SteroidsPlugin = async () => {
+export const SteroidsPlugin = async ({ client }: any) => {
   // ponytail: dedup double-fire; same prompt within 5s = skip.
   let lastQ = ""
   let lastT = 0
+  // ponytail: braille spinner = best 1-char loader (all fonts, no width jitter).
+  // Others that fit: lineiné -\|/, dots …, bounce ⠁⠉⠙, clock 🕐🕑, moon 🌑🌒. Braille wins.
+  const SPIN = ["⠋", "⠙", "⠹", "⠸", "⠼", "⠴", "⠦", "⠧", "⠇", "⠏"]
+  let rep = 0
+  const log = (level: "info" | "debug", message: string) => {
+    try {
+      const p = client?.app?.log?.({ body: { service: "steroids", level, message } })
+      ;(p as any)?.catch?.(() => {})
+    } catch {}
+  }
+  const spotlight = (skills: string) => {
+    // ponytail: server toast = plain text only, no shimmer/opacity API.
+    // Bold STEROIDS title is the max branding here; true shimmer needs TUI slot.
+    log("debug", `[Steroids] → ${skills}`)
+    try {
+      const p = client?.tui?.showToast?.({
+        body: {
+          title: "STEROIDS",
+          message: `${SPIN[rep++ % SPIN.length]} ${skills} 🏋️`,
+          variant: "info",
+          duration: 2000,
+        },
+      })
+      ;(p as any)?.catch?.(() => {})
+    } catch {}
+  }
   return {
     event: async ({ event }: any) => {
-      if (event?.type === "session.created") {
-        console.log(`[Steroids] router live: ${N} indexed skills`)
-      }
+      if (event?.type === "session.created") log("info", `[Steroids] router live: ${N} indexed skills`)
     },
     "chat.message": async (_input: any, output: any) => {
-      // ponytail: hint via console.log (proven visible); no Part-shape risk.
+      // ponytail: toast = spotlight during the run; no Part-shape risk, no TUI corruption.
       // output.parts here IS the user message (per @opencode-ai/plugin types).
       try {
         const text = (output?.parts || [])
@@ -64,7 +98,8 @@ export const SteroidsPlugin = async () => {
         lastQ = text
         lastT = now
         const hint = route(text)
-        if (hint) console.log(`\n[Steroids] ${hint}\n`)
+        if (!hint) return
+        spotlight(hint)
       } catch {
         // never block a prompt
       }

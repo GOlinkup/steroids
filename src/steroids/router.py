@@ -32,6 +32,10 @@ SHARED_RULES_PATH = os.path.join(BASE_DIR, "shared-rules.json")
 CACHE_PATH = os.path.join(BASE_DIR, "skill-index.json")
 MEM_PATH = os.path.join(BASE_DIR, "memory.json")
 LOG_PATH = os.path.join(BASE_DIR, "served.jsonl")
+STICKY_PATH = os.path.join(BASE_DIR, "sticky.json")
+STICKY_TTL_DAYS = 14      # champion memory expires; learning still evolves
+STICKY_TIE_MARGIN = 0.1   # only arbitrate genuine near-ties
+STICKY_MAX = 512          # cap entries; prune oldest
 PY2D_PATH = os.path.join(BASE_DIR, "steroids2d.py")
 
 def stem(w):
@@ -611,6 +615,81 @@ def apply_downvotes(accepts, served, threshold=3):
         if c >= threshold and s not in out:
             out[s] = -1
     return out
+
+def _qkey(prompt):
+    # ponytail: C31 — same 12-hex query key the served log uses.
+    return hashlib.sha1(str(prompt).encode()).hexdigest()[:12]
+
+def load_sticky(path=STICKY_PATH):
+    # ponytail: C31 — {qhash: {skill, t}}; missing/corrupt = {}.
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, dict) else {}
+    except Exception:
+        return {}
+
+def apply_sticky(top, prompt, sticky=None, path=STICKY_PATH, now=None,
+                 ttl_days=STICKY_TTL_DAYS, margin=STICKY_TIE_MARGIN):
+    # ponytail: C31 — same query keeps last winner on near-ties. Kills the
+    # unstable-repeat oscillation (nightly report): the served-count downvote
+    # (C25) demotes whatever just served, so two near-tied skills flip top-1
+    # every serve. Champion must be in the top-3 (a downvoted champion is
+    # gone, never resurrected) and the live top-2 gap must be a near-tie.
+    # Evals bypass this — benchmarks stay honest.
+    if not top:
+        return top
+    sticky = load_sticky(path) if sticky is None else sticky
+    rec = sticky.get(_qkey(prompt))
+    if not rec:
+        return top
+    try:
+        if now is None:
+            now = time.time()
+        if now - float(rec.get("t", 0)) > ttl_days * 86400.0:
+            return top
+    except Exception:
+        return top
+    champ = rec.get("skill")
+    names = [n for _, n, _ in top]
+    if champ not in names or names.index(champ) == 0:
+        return top  # absent (never resurrect) or already leading
+    if not (len(top) >= 2 and (top[0][0] - top[1][0]) < margin):
+        return top  # clear live winner: memory does not overrule it
+    i = names.index(champ)
+    top[0], top[i] = top[i], top[0]
+    return top
+
+def record_sticky(top, prompt, path=STICKY_PATH, now=None,
+                  margin=STICKY_TIE_MARGIN, cap=STICKY_MAX):
+    # ponytail: C31 — remember the winner only for near-ties (margin); a clear
+    # win clears the record so real learning still moves the top. Best-effort.
+    if not top:
+        return False
+    if now is None:
+        now = time.time()
+    sticky = load_sticky(path)
+    key = _qkey(prompt)
+    tied = len(top) >= 2 and (top[0][0] - top[1][0]) < margin
+    if not tied:
+        if key in sticky:
+            sticky.pop(key)  # clear a stale champion; write below persists removal
+        else:
+            return False
+        recorded = False
+    else:
+        sticky[key] = {"skill": top[0][1], "t": int(now)}
+        recorded = True
+    if len(sticky) > cap:
+        for k, _ in sorted(sticky.items(), key=lambda kv: kv[1].get("t", 0))[:len(sticky) - cap]:
+            sticky.pop(k, None)
+    try:
+        os.makedirs(os.path.dirname(path) or ".", exist_ok=True)
+        with open(path, "w", encoding="utf-8") as f:
+            json.dump(sticky, f)
+    except OSError:
+        return False
+    return recorded
 
 def retirement_candidates(rules, idx, accepts=None, outcomes=None, seen=None, now=None, days=90):
     # ponytail: C26 — 90-day zero-outcome quarantine list; dry-run report only, never enforced here.
@@ -2607,6 +2686,8 @@ def main():
     top = apply_taste(top, load_taste_profile())
     top = stall_rescue(top, idx, prompt)
     session = track_session(top)
+    sticky = load_sticky()
+    top = apply_sticky(top, prompt, sticky)
     for w in preauth_warnings([n for _, n, _ in top or []]):
         print(f"[Steroids] {w}", file=sys.stderr)
 
@@ -2664,6 +2745,7 @@ def main():
     else:
         # ponytail: log abstentions too (attempted trigs, hash only) — propose mines these.
         attempted = ",".join(sorted(set(toks(prompt)) - set(rules.get("glue", [])))[:6])
+        record_sticky([], prompt)  # ponytail: C31 — abstention clears a stale champion
         log_impression(prompt, attempted, "")
         if is_antigravity:
             print(json.dumps({}))

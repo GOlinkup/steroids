@@ -1,6 +1,6 @@
 # Steroids router — trust report (1st edition)
 
-_Published 2026-09-27 · bench commit `10b80366cb9b` · sources: `nightly-2026-09-27.md`, `lint-2026-09-26.md`_
+_Published 2026-09-30 · bench commit `cb9edc32732f` · sources: `nightly-2026-09-30.md`, `lint-2026-09-26.md`_
 
 ## Precision (labeled sets, 480 queries)
 | set | n | P@1 | P@3 | MRR | leaks |
@@ -11,7 +11,7 @@ _Published 2026-09-27 · bench commit `10b80366cb9b` · sources: `nightly-2026-0
 
 ## Live traffic health (unlabeled — prompts are hash-only by design)
 - today: 0 serves, 0 distinct queries, abstentions 0 (0.0%), unstable repeats 0
-- all: 2031 serves, 1758 distinct queries, abstentions 27 (1.3%), unstable repeats 24
+- all: 2376 serves, 2032 distinct queries, abstentions 33 (1.4%), unstable repeats 27
 
 ## Index hygiene (linter)
 - 1353 unique skills (2863 files across harness homes), 590 frontmatter errors, 1362 warnings, 1352 cross-home shadows (first wins, by design)

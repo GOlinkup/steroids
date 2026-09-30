@@ -1,6 +1,8 @@
 """Stdlib unittest for steroids router; loads router.py directly, no install."""
 import importlib.util
 import os
+import tempfile
+import time
 import unittest
 
 _ROUTER_PATH = os.path.join(os.path.dirname(__file__), "..", "src", "steroids", "router.py")
@@ -13,6 +15,72 @@ RULES = {"glue": ["onto", "main", "file", "files", "folder", "folders", "repo", 
 
 
 class TestRouter(unittest.TestCase):
+    def test_sticky_champion_prevents_flip_on_near_tie(self):
+        # ponytail: C31 — same prompt, near-tied top-2: the previous winner
+        # stays top-1 instead of oscillating with the served-count downvote.
+        idx = {
+            "code-review": ["branch", "rebase"],
+            "git-workflow": ["branch", "rebase"],
+        }
+        rules = dict(RULES, max_recommendations=3)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "sticky.json")
+            sticky = {router._qkey("branch rebase"): {"skill": "git-workflow", "t": int(time.time())}}
+            top = router.route_query("branch rebase", rules, idx)
+            self.assertEqual(top[0][1], "code-review")  # alphabetical without memory
+            top = router.apply_sticky(top, "branch rebase", sticky, path=path)
+            self.assertEqual(top[0][1], "git-workflow")
+
+    def test_sticky_never_resurrects_downvoted_champion(self):
+        # champion absent from the live top = gone, memory must not revive it.
+        idx = {
+            "code-review": ["branch", "rebase"],
+            "git-workflow": ["branch", "rebase"],
+        }
+        rules = dict(RULES, max_recommendations=1)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "sticky.json")
+            sticky = {router._qkey("branch rebase"): {"skill": "git-workflow", "t": int(time.time())}}
+            top = router.route_query("branch rebase", rules, idx)
+            self.assertEqual([s for _, s, _ in top], ["code-review"])  # git-workflow cut by max_recommendations=1
+            top = router.apply_sticky(top, "branch rebase", sticky, path=path)
+            self.assertEqual(top[0][1], "code-review")
+
+    def test_sticky_ignores_clear_winner(self):
+        # a live top-1 that beats runner-up by >= margin wins over memory.
+        idx = {
+            "strong-skill": ["branch", "rebase"],
+            "code-review": ["branch"],
+            "git-workflow": ["branch"],
+        }
+        rules = dict(RULES, max_recommendations=3)
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "sticky.json")
+            sticky = {router._qkey("branch rebase"): {"skill": "code-review", "t": int(time.time())}}
+            top = router.route_query("branch rebase", rules, idx)
+            top = router.apply_sticky(top, "branch rebase", sticky, path=path, margin=0.1)
+            self.assertEqual(top[0][1], "strong-skill")
+
+    def test_sticky_respects_ttl_expiry(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "sticky.json")
+            sticky = {router._qkey("branch rebase"): {"skill": "code-review", "t": int(time.time())}}
+            top = [(0.5, "git-workflow", ["branch"]), (0.49, "code-review", ["branch"])]
+            top = router.apply_sticky(top, "branch rebase", sticky, path=path,
+                                      now=time.time() + 15 * 86400, ttl_days=14)
+            self.assertEqual(top[0][1], "git-workflow")  # record expired: live order stands
+
+    def test_record_sticky_writes_and_clears(self):
+        with tempfile.TemporaryDirectory() as td:
+            path = os.path.join(td, "sticky.json")
+            tied = [(0.5, "code-review", ["branch"]), (0.49, "git-workflow", ["branch"])]
+            self.assertTrue(router.record_sticky(tied, "branch rebase", path=path))
+            saved = router.load_sticky(path)
+            self.assertEqual(saved[router._qkey("branch rebase")]["skill"], "code-review")
+            clear = [(0.9, "code-review", ["branch"]), (0.1, "git-workflow", ["branch"])]
+            self.assertFalse(router.record_sticky(clear, "branch rebase", path=path))
+            self.assertNotIn(router._qkey("branch rebase"), router.load_sticky(path))
+
     def test_neg_filter_blocks_wireguard_on_mobile_payments(self):
         idx = {
             "homelab-wireguard-vpn": ["flutter", "mobile", "payment"],
