@@ -113,12 +113,7 @@ Steroids runs fully offline on your machine. Routine routing sends nothing anywh
 - Installs only from the curated HF skills repo (`--install-skill`); arbitrary URLs refused.
 - Hints are suggestions, not guarantees — the agent decides what to load.
 
-## Demo
-
-![Live demo: skill graph with mascot](docs/img/demo-graph.png)
-
-Open `demo/skill-graph.html` in a browser — zero dependencies, works offline.
-Regenerate its data from your live index with `steroids graph --export demo/graph.json`.
+## Lens
 
 **Lens** — watch agent visual work live: `steroids lens --watch ./shots`
 serves `http://127.0.0.1:8904` where every new screenshot pops a card
