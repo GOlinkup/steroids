@@ -48,42 +48,14 @@ before any file is copied, so retrying after syncing skills is safe.
 | Live probe (`tests/live_probe.py`) | 16 | 1.000 | 1.000 | 0 | — | — |
 | Blind second set, stranger-style (`tests/blind_eval_second.py`) | 315 | 0.898 | 0.959 | 0 | 0.933 | 0.909 |
 
-Re-run any time: `python3 tests/benchmark.py --live` (all three sets).
+Re-run any time: `python3 tests/benchmark.py --live` (all three sets), `--golden` for the frozen snapshot, `--check` for README/snapshot drift.
 
-### Reproducible golden benchmark
+![Accuracy chart](docs/img/chart-accuracy.png)
+![Speed chart](docs/img/chart-speed.png)
+![Outcome chart](docs/img/chart-outcome.png)
+![Headline numbers](docs/img/chart-size.png)
 
-`--live` measures against whatever is installed on your machine today.
-`--golden` measures against a frozen snapshot so numbers stay comparable
-across commits and machines:
-
-```bash
-python3 tests/benchmark.py --golden   # frozen 1265-skill snapshot (benchmarks/golden-1265/)
-python3 tests/benchmark.py --check    # README claims match the snapshot metadata
-```
-
-`--check` fails if the README table drifts from `benchmarks/golden-1265/metadata.json`
-(the class of error that once shipped 366-skill measurements under a 1265-skill header).
-
-### Honest comparison
-
-Full version with evidence links: `docs/STEROIDS_V1.md` §22 (D-3).
-
-| Context | Steroids | Alternative |
-|---|---|---|
-| Exact/near-vocabulary skill discovery | blind149 P@1 0.799 | Grep: no ranking, no typo-fix |
-| Cold machine, zero install | Routes from a clean checkout | Plugins needing install + warm-up |
-| Thousands of skills | 3915 indexed in ~4s, sub-second queries | Full docs in context: blows the window |
-| Miss recovery | `--correct` door, queryable rate | Misses evaporate |
-| **Paraphrased queries — narrowed, not closed** | Trigram + offline ONNX rescue near-paraphrases; distant rewordings can still abstain | Fine-tuned embedding retrieval bridges more paraphrase |
-
-### Historical results
-
-| Date | Index | blind149 P@1 / P@3 | Notes |
-|---|---|---|---|
-| 2026-09-20 | 366 skills | 0.933 / 0.993 | Pre-expansion index; embed rerank on. Smaller index, fewer distractors. |
-| 2026-09-23 | 1265 skills | 0.799 / 0.960 | Index grew 3.5×; same router beats the old one 0.799 vs 0.577 on this index. |
-| 2026-09-25 | 1267 skills | 0.872 / 0.980 (live GOLDEN, relabeled) | 10 stale labels fixed (new skills deserved the win), 2 live leaks NEG-fixed. Frozen golden-1265 untouched: still 0.799 / 0.960. |
-| 2026-09-25 | 1267 skills | 0.993 / 1.000 (live GOLDEN) | 19 genuine misses fixed: 16 trigger packs + 17 NEG guards, 3 labels corrected. 1 miss left (django-tdd, semantic-layer flip, P@3 held). |
+Interactive versions live in `index.html`. Different pools/metrics from SkillRouter et al. — only params, latency and cost compare directly. Full version with evidence links: `docs/STEROIDS_V1.md` §22 (D-3).
 
 ## Multi-harness support
 
