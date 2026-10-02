@@ -24,6 +24,16 @@ class TestLens(unittest.TestCase):
         self.assertEqual(lens.shot_label("shot-menu2.png"), "shot menu2")
         self.assertEqual(lens.shot_label("hero_final.webp"), "hero final")
 
+    def test_term_lines_card(self):
+        card = lens.term_lines(
+            {"label": "shot menu2", "time": "12:03:44", "size": 90000},
+            "http://127.0.0.1:8904")
+        self.assertIn("🔎 NEW SHOT  shot menu2", card)
+        self.assertIn("12:03:44 · 87 KB", card)
+        self.assertIn("http://127.0.0.1:8904", card)
+        # plain text — no ANSI escapes in the pure helper
+        self.assertNotIn("\033", card)
+
     def test_collect_newest_first_and_images_only(self):
         d = tempfile.mkdtemp()
         _touch(d, "b.txt")

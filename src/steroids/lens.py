@@ -15,9 +15,14 @@ import os
 import shutil
 import subprocess
 import sys
+import threading
 import time
 
 SHOT_EXTS = (".png", ".jpg", ".jpeg", ".gif", ".webp")
+
+_TERM_ORANGE = "\033[38;5;208m"
+_TERM_BOLD = "\033[1m"
+_TERM_RESET = "\033[0m"
 
 
 def shot_label(filename):
@@ -276,17 +281,78 @@ def open_browser(url):
         pass
 
 
+def term_lines(shot, url=""):
+    """Plain popup-card text for one shot (no ANSI, unit-testable)."""
+    size_kb = max(1, int(shot.get("size", 0)) // 1024)
+    url_part = (" · " + url) if url else ""
+    return "\n".join([
+        "─" * 44,
+        "🔎 NEW SHOT  " + shot.get("label", ""),
+        "%s · %d KB%s" % (shot.get("time", ""), size_kb, url_part),
+        "─" * 44,
+    ])
+
+
+def term_popup(shot, url=""):
+    """Print the popup card + best-effort OSC 9 desktop notification.
+
+    OSC 9 shows a native notification in iTerm2, Windows Terminal, kitty
+    and friends; terminals without support swallow it silently.
+    """
+    try:
+        sys.stdout.write("\033]9;Steroids Lens: %s\033\\" % shot.get("label", ""))
+    except Exception:
+        pass
+    for i, ln in enumerate(term_lines(shot, url).split("\n")):
+        if i == 1:
+            head, _, label = ln.partition("  ")
+            sys.stdout.write("%s%s%s %s%s%s\n" % (
+                _TERM_ORANGE, head, _TERM_RESET, _TERM_BOLD, label, _TERM_RESET))
+        elif set(ln) == {"─"}:
+            sys.stdout.write("%s%s%s\n" % (_TERM_ORANGE, ln, _TERM_RESET))
+        else:
+            sys.stdout.write(ln + "\n")
+    sys.stdout.flush()
+
+
+def _poll_term(watch_dir, url, stop, interval=2.0):
+    """Print a terminal popup for each new shot until stop is set."""
+    seen = {}
+    first = True
+    while not stop.is_set():
+        for s in collect_shots(watch_dir):
+            key = "%s:%s" % (s["name"], s["mtime"])
+            if key in seen:
+                continue
+            seen[key] = 1
+            if not first:
+                term_popup(s, url)
+        first = False
+        stop.wait(interval)
+
+
 def serve(watch_dir=".", port=8904):
-    """Serve the Lens page until Ctrl-C. Returns exit code."""
+    """Serve the Lens page until Ctrl-C. Returns exit code.
+
+    A side thread polls the watch dir and pops a card in this terminal
+    for each new shot (daemonized runs just print to /dev/null, harmless).
+    """
     os.makedirs(watch_dir, exist_ok=True)
     # ponytail: per-server subclass so two servers never share a watch dir.
     cls = type("LensHandler", (_Handler,),
                {"watch_dir": os.path.abspath(watch_dir)})
     srv = http.server.HTTPServer(("127.0.0.1", port), cls)
-    print("Steroids Lens on http://127.0.0.1:%d watching %s" % (
-        port, cls.watch_dir), flush=True)
+    url = "http://127.0.0.1:%d" % port
+    print("Steroids Lens on %s watching %s (popups here + %s)" % (
+        url, cls.watch_dir, url), flush=True)
+    stop = threading.Event()
+    watcher = threading.Thread(
+        target=_poll_term, args=(cls.watch_dir, url, stop), daemon=True)
+    watcher.start()
     try:
         srv.serve_forever()
     except KeyboardInterrupt:
         pass
+    finally:
+        stop.set()
     return 0

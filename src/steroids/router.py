@@ -2457,7 +2457,7 @@ def main():
     parser.add_argument("--global-counts", action="store_true", help="Fetch merged global learning counts from the hub (read-only)")
     parser.add_argument("--sync-shared", action="store_true", help="Pull hub-earned shared rules into shared-rules.json (add-only merge at route time)")
     parser.add_argument("--unused", action="store_true", help="List installed skills with zero accepts ever — prune candidates; usage comes from memory.json accepts")
-    parser.add_argument("--lens", action="store_true", help="Serve the Lens watch page: new screenshots in --watch pop as cards (v0.1.0)")
+    parser.add_argument("--lens", action="store_true", help="Serve the Lens watch page: new screenshots in --watch pop as cards in the browser + this terminal (v0.1.0)")
     parser.add_argument("--watch", default="shots", help="Lens watch folder (default ./shots)")
     parser.add_argument("--port", type=int, default=8904, help="Lens port (default 8904)")
     parser.add_argument("--open", action="store_true", help="Lens: reuse-or-start the server and open it in a browser (only opens on fresh start, never tab-spam)")
