@@ -6,16 +6,20 @@
 
 Universal skill router plugin for AI coding harnesses. **Steroids is not a model** — it indexes the skills already installed on your machine and recommends the relevant ones for each prompt.
 
+[![Live site preview](docs/img/preview-index.png)](index.html)
+
+> Preview of `index.html` (click through opens the full interactive page). GitHub READMEs render as text/markdown only — no live CSS/JS/iframe — so for the real web look host it with GitHub Pages (`Settings → Pages → Deploy from branch → / (root)`) then it serves `index.html` as a website.
+
 [Router architecture diagram](docs/architecture.html) (interactive, explorable).
 
 ## 30-second quickstart
 
 ```bash
-git clone <repo> steroids && cd steroids
+git clone https://github.com/talkstreamsa/steroids.git && cd steroids
 python3 src/steroids/router.py --count        # live count: 1267 (~0.3s); run it, don't trust docs
-python3 src/steroids/router.py "build a flutter mobile app"
-# -> build,flutter -> dart-flutter-patterns/...
-bash install.sh                               # deploy binary + hooks (optional)
+python3 src/steroids/router.py "write a git commit message"
+# e.g. -> commit,git -> git-commit-helper/... (live index; yours varies)
+bash install.sh                               # deploy binary + hooks (first time; afterwards: steroids install)
 bash scripts/demo-serve.sh                # demo on :8903, auto-closes with the CLI
 ```
 
@@ -109,12 +113,11 @@ Steroids runs fully offline on your machine. Routine routing sends nothing anywh
 - Installs only from the curated HF skills repo (`--install-skill`); arbitrary URLs refused.
 - Hints are suggestions, not guarantees — the agent decides what to load.
 
-## Demo
+## Lens
 
-![Live demo: skill graph with mascot](docs/img/demo-graph.png)
-
-Open `demo/skill-graph.html` in a browser — zero dependencies, works offline.
-Regenerate its data from your live index with `steroids graph --export demo/graph.json`.
+**Lens** — watch agent visual work live: `steroids lens --watch ./shots`
+serves `http://127.0.0.1:8904` where every new screenshot pops a card
+(thumbnail, name, time). Any harness, all local, nothing uploaded.
 
 ## Roadmap
 
