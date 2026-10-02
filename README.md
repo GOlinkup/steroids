@@ -74,7 +74,7 @@ Full version with evidence links: `docs/STEROIDS_V1.md` §22 (D-3).
 | Cold machine, zero install | Routes from a clean checkout | Plugins needing install + warm-up |
 | Thousands of skills | 3915 indexed in ~4s, sub-second queries | Full docs in context: blows the window |
 | Miss recovery | `--correct` door, queryable rate | Misses evaporate |
-| **Paraphrased queries — STEROIDS LOSES** | Lexical-only; overlap miss → abstain | Embedding retrieval bridges paraphrase |
+| **Paraphrased queries — narrowed, not closed** | Trigram + offline ONNX rescue near-paraphrases; distant rewordings can still abstain | Fine-tuned embedding retrieval bridges more paraphrase |
 
 ### Historical results
 
@@ -121,10 +121,7 @@ serves `http://127.0.0.1:8904` where every new screenshot pops a card
 
 ## Roadmap
 
-Milestones live in [`docs/V1_PLANNING.md`](docs/V1_PLANNING.md) §7 (10 milestones,
-relative weeks from kickoff). Phase 0 status: reference env frozen, trial
-policy in bench, task bank collecting real failures, paired harness in
-skeleton, grader policy set.
+Tracked privately while v1 is validated — public milestones ship with the v1 announcement.
 
 ## Contributing
 
