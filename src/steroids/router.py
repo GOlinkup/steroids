@@ -2407,6 +2407,22 @@ def build_loop(spec, rules, idx, demo_dir=None):
     return out
 
 def main():
+    # ponytail: `steroids install` == bash install.sh in the checkout.
+    # install.sh records its repo path at deploy time; without it there
+    # is no checkout to run (fresh machine → clone first).
+    if sys.argv[1:] == ["install"]:
+        rp = os.path.join(BASE_DIR, "repo-path")
+        try:
+            with open(rp) as f:
+                repo = f.read().strip()
+        except OSError:
+            repo = ""
+        sh = os.path.join(repo, "install.sh") if repo else ""
+        if not sh or not os.path.isfile(sh):
+            print(json.dumps({"ok": False,
+                "error": "no checkout recorded — git clone https://github.com/talkstreamsa/steroids.git && cd steroids && bash install.sh"}))
+            return
+        sys.exit(subprocess.call(["bash", sh]))
     parser = argparse.ArgumentParser(
         description="Steroids — Universal AI Skill Router & Accelerator for Antigravity, Claude Code, OpenCode, and CLI."
     )
@@ -2441,8 +2457,35 @@ def main():
     parser.add_argument("--global-counts", action="store_true", help="Fetch merged global learning counts from the hub (read-only)")
     parser.add_argument("--sync-shared", action="store_true", help="Pull hub-earned shared rules into shared-rules.json (add-only merge at route time)")
     parser.add_argument("--unused", action="store_true", help="List installed skills with zero accepts ever — prune candidates; usage comes from memory.json accepts")
+    parser.add_argument("--lens", action="store_true", help="Serve the Lens watch page: new screenshots in --watch pop as cards (v0.1.0)")
+    parser.add_argument("--watch", default="shots", help="Lens watch folder (default ./shots)")
+    parser.add_argument("--port", type=int, default=8904, help="Lens port (default 8904)")
+    parser.add_argument("--open", action="store_true", help="Lens: reuse-or-start the server and open it in a browser (only opens on fresh start, never tab-spam)")
 
     args, unknown = parser.parse_known_args()
+
+    if args.lens:
+        # ponytail: same lazy import as share (installed copy has siblings).
+        try:
+            from . import lens as _lens
+        except ImportError:
+            _lens_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "lens.py")
+            if not os.path.isfile(_lens_path):
+                print(json.dumps({"ok": False, "error": "lens.py not deployed alongside router"}))
+                return
+            import importlib.util as _ilu
+            _spec = _ilu.spec_from_file_location("steroids_lens", _lens_path)
+            _lens = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_lens)
+        if args.open:
+            # ponytail: open exactly once — only when we just started it.
+            # Reuse prints the URL and stays silent (per-prompt safe).
+            url, started = _lens.ensure(args.watch, args.port)
+            print(url, flush=True)
+            if started:
+                _lens.open_browser(url)
+            return
+        sys.exit(_lens.serve(args.watch, args.port))
 
     if args.check:
         print(json.dumps(check_skill_update()))

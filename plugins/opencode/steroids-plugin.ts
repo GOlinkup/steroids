@@ -8,7 +8,7 @@
  * Ceiling: keyword overlap, not semantic search.
  */
 
-import { spawnSync } from "node:child_process"
+import { spawnSync, spawn } from "node:child_process"
 import * as fs from "fs"
 import { homedir } from "node:os"
 import * as path from "path"
@@ -81,7 +81,22 @@ export const SteroidsPlugin = async ({ client }: any) => {
   }
   return {
     event: async ({ event }: any) => {
-      if (event?.type === "session.created") log("info", `[Steroids] router live: ${N} indexed skills`)
+      if (event?.type === "session.created") {
+        log("info", `[Steroids] router live: ${N} indexed skills`)
+        // ponytail: Lens auto-open, once per session — the binary opens
+        // the browser only when it just started the server; reuse is
+        // silent. Detached + stdio-ignored: never blocks the session,
+        // never touches the TUI.
+        try {
+          const dir = (event as any)?.properties?.directory || process.cwd()
+          const child = spawn(
+            "steroids",
+            ["--lens", "--open", "--watch", path.join(dir, "shots")],
+            { detached: true, stdio: "ignore" },
+          )
+          child.unref()
+        } catch {}
+      }
     },
     "chat.message": async (_input: any, output: any) => {
       // ponytail: toast = spotlight during the run; no Part-shape risk, no TUI corruption.

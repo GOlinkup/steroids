@@ -104,10 +104,13 @@ main{padding-top:0;max-width:1440px;margin:0 auto;width:100%}
 .demo-bar .ddot{width:9px;height:9px;border-radius:50%;background:rgba(255,255,255,.18)}
 .demo-bar .ddot:first-child{background:#ff5f57}.demo-bar .ddot:nth-child(2){background:#febc2e}.demo-bar .ddot:nth-child(3){background:#28c840}
 .demo-bar{border-radius:14px 14px 0 0}
-.install{position:relative;margin-left:auto;display:inline-flex;align-items:center;gap:.3rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:99em;padding:.12rem .12rem .12rem .55rem;max-width:60%;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:none;letter-spacing:0}
+.install{position:relative;margin-left:auto;display:inline-flex;align-items:center;gap:.3rem;background:rgba(255,255,255,.06);border:1px solid rgba(255,255,255,.12);border-radius:99em;padding:.12rem .12rem .12rem .55rem;max-width:60%;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;text-transform:none;letter-spacing:0;transition:background .15s ease,border-color .15s ease}
+.install.open{border-color:rgba(251,146,60,.45);background:rgba(255,255,255,.08)}
 .install code{font-size:.66rem;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;min-width:0}
-.install button{flex:none;display:inline-flex;align-items:center;justify-content:center;width:1.4rem;height:1.4rem;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:.7rem;line-height:1;padding:0}
-.install button:hover{background:rgba(255,255,255,.22)}
+.install > button{flex:none;display:inline-flex;align-items:center;justify-content:center;width:1.4rem;height:1.4rem;border-radius:50%;border:none;background:rgba(255,255,255,.1);color:#fff;cursor:pointer;font-size:.7rem;line-height:1;padding:0;transition:background .15s ease,color .15s ease,transform .15s ease}
+.install > button:hover{background:var(--accent-2);color:#0a0a0c}
+.install > button:active{transform:scale(.94)}
+.install > button:focus-visible{outline:2px solid rgba(251,146,60,.65);outline-offset:1px}
 .install-menu{position:absolute;top:calc(100% + 8px);right:0;min-width:230px;background:#1c1d22;border:1px solid var(--border-soft);border-radius:12px;padding:.35rem;display:none;box-shadow:0 12px 30px rgba(0,0,0,.5);z-index:50;text-align:left}
 .install.open .install-menu{display:block}
 .install-menu button{display:block;width:100%;text-align:left;background:none;border:none;color:var(--dim);font-size:.75rem;font-weight:600;padding:.5rem .7rem;border-radius:8px;cursor:pointer;font-family:inherit}

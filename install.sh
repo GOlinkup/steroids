@@ -10,9 +10,9 @@ BIN="$HOME/.local/bin/steroids"
 if [ "${1:-}" = "--uninstall" ]; then
   # Removes exactly what install copies. Settings registrations untouched.
   rm -f "$BIN" "$HOME/.local/bin/net.py" "$HOME/.local/bin/embed.py" "$HOME/.local/bin/ids.py" \
-    "$HOME/.local/bin/share.py" \
+    "$HOME/.local/bin/share.py" "$HOME/.local/bin/lens.py" \
     "$LIVE_DATA/hook.sh" "$LIVE_DATA/skill-rules.json" "$LIVE_DATA/skill-index.json" \
-    "$LIVE_DATA/skill-needs.json" "$LIVE_DATA/skill-proof.json" \
+    "$LIVE_DATA/skill-needs.json"     "$LIVE_DATA/skill-proof.json" "$LIVE_DATA/repo-path" \
     "$HOME/.config/opencode/plugins/steroids-plugin.ts" \
     "$HOME/.config/steroids/steroids2d.py"
   rmdir "$LIVE_DATA" 2>/dev/null || true
@@ -38,10 +38,16 @@ bash "$REPO/scripts/eval_gate.sh" || { echo "EVAL GATE FAILED — deploy refused
 mkdir -p "$LIVE_DATA" "$HOME/.local/bin"
 cp "$REPO/src/steroids/router.py" "$BIN"
 chmod +x "$BIN"
+# ponytail: the binary is useless if its dir isn't on PATH — say so loudly.
+case ":$PATH:" in
+  *":$HOME/.local/bin:"*) ;;
+  *) echo "WARN: ~/.local/bin not on PATH — run: export PATH=\"\$HOME/.local/bin:\$PATH\"" ;;
+esac
 cp "$REPO/src/steroids/ids.py" "$HOME/.local/bin/ids.py"  # B-13: log_impression loads ids.py next to __file__
 cp "$REPO/src/steroids/net.py" "$HOME/.local/bin/net.py"
 cp "$REPO/src/steroids/share.py" "$HOME/.local/bin/share.py"  # shared learning: daily counters ping
 cp "$REPO/src/steroids/embed.py" "$HOME/.local/bin/embed.py"
+cp "$REPO/src/steroids/lens.py" "$HOME/.local/bin/lens.py"  # `steroids lens` page
 cp "$REPO/src/steroids/hook.sh" "$LIVE_DATA/hook.sh"
 cp "$REPO/skill-rules.json" "$LIVE_DATA/skill-rules.json"
 cp "$REPO/plugins/opencode/steroids-plugin.ts" "$HOME/.config/opencode/plugins/steroids-plugin.ts"
@@ -51,6 +57,7 @@ if [ ! -e "$HOME/.config/steroids" ]; then
   ln -s "$LIVE_DATA" "$HOME/.config/steroids"
 fi
 cp "$REPO/src/steroids/steroids2d.py" "$HOME/.config/steroids/steroids2d.py"
+echo "$REPO" > "$LIVE_DATA/repo-path"  # `steroids install` runs this checkout
 echo "Installed: $BIN + plugin. Index at $LIVE_DATA/skill-index.json"
 "$BIN" --reindex --count
 bash "$REPO/scripts/verify-hooks.sh"
