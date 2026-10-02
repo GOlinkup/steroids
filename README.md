@@ -1,4 +1,4 @@
-# Steroids
+# STEROIDS v0.1.0
 
 <img src="docs/img/logo.png" width="96" alt="Steroids mascot">
 
