@@ -16,9 +16,9 @@ bench @ `eb51006b97ba` (dirty paths: 1)
 - distinct queries: 0, abstentions: 0 (0.0%), unstable repeats: 0
 - top skills: 
 
-... wrote /home/TWIG/steroids/reports/nightly-2026-09-24.md
+... wrote ~/steroids/reports/nightly-2026-09-24.md
 clusters=2 proposals=2
-wrote /home/TWIG/steroids/reports/miss-goldens-2026-09-24.md
+wrote ~/steroids/reports/miss-goldens-2026-09-24.md
 # Steroids router — trust report (1st edition)
 
 _Published 2026-09-24 · bench commit `eb51006b97ba` · sources: `nightly-2026-09-24.md`, `lint-2026-09-23.md`_
@@ -33,4 +33,4 @@ _Published 2026-09-24 · bench commit `eb51006b97ba` · sources: `nightly-2026-0
 ## Live traffic health (unlabeled — prompts are hash-only by design)
 - today: 0 serves, 0 distinct queries, abstentions 0 (0.0%), unstable repeats 0
 - all: 1670 serves, 1420 distinct q
-... wrote /home/TWIG/steroids/docs/TRUST.md
+... wrote ~/steroids/docs/TRUST.md

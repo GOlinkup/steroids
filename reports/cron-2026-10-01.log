@@ -16,9 +16,9 @@ bench @ `5c3bf0d60b51` (dirty paths: 4)
 - distinct queries: 49, abstentions: 0 (0.0%), unstable repeats: 0
 - top skills: ponytail 27, i-have-adhd 7, save 4, grilling 4, gtars 3, brainstorming--productivity 3, pc-games 3, steroids 3
 
-... wrote /home/TWIG/steroids/reports/nightly-2026-10-01.md
+... wrote ~/steroids/reports/nightly-2026-10-01.md
 clusters=3 proposals=1
-wrote /home/TWIG/steroids/reports/miss-goldens-2026-10-01.md
+wrote ~/steroids/reports/miss-goldens-2026-10-01.md
 {"ok": true, "added": 0, "pruned": 0, "total": 1}
 # Steroids router — trust report (1st edition)
 
@@ -34,4 +34,4 @@ _Published 2026-10-01 · bench commit `5c3bf0d60b51` · sources: `nightly-2026-1
 ## Live traffic health (unlabeled — prompts are hash-only by design)
 - today: 49 serves, 49 distinct queries, abstentions 0 (0.0%), unstable repeats 0
 - all: 2660 serves, 2245 distinct
-... wrote /home/TWIG/steroids/docs/TRUST.md
+... wrote ~/steroids/docs/TRUST.md

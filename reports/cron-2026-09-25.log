@@ -16,9 +16,9 @@ bench @ `9ab02e7a681e` (dirty paths: 21)
 - distinct queries: 22, abstentions: 1 (4.5%), unstable repeats: 0
 - top skills: 3d-web-experience 6, k6-load-testing 3, generate-image 3, develop-web-game 3, steroids 2, archify 2, imagegen 2, 3d-games 2
 
-... wrote /home/TWIG/steroids/reports/nightly-2026-09-25.md
+... wrote ~/steroids/reports/nightly-2026-09-25.md
 clusters=3 proposals=3
-wrote /home/TWIG/steroids/reports/miss-goldens-2026-09-25.md
+wrote ~/steroids/reports/miss-goldens-2026-09-25.md
 # Steroids router — trust report (1st edition)
 
 _Published 2026-09-25 · bench commit `9ab02e7a681e` · sources: `nightly-2026-09-25.md`, `lint-2026-09-23.md`_
@@ -33,4 +33,4 @@ _Published 2026-09-25 · bench commit `9ab02e7a681e` · sources: `nightly-2026-0
 ## Live traffic health (unlabeled — prompts are hash-only by design)
 - today: 22 serves, 22 distinct queries, abstentions 1 (4.5%), unstable repeats 0
 - all: 1694 serves, 1442 distinct
-... wrote /home/TWIG/steroids/docs/TRUST.md
+... wrote ~/steroids/docs/TRUST.md

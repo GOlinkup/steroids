@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Mine-only analytics for the live served-query log (proposal support).
 
-Reads /home/TWIG/.config/steroids/served.jsonl (NOT in repo) and prints:
+Reads ~/.config/steroids/served.jsonl (NOT in repo) and prints:
   top trigger stems, top served skills, dup rate, zero-trigger (no-match)
   queries, and trigger-instability (same query hash, different trigs).
 

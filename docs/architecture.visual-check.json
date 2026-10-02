@@ -6,7 +6,7 @@
   "status": "pass",
   "visualReview": "pending",
   "artifact": {
-    "path": "/home/TWIG/steroids/docs/architecture.html",
+    "path": "~/steroids/docs/architecture.html",
     "sha256": "84d0cacadc8cd681632afacb1f5fc926cac5335d73613ba7f7f3d0b54cb659c6",
     "bytes": 715592
   },
@@ -16,7 +16,7 @@
   },
   "chrome": {
     "status": "available",
-    "executable": "/home/TWIG/.local/bin/google-chrome"
+    "executable": "~/.local/bin/google-chrome"
   },
   "diagnostics": [],
   "containment": {
