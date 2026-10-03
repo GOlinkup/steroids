@@ -8,7 +8,6 @@ A skill router plugin for AI coding tools. Steroids is not a model. It looks at 
 
 [![Live site preview](docs/img/preview-index.png)](index.html)
 
-> This is what `index.html` looks like. Click it for the full page. A README can only show pictures, it cannot run the site. To put the real site online, use GitHub Pages (Settings, Pages, Deploy from branch, root) and it will serve `index.html`.
 
 Router architecture diagram: [docs/architecture.html](docs/architecture.html). Open it in a browser to explore.
 
