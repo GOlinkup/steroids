@@ -1,6 +1,6 @@
 # STEROIDS v0.1.0
 
-<img src="docs/img/logo.png" width="96" alt="Steroids mascot">
+<img src="docs/img/logo.svg" width="96" alt="Steroids mascot">
 
 ![offline-first](https://img.shields.io/badge/offline--first-yes-7ee787) ![P@1 blind-149](https://img.shields.io/badge/P%401_0.993-1f6feb) ![telemetry](https://img.shields.io/badge/telemetry-zero-8b949e) ![v0.1.0](https://img.shields.io/badge/version-0.1.0-8b949e)
 
@@ -51,6 +51,10 @@ Re-run any time: `python3 tests/benchmark.py --live` (all three sets), `--golden
 
 The charts above come from `index.html`, where they are interactive. Ours and SkillRouter's numbers come from different tests, so only size, speed and cost can be compared head to head. Full writeup with links: `docs/STEROIDS_V1.md` §22 (D-3).
 
+## Built with (dogfooded)
+
+ponytail, systematic-debugging, frontend-design + browser-qa, 3d-web-experience, postgres-patterns — full accept log in `memory.json`.
+
 ## Multi-harness support
 
 | Harness | How it hooks in |
@@ -95,4 +99,4 @@ How we work: [CONTRIBUTING.md](CONTRIBUTING.md). Read it before you commit.
 
 ## License
 
-MIT, see [LICENSE](LICENSE). Use it, change it, sell it, just keep the copyright notice and license with it.
+Free for personal and internal business use, but not for sale — see [LICENSE](LICENSE). Keep the copyright notice with it.
