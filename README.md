@@ -9,7 +9,6 @@ A skill router plugin for AI coding tools. Steroids is not a model. It looks at 
 [![Live site preview](docs/img/preview-index.png)](index.html)
 
 
-Router architecture diagram: [docs/architecture.html](docs/architecture.html). Open it in a browser to explore.
 
 ## 30-second quickstart
 
