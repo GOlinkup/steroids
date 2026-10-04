@@ -43,6 +43,21 @@ class TestLens(unittest.TestCase):
         self.assertEqual([s["name"] for s in shots], ["new.png", "old.png"])
         self.assertEqual(shots[0]["label"], "new")
 
+    def test_collect_limit_returns_newest_n(self):
+        d = tempfile.mkdtemp()
+        for i in range(5):
+            _touch(d, "s%d.png" % i, mtime=1000 + i)
+        shots = lens.collect_shots(d, limit=3)
+        self.assertEqual([s["name"] for s in shots],
+                         ["s4.png", "s3.png", "s2.png"])
+        self.assertEqual(len(lens.collect_shots(d)), 5)
+
+    def test_shot_limit_query(self):
+        self.assertEqual(lens.shot_limit(""), lens.PAGE_SCOPE_N)
+        self.assertEqual(lens.shot_limit("n=5"), 5)
+        self.assertEqual(lens.shot_limit("all=1"), 0)
+        self.assertEqual(lens.shot_limit("n=junk"), lens.PAGE_SCOPE_N)
+
     def test_collect_missing_dir_is_empty(self):
         self.assertEqual(lens.collect_shots("/nope/not/here"), [])
 

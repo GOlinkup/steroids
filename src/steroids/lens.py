@@ -45,8 +45,15 @@ def safe_name(watch_dir, name):
     return path if os.path.isfile(path) else None
 
 
-def collect_shots(watch_dir):
-    """Newest-first shot cards for a directory. Never throws."""
+PAGE_SCOPE_N = 24  # lens shows newest-N cards; ?all=1 escapes (kill-the-noise default)
+
+
+def collect_shots(watch_dir, limit=0):
+    """Newest-first shot cards for a directory. Never throws.
+
+    limit>0 returns only the newest `limit` cards (lens scope default);
+    limit<=0 returns everything (terminal watcher + ?all=1 path).
+    """
     try:
         names = os.listdir(watch_dir)
     except OSError:
@@ -70,7 +77,22 @@ def collect_shots(watch_dir):
             "size": st.st_size,
         })
     shots.sort(key=lambda s: s["mtime"], reverse=True)
+    if limit and limit > 0:
+        shots = shots[:limit]
     return shots
+
+
+def shot_limit(query):
+    """Page scope from an /api/shots query string. 0 = all (?all=1)."""
+    try:
+        from urllib.parse import parse_qs
+        q = parse_qs(query or "")
+        if "all" in q:
+            return 0
+        n = int((q.get("n") or [""])[0] or 0)
+        return n if n > 0 else PAGE_SCOPE_N
+    except (ValueError, TypeError):
+        return PAGE_SCOPE_N
 
 
 PAGE = """<!DOCTYPE html>
@@ -104,7 +126,7 @@ header{position:sticky;top:0;background:#11141b;border-bottom:1px solid rgba(255
 </style>
 </head>
 <body>
-<header><span class="dot"></span><b>Steroids Lens</b><span id="dir"></span><span id="count"></span><button id="bell" title="Desktop notifications when a new shot lands">🔔 off</button></header>
+<header><span class="dot"></span><b>Steroids Lens</b><span id="dir"></span><span id="count"></span><button id="scope" title="Lens shows newest 24 — toggle the full archive">recent</button><button id="bell" title="Desktop notifications when a new shot lands">🔔 off</button></header>
 <div id="grid"></div>
 <div id="empty">drop screenshots in the watched folder — new shots pop here</div>
 <div id="toast"><img alt=""><div><b></b><span></span></div></div>
@@ -113,8 +135,15 @@ header{position:sticky;top:0;background:#11141b;border-bottom:1px solid rgba(255
 var seen={},grid=document.getElementById('grid'),empty=document.getElementById('empty'),
     dir=document.getElementById('dir'),count=document.getElementById('count'),
     bell=document.getElementById('bell'),toast=document.getElementById('toast'),
-    tTitle=document.title,first=true,timer=null,notifyOn=
-    ('Notification' in window&&Notification.permission==='granted');
+     tTitle=document.title,first=true,timer=null,notifyOn=
+     ('Notification' in window&&Notification.permission==='granted'),
+     scopeBtn=document.getElementById('scope'),scopeAll=false;
+function setScope(){scopeBtn.textContent=scopeAll?'all':'recent';}
+setScope();
+scopeBtn.onclick=function(){
+  scopeAll=!scopeAll;setScope();
+  grid.innerHTML='';seen={};first=true;poll();
+};
 function setBell(){bell.textContent=notifyOn?'🔔 on':'🔔 off';bell.className=notifyOn?'on':'';}
 setBell();
 bell.onclick=function(){
@@ -158,8 +187,10 @@ function card(s){
   m.appendChild(b);m.appendChild(sp);d.appendChild(img);d.appendChild(m);return d;
 }
 function poll(){
-  fetch('/api/shots').then(function(r){return r.json();}).then(function(list){
-    dir.textContent=list.dir||'';count.textContent=list.shots.length+' shots';
+  fetch(scopeAll?'/api/shots?all=1':'/api/shots?n=24').then(function(r){return r.json();}).then(function(list){
+    dir.textContent=list.dir||'';
+    var total=list.total!=null?list.total:list.shots.length;
+    count.textContent=total>list.shots.length?('showing '+list.shots.length+' of '+total):(total+' shots');
     empty.style.display=list.shots.length?'none':'block';
     var fresh=[];
     list.shots.forEach(function(s){if(!seen[s.name+':'+s.mtime])fresh.push(s);});
@@ -196,10 +227,15 @@ class _Handler(http.server.BaseHTTPRequestHandler):
     def do_GET(self):
         if self.path == "/" or self.path.startswith("/?"):
             self._send(200, PAGE, "text/html; charset=utf-8")
-        elif self.path == "/api/shots":
+        elif self.path.startswith("/api/shots"):
+            query = self.path.partition("?")[2] if "?" in self.path else ""
+            full = collect_shots(self.watch_dir)
+            lim = shot_limit(query)
             payload = json.dumps({
                 "dir": os.path.abspath(self.watch_dir),
-                "shots": collect_shots(self.watch_dir),
+                "total": len(full),
+                "limit": lim,
+                "shots": full[:lim] if lim else full,
             })
             self._send(200, payload, "application/json")
         elif self.path.startswith("/shot/"):
