@@ -209,7 +209,74 @@ const ENGINES: Array<{ id: string; label: string; mark: string; outcome: string;
   { id: "codex", label: "codex", mark: "X", outcome: "code", models: ["gpt-5", "codex-mini"] },
   { id: "ollama", label: "ollama", mark: "L", outcome: "offline", models: ["local"] },
 ];
-const EFFORTS = ["low", "med", "high"] as const;
+/// Effort tiers (designspells-333 motion spec): 4 detents, gradient
+/// fill blue->purple, label recolors by tier, lightning chip + sparkles
+/// at max. Sent values stay free-string on the wire (bridge passes thru).
+const EFFORT_TIERS = [
+  { id: "low", label: "Low", color: "#9ca3af" },
+  { id: "med", label: "Med", color: "#9ca3af" },
+  { id: "high", label: "High", color: "#3b82f6" },
+  { id: "ultra", label: "Ultra", color: "#a855f7" },
+] as const;
+
+/// Effort slider: native range = thumb drag with step detents; detent
+/// dots, gradient fill, recoloring label + chevron, static model name,
+/// lightning chip (gray->purple at max), sparkles at max.
+export function EffortSlider({
+  value,
+  model,
+  onChange,
+}: {
+  value: string;
+  model: string;
+  onChange: (id: string) => void;
+}) {
+  const idx = Math.max(0, EFFORT_TIERS.findIndex((t) => t.id === value));
+  const tier = EFFORT_TIERS[idx];
+  const pct = (idx / (EFFORT_TIERS.length - 1)) * 100;
+  const maxed = idx === EFFORT_TIERS.length - 1;
+  return (
+    <div className="effort">
+      <div className="effort-top">
+        <span className="effort-label" style={{ color: tier.color }}>
+          {tier.label} ›
+        </span>
+        <span className={maxed ? "bolt on" : "bolt"} title="max effort">
+          ⚡
+        </span>
+      </div>
+      <input
+        type="range"
+        min={0}
+        max={EFFORT_TIERS.length - 1}
+        step={1}
+        value={idx}
+        aria-label="Effort"
+        className="effort-range"
+        style={{
+          backgroundColor: "#26272c",
+          backgroundImage: "linear-gradient(90deg,#3b82f6,#a855f7)",
+          backgroundSize: `${pct}% 100%`,
+          backgroundRepeat: "no-repeat",
+        }}
+        onChange={(e) => onChange(EFFORT_TIERS[Number(e.target.value)].id)}
+      />
+      <div className="effort-dots">
+        {EFFORT_TIERS.map((t, i) => (
+          <i key={t.id} className={i <= idx ? "dot on" : "dot"} />
+        ))}
+        {maxed && (
+          <span className="sparkles" aria-hidden="true">
+            <i />
+            <i />
+            <i />
+          </span>
+        )}
+      </div>
+      <div className="effort-model">{model}</div>
+    </div>
+  );
+}
 
 // ~4 chars per token — estimate, labeled as such.
 export function estTokens(text: string): number {
@@ -352,30 +419,6 @@ export function ChatPanel({
         }
       }}
     >
-      <div className="engine-row" title="engine: provider · model · effort">
-        <div className="engine-providers">
-          {ENGINES.map((e) => (
-            <button
-              key={e.id}
-              className={e.id === provider ? "engine on" : "engine"}
-              title={`${e.label} — ${e.outcome}`}
-              onClick={() => pickProvider(e.id)}
-            >
-              <i className="mark">{e.mark}</i>{e.label}<em>{e.outcome}</em>
-            </button>
-          ))}
-        </div>
-        <div className="engine-tune">
-          <select
-            className="tune"
-            aria-label="Effort"
-            value={effort}
-            onChange={(e) => setEffort(e.target.value)}
-          >
-            {EFFORTS.map((f) => <option key={f} value={f}>{f} effort</option>)}
-          </select>
-        </div>
-      </div>
       <div className="chat-log">
         {messages.length === 0 && !thinking && (
           <ActivityOrb
@@ -414,14 +457,21 @@ export function ChatPanel({
       {attachments.length > 0 && (
         <div className="chip-row">
           {attachments.map((a) => (
-            <span key={a.id} className="chip">
-              {a.kind === "image" && a.url && (
-                <img src={a.url} alt={a.name} style={{ width: 32, height: 32, borderRadius: 6, objectFit: "cover" }} />
-              )}
-              <i className="chip-dot" />
-              <span><b className="kind-tag">{kindIcon(a.kind)}</b> {a.name} · {formatSize(a.size)}</span>
-              <button className="chip-x" onClick={() => onRemoveAttachment(a.id)} aria-label="Remove"><XIcon /></button>
-            </span>
+            a.kind === "image" && a.url ? (
+              <span key={a.id} className="chip image-full">
+                <img src={a.url} alt={a.name} className="bubble-img" />
+                <button className="chip-x" onClick={() => onRemoveAttachment(a.id)} aria-label="Remove"><XIcon /></button>
+              </span>
+            ) : (
+              <span key={a.id} className="chip">
+                {a.kind === "image" && a.url && (
+                  <img src={a.url} alt={a.name} style={{ width: 32, height: 32, borderRadius: 6, objectFit: "cover" }} />
+                )}
+                <i className="chip-dot" />
+                <span><b className="kind-tag">{kindIcon(a.kind)}</b> {a.name} · {formatSize(a.size)}</span>
+                <button className="chip-x" onClick={() => onRemoveAttachment(a.id)} aria-label="Remove"><XIcon /></button>
+              </span>
+            )
           ))}
         </div>
       )}
@@ -475,6 +525,25 @@ export function ChatPanel({
           <span className="tools-gap" />
           <button className={canSend ? "send-btn ready" : "send-btn"} onClick={submit} aria-label="Send" disabled={!canSend}>↑</button>
         </div>
+      </div>
+      <div className="engine-row" title="engine: provider · effort">
+        <select
+          className="tune provider-pick"
+          aria-label="Provider"
+          value={provider}
+          onChange={(e) => pickProvider(e.target.value)}
+        >
+          {ENGINES.map((e) => (
+            <option key={e.id} value={e.id}>
+              {e.mark} {e.label} — {e.outcome}
+            </option>
+          ))}
+        </select>
+        <EffortSlider
+          value={effort}
+          model={model}
+          onChange={setEffort}
+        />
       </div>
       <div className="composer-status">
         <TokenMeter text={draft} thinking={thinking} turnMs={turnMs} model={`${provider}/${model}`} />
