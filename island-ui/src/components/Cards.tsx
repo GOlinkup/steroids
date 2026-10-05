@@ -219,61 +219,119 @@ const EFFORT_TIERS = [
   { id: "ultra", label: "Ultra", color: "#a855f7" },
 ] as const;
 
-/// Effort slider: native range = thumb drag with step detents; detent
-/// dots, gradient fill, recoloring label + chevron, static model name,
-/// lightning chip (gray->purple at max), sparkles at max.
-export function EffortSlider({
+/// Effort picker (designspells-333): pill button in the composer opens a
+/// floating sheet — bolt left, big centered label + chevron (crossfades +
+/// recolors by tier), reset right, static model below, thick track with
+/// detent dots ON it, gradient fill blue->purple, big thumb drag,
+/// lightning chip + sparkles on the fill at max.
+export function EffortPicker({
   value,
   model,
   onChange,
+  defaultOpen,
 }: {
   value: string;
   model: string;
   onChange: (id: string) => void;
+  defaultOpen?: boolean;
 }) {
+  const [open, setOpen] = useState(defaultOpen ?? false);
+  const trackRef = useRef<HTMLDivElement>(null);
   const idx = Math.max(0, EFFORT_TIERS.findIndex((t) => t.id === value));
   const tier = EFFORT_TIERS[idx];
-  const pct = (idx / (EFFORT_TIERS.length - 1)) * 100;
   const maxed = idx === EFFORT_TIERS.length - 1;
+  const pct = (idx / (EFFORT_TIERS.length - 1)) * 100;
+  const pick = (i: number) => {
+    const c = Math.max(0, Math.min(EFFORT_TIERS.length - 1, i));
+    onChange(EFFORT_TIERS[c].id);
+  };
+  const fromPointer = (clientX: number) => {
+    const el = trackRef.current;
+    if (!el) return;
+    const r = el.getBoundingClientRect();
+    pick(Math.round(((clientX - r.left) / r.width) * (EFFORT_TIERS.length - 1)));
+  };
   return (
-    <div className="effort">
-      <div className="effort-top">
-        <span className="effort-label" style={{ color: tier.color }}>
-          {tier.label} ›
-        </span>
-        <span className={maxed ? "bolt on" : "bolt"} title="max effort">
-          ⚡
-        </span>
-      </div>
-      <input
-        type="range"
-        min={0}
-        max={EFFORT_TIERS.length - 1}
-        step={1}
-        value={idx}
-        aria-label="Effort"
-        className="effort-range"
-        style={{
-          backgroundColor: "#26272c",
-          backgroundImage: "linear-gradient(90deg,#3b82f6,#a855f7)",
-          backgroundSize: `${pct}% 100%`,
-          backgroundRepeat: "no-repeat",
-        }}
-        onChange={(e) => onChange(EFFORT_TIERS[Number(e.target.value)].id)}
-      />
-      <div className="effort-dots">
-        {EFFORT_TIERS.map((t, i) => (
-          <i key={t.id} className={i <= idx ? "dot on" : "dot"} />
-        ))}
-        {maxed && (
-          <span className="sparkles" aria-hidden="true">
-            <i />
-            <i />
-            <i />
-          </span>
-        )}
-      </div>
-      <div className="effort-model">{model}</div>
+    <div className="effort-wrap">
+      <button
+        className="effort-pill"
+        aria-label="Select effort"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {tier.label} <span aria-hidden="true">⌄</span>
+      </button>
+      {open && (
+        <div className="effort-sheet" role="dialog" aria-label="Effort">
+          <div className="effort-top">
+            <span className={maxed ? "bolt on" : "bolt"} title="effort">
+              ⚡
+            </span>
+            <span
+              key={tier.id}
+              className="effort-label"
+              style={{ color: tier.color }}
+            >
+              {tier.label} <span aria-hidden="true">›</span>
+            </span>
+            <button
+              className="effort-reset"
+              title="Reset effort"
+              onClick={() => onChange("med")}
+            >
+              ↻
+            </button>
+          </div>
+          <div className="effort-model">{model}</div>
+          <div
+            ref={trackRef}
+            className="effort-track"
+            role="slider"
+            aria-valuemin={0}
+            aria-valuemax={EFFORT_TIERS.length - 1}
+            aria-valuenow={idx}
+            aria-label="Effort"
+            onPointerDown={(e) => {
+              (e.target as Element).setPointerCapture?.(e.pointerId);
+              fromPointer(e.clientX);
+            }}
+            onPointerMove={(e) => {
+              if (e.buttons > 0) fromPointer(e.clientX);
+            }}
+          >
+            <div
+              className="effort-fill"
+              style={{
+                width: `${pct}%`,
+                backgroundImage:
+                  "linear-gradient(90deg,#3b82f6,#a855f7)",
+              }}
+            >
+              {maxed && (
+                <span className="sparkles on-fill" aria-hidden="true">
+                  <i />
+                  <i />
+                  <i />
+                </span>
+              )}
+            </div>
+            {EFFORT_TIERS.map((t, i) => (
+              <i
+                key={t.id}
+                className={
+                  i <= idx ? "detent on" : "detent"
+                }
+                style={{
+                  left: `${(i / (EFFORT_TIERS.length - 1)) * 100}%`,
+                }}
+              />
+            ))}
+            <span
+              className="effort-thumb"
+              style={{ left: `${pct}%` }}
+            />
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -507,7 +565,7 @@ export function ChatPanel({
             }
           }}
         />
-        <div className="composer-tools">
+        <div className="composer-innerbar">
           <button
             className="tool-btn"
             title="Attach files"
@@ -515,6 +573,24 @@ export function ChatPanel({
           >
             <PlusIcon size={18} />
           </button>
+          <select
+            className="tune provider-pick"
+            aria-label="Provider"
+            title="engine provider"
+            value={provider}
+            onChange={(e) => pickProvider(e.target.value)}
+          >
+            {ENGINES.map((e) => (
+              <option key={e.id} value={e.id}>
+                {e.mark} {e.label} — {e.outcome}
+              </option>
+            ))}
+          </select>
+        <EffortPicker
+          value={effort}
+          model={model}
+          onChange={setEffort}
+        />
           <button
             className={recording ? "tool-btn recording" : "tool-btn"}
             title={recording ? `Stop recording (${recSecs}s)` : "Record voice note"}
@@ -522,28 +598,8 @@ export function ChatPanel({
           >
             {recording ? <span className="rec-dot" /> : <MicIcon size={18} />}
           </button>
-          <span className="tools-gap" />
           <button className={canSend ? "send-btn ready" : "send-btn"} onClick={submit} aria-label="Send" disabled={!canSend}>↑</button>
         </div>
-      </div>
-      <div className="engine-row" title="engine: provider · effort">
-        <select
-          className="tune provider-pick"
-          aria-label="Provider"
-          value={provider}
-          onChange={(e) => pickProvider(e.target.value)}
-        >
-          {ENGINES.map((e) => (
-            <option key={e.id} value={e.id}>
-              {e.mark} {e.label} — {e.outcome}
-            </option>
-          ))}
-        </select>
-        <EffortSlider
-          value={effort}
-          model={model}
-          onChange={setEffort}
-        />
       </div>
       <div className="composer-status">
         <TokenMeter text={draft} thinking={thinking} turnMs={turnMs} model={`${provider}/${model}`} />
