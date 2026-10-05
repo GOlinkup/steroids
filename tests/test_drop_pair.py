@@ -52,6 +52,20 @@ class PairTest(unittest.TestCase):
         old = {"pin": p["pin"], "expires": time.time() - 1}
         self.assertFalse(pair.pin_valid(old, p["pin"]))  # expired dies
 
+    def test_openssl_missing_refuses_clean(self):
+        import shutil as _shutil
+        real = _shutil.which
+        _shutil.which = lambda c: None
+        pair.CERT_FILE = os.path.join(self.tmp, "fresh-cert.pem")
+        pair.KEY_FILE = os.path.join(self.tmp, "fresh-key.pem")
+        try:
+            self.assertIn("openssl", pair.REQUIRES[0].lower())
+            with self.assertRaises(RuntimeError) as ctx:
+                pair.ensure_cert()
+            self.assertIn("openssl", str(ctx.exception).lower())
+        finally:
+            _shutil.which = real
+
     def test_pair_unpair_roundtrip(self):
         self.assertFalse(pair.is_paired("abc"))
         pair.pair("abc", "test-phone")

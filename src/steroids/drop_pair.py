@@ -1,18 +1,23 @@
 #!/usr/bin/env python3
 """Steroids drop pairing — T1-1: QR+PIN trust, platform TLS after.
 
-One trust for all drop channels: a self-signed cert (openssl CLI, cached),
-its SHA-256 fingerprint carried in the QR, and a 6-digit PIN that opens a
-session. No in-tree E2E libs exist (stdlib has no AES-GCM/X25519) — secrecy
-rides platform TLS; the PIN authorizes, the fingerprint defeats MITM.
+One trust for all drop channels: a self-signed cert, its SHA-256
+fingerprint carried in the QR, and a 6-digit PIN that opens a session.
+No in-tree E2E libs exist (stdlib has no AES-GCM/X25519) — secrecy rides
+platform TLS; the PIN authorizes, the fingerprint defeats MITM.
+
+Requires: openssl CLI (declared dep). Absent or failing openssl raises
+a clean RuntimeError naming the fix — never a CalledProcessError death.
 """
 import hashlib
 import json
 import os
 import secrets
+import shutil
 import subprocess
 import time
 
+REQUIRES = ("openssl CLI",)  # declared external dep, exactly one
 CERT_DIR = os.path.join(os.environ.get("XDG_CACHE_HOME",
                                         os.path.expanduser("~/.cache")),
                         "steroids", "drop")
@@ -22,14 +27,25 @@ REGISTRY_FILE = os.path.join(CERT_DIR, "paired.json")
 PIN_TTL = 120  # a shown PIN opens sessions for 2 minutes, then dies
 
 
+def _openssl(args):
+    """Run openssl, refusing cleanly instead of dying on check=True."""
+    if shutil.which("openssl") is None:
+        raise RuntimeError("openssl CLI required for drop certs "
+                           "(install openssl, then retry)")
+    proc = subprocess.run(["openssl"] + args, capture_output=True)
+    if proc.returncode != 0:
+        tail = proc.stderr.decode().strip().splitlines()[-1:]
+        raise RuntimeError("openssl failed: %s" % " ".join(tail))
+    return proc.stdout
+
+
 def ensure_cert():
     """Mint (once) + return (cert_path, key_path). Shells to openssl CLI."""
     os.makedirs(CERT_DIR, exist_ok=True)
     if not (os.path.exists(CERT_FILE) and os.path.exists(KEY_FILE)):
-        subprocess.run(["openssl", "req", "-x509", "-newkey", "rsa:2048",
-                        "-keyout", KEY_FILE, "-out", CERT_FILE,
-                        "-days", "3650", "-nodes", "-subj", "/CN=steroids-drop"],
-                       check=True, capture_output=True)
+        _openssl(["req", "-x509", "-newkey", "rsa:2048",
+                  "-keyout", KEY_FILE, "-out", CERT_FILE,
+                  "-days", "3650", "-nodes", "-subj", "/CN=steroids-drop"])
         os.chmod(KEY_FILE, 0o600)
     return CERT_FILE, KEY_FILE
 
@@ -37,10 +53,8 @@ def ensure_cert():
 def fingerprint(cert_path=None):
     """SHA-256 hex of the DER cert — the value the QR carries."""
     cert_path = cert_path or CERT_FILE  # resolve late: tests repoint it
-    out = subprocess.run(["openssl", "x509", "-in", cert_path,
-                          "-outform", "DER"],
-                         check=True, capture_output=True).stdout
-    return hashlib.sha256(out).hexdigest()
+    der = _openssl(["x509", "-in", cert_path, "-outform", "DER"])
+    return hashlib.sha256(der).hexdigest()
 
 
 def mint_pin():

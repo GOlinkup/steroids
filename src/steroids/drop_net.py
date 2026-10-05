@@ -23,9 +23,8 @@ MULTICAST_GROUP = "224.0.0.167"  # LocalSend default; Android-safe range
 MULTICAST_PORT = 53317
 PROTOCOL_VERSION = "2.0"
 PEER_TIMEOUT = 120  # stale peers (left network) drop after 2 minutes
+SESSION_TTL = 600  # dead sessions stop blocking new prepares after 10 min
 
-_sessions = {}  # sessionId -> {pin_ok, files: {id: meta}, created}
-_sessions_lock = threading.Lock()
 
 
 def self_info(alias, port, fingerprint):
@@ -129,6 +128,18 @@ def pinned_get(host, port, path, fingerprint, body=None, timeout=10):
         conn.close()
 
 
+def manual_add(host, port, fingerprint, own_info, peers):
+    """Hostile-network fallback: direct pinned register, no multicast.
+    Returns the peer info; raises (loudly) on refusal or mismatch."""
+    st, info = pinned_get(host, port, "/api/localsend/v2/register",
+                          fingerprint, own_info)
+    if st != 200 or not isinstance(info, dict) or \
+            "fingerprint" not in info:
+        raise ConnectionError("manual register failed: %s %s" % (st, info))
+    peers.seen(info, host)
+    return info
+
+
 class DropHandler(http.server.BaseHTTPRequestHandler):
     server_version = "SteroidsDrop/1.0"
     # set by serve(): srv.info, srv.peers, srv.pin_state, srv.on_upload
@@ -161,10 +172,13 @@ class DropHandler(http.server.BaseHTTPRequestHandler):
         query = urllib.parse.parse_qs(url.query)
         if url.path == "/api/localsend/v2/register":
             info = self._read_json()
-            if isinstance(info, dict) and "fingerprint" in info:
-                host = self.client_address[0]
-                self.server.peers.seen(info, host)
-            self._send(200, self.server.info)
+            if not isinstance(info, dict) or "fingerprint" not in info:
+                return self._send(400, {"error": "bad peer info"})
+            if info["fingerprint"] == self.server.info["fingerprint"]:
+                return self._send(412, {"error": "self-register refused"})
+            host = self.client_address[0]
+            self.server.peers.seen(info, host)
+            return self._send(200, self.server.info)
         elif url.path == "/api/localsend/v2/prepare-upload":
             self._handle_prepare(query)
         elif url.path == "/api/localsend/v2/upload":
@@ -181,17 +195,31 @@ class DropHandler(http.server.BaseHTTPRequestHandler):
         if not self._pin_ok(query):
             self._send(401, {"error": "PIN required or expired"})
             return
+        # NOTE (consent): a correct PIN typed on the sender IS the human
+        # consent gate for this session. A full per-file accept-UI on the
+        # receiver waits for the phone card; until then one live session
+        # at a time — a second prepare while one is unfinished gets 409.
+        now = time.time()
+        with self.server.sessions_lock:
+            for sid in [s for s in self.server.sessions
+                        if now - self.server.sessions[s]["created"] > SESSION_TTL]:
+                del self.server.sessions[sid]
+            busy = [s for s, v in self.server.sessions.items()
+                    if any(not m.get("done") for m in v["files"].values())]
+        if busy:
+            self._send(409, {"error": "busy: current drop unfinished"})
+            return
         req = self._read_json()
         files = req.get("files", {}) if isinstance(req, dict) else {}
         session_id = secrets.token_hex(8)
         accepted = {}
-        with _sessions_lock:
-            _sessions[session_id] = {"files": {}, "created": time.time()}
+        with self.server.sessions_lock:
+            self.server.sessions[session_id] = {"files": {}, "created": time.time()}
             for fid, meta in files.items():
                 if not isinstance(meta, dict):
                     continue
                 token = secrets.token_hex(8)
-                _sessions[session_id]["files"][fid] = dict(meta, token=token)
+                self.server.sessions[session_id]["files"][fid] = dict(meta, token=token)
                 accepted[fid] = token
         self._send(200, {"sessionId": session_id, "files": accepted})
 
@@ -200,8 +228,8 @@ class DropHandler(http.server.BaseHTTPRequestHandler):
                       if "sessionId" in query else "")
         file_id = query.get("fileId", [""])[0] if "fileId" in query else ""
         token = query.get("token", [""])[0] if "token" in query else ""
-        with _sessions_lock:
-            session = _sessions.get(session_id)
+        with self.server.sessions_lock:
+            session = self.server.sessions.get(session_id)
             meta = (session or {}).get("files", {}).get(file_id)
         if not session or not meta or meta.get("token") != token:
             self._send(403, {"error": "bad session, file, or token"})
@@ -247,6 +275,11 @@ class DropHandler(http.server.BaseHTTPRequestHandler):
         except OSError as e:
             self._send(500, {"error": "finalize failed: %s" % e})
             return
+        with self.server.sessions_lock:  # landed: session progress for the 409 gate
+            done_mark = self.server.sessions.get(session_id, {}).get("files", {}).get(
+                file_id)
+            if done_mark is not None:
+                done_mark["done"] = True
         try:
             self.server.on_upload(dict(meta, path=final,
                                        sha256=digest.hexdigest()))
@@ -287,6 +320,8 @@ class DropServer:
         self._http.info = self.info
         self._http.peers = self.peers
         self._http.pin_state = pin_state or {}
+        self._http.sessions = {}  # per-server: instances never share
+        self._http.sessions_lock = threading.Lock()
         self._http.dest_dir = dest_dir
         self._http.on_upload = lambda meta: None
         self._http.socket = ctx.wrap_socket(self._http.socket,

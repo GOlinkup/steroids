@@ -230,6 +230,33 @@ class QRTest(unittest.TestCase):
         fixed = _correct_errors(cw, [])
         self.assertEqual(bytes(fixed[:data_len]), bytes(clean[:data_len]))
 
+    def test_spec_table_crosscheck(self):
+        # ISO 18004 §6.7/Annex E values, hardcoded: catches table typos.
+        self.assertEqual(qr._VERSIONS,
+                         {1: (21, 19, 7, []),
+                          2: (25, 34, 10, [6, 18]),
+                          3: (29, 55, 15, [6, 22]),
+                          4: (33, 80, 20, [6, 26])})
+        for text, ver in (("A", 1), ("B" * 30, 2),
+                          ("SD1:" + "C" * 64 + ":1", 3), ("Q" * 100, 4)):
+            mat, got = qr.encode(text)
+            self.assertEqual(got, ver)
+            n = len(mat)
+            size, data_cw, ecc_cw, centers = qr._VERSIONS[ver]
+            self.assertEqual(n, size)
+            for c in centers:  # alignment rings really land on ISO centers
+                if c == 6:
+                    continue  # timing intersection, never a pattern
+                ring = [mat[c - 2][c - 2 + i] for i in range(5)] + \
+                       [mat[c + 2][c - 2 + i] for i in range(5)]
+                self.assertTrue(all(ring), "outer ring dark at %d" % c)
+                self.assertEqual(mat[c][c], 1)  # core dark
+                self.assertEqual(mat[c - 1][c], 0)  # moat light
+            free = sum(1 for r in range(n) for cc in range(n)
+                       if not _func_map(n)[r][cc])
+            rem = {1: 0, 2: 7, 3: 7, 4: 7}[ver]
+            self.assertEqual(free, (data_cw + ecc_cw) * 8 + rem)
+
     def test_function_geometry(self):
         mat, ver = qr.encode("GEOMETRY")
         n = len(mat)
