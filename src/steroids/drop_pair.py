@@ -78,14 +78,17 @@ def _load_registry():
 
 
 def is_paired(peer_fingerprint):
-    """Trust-forever check: fingerprint pinned at pair time."""
-    return peer_fingerprint in _load_registry()
+    """Trust-forever check: fingerprint pinned at pair time.
+
+    Hex is case-blind: the QR ships UPPER, callers may pass either."""
+    return peer_fingerprint.lower() in _load_registry()
 
 
 def pair(peer_fingerprint, alias):
     """Pin a verified fingerprint. Call only after QR/PIN verification."""
     reg = _load_registry()
-    reg[peer_fingerprint] = {"alias": alias, "paired_at": time.time()}
+    reg[peer_fingerprint.lower()] = {"alias": alias,
+                                     "paired_at": time.time()}
     os.makedirs(CERT_DIR, exist_ok=True)
     with open(REGISTRY_FILE, "w") as f:
         json.dump(reg, f)
@@ -94,6 +97,6 @@ def pair(peer_fingerprint, alias):
 def unpair(peer_fingerprint):
     """Revoke trust. All channels die with it (checked per session)."""
     reg = _load_registry()
-    reg.pop(peer_fingerprint, None)
+    reg.pop(peer_fingerprint.lower(), None)
     with open(REGISTRY_FILE, "w") as f:
         json.dump(reg, f)

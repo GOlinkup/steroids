@@ -74,6 +74,12 @@ class PairTest(unittest.TestCase):
         pair.unpair("abc")  # revocation kills trust
         self.assertFalse(pair.is_paired("abc"))
 
+    def test_pair_lookup_case_blind(self):
+        pair.pair("ab12cd", "case-phone")  # stored lower...
+        self.assertTrue(pair.is_paired("AB12CD"))  # ...QR ships UPPER
+        pair.unpair("AB12CD")  # revocation is case-blind too
+        self.assertFalse(pair.is_paired("ab12cd"))
+
 
 if __name__ == "__main__":
     unittest.main()
