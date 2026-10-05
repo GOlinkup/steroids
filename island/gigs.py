@@ -86,9 +86,11 @@ def add_native(title, pay_cents, category="general", location="",
 def remotive_rows(limit=10, opener=None, now=None):
     """Keyless seed. Attribution + freshness on every row; outage -> []."""
     at = now if now is not None else int(time.time())
+    req = urllib.request.Request(
+        REMOTIVE_URL % limit,
+        headers={"User-Agent": "SteroidsIsland/0.1.1 (gig-seed)"})
     try:
-        resp = (opener or urllib.request.urlopen)(
-            REMOTIVE_URL % limit, timeout=15)
+        resp = (opener or urllib.request.urlopen)(req, timeout=15)
         body = json.loads(resp.read().decode())
     except Exception:
         return []
