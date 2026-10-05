@@ -42,3 +42,7 @@ P3 daily (S3) / P4 money (S5) / P5 limitless spine (little-at-a-time).
 
 Every sprint: story.md (pointer) + tasks.md (Description / Do-not-touch /
 Acceptance checkboxes / Verification / Dependencies / Files / Size).
+
+Naming: human calls this release v0.1.1 (not "v11"). Card titles use v0.1.1;
+`v11-*` ids and `specs/v11-*` dirs stay as stable internal keys (renaming
+keys breaks chains; titles are what humans read).

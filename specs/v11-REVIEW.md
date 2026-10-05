@@ -1,0 +1,56 @@
+# v0.1.1 review — every task, how it closed (god-compiled 2026-10-05)
+
+Ledger: 34 v0.1.1 cards. Method throughout: builder → second worker audits
+vs online refs → god verifies in-tree (hash + stat + substance) → verdict.
+10/10 by all 3 or the card loops. No closes on report words alone.
+
+## VERDICTS 10/10 (5)
+- Sprint 1 pair+drop (steroids Python): a117a1e + 48283b8 → audit 7/10 →
+  redo 37bb047 → re-audit 9/10 → jsqr MATCH → qrcase 2155afe (god
+  diff-read) → 10/10. Transport engine kept as island backend.
+- Sprint 3 daily (Flutter, historical): 4 commits → audit 9/10 → redo
+  0f7eb0d → confirm 10/10. React port carded (r-daily, building).
+- Sprint 2 mirror (Flutter, historical): 4 commits → audit 10/10 confirm.
+  React port carded (r-mirror).
+- Sprint 5 money (Flutter, historical): 3 commits → audit 10/10 (1 nit →
+  s4). React port carded (r-money).
+- Chat images (React island, LIVE): 9245585 thumbnail → audit 10/10.
+  Served on :8905 (fresh dist verified).
+
+## BUILT, VERDICT VIA PORT (Flutter historical, ports chained)
+- Sprint 4 socials: 7f56901 + 4f94e25 + 2d5545f + 0da87e5 cuts (verified).
+  Audit cancelled (tree went red on foreign rail import; port first).
+- Lens scope (island backend, LIVE): 8f61346 newest-24 + toggle, 8/8.
+- Island rebuild: vite clean, :8905 restarted, 200 + marker verified.
+
+## RESEARCH (all closed, read-only)
+- Phone: native over PWA; LocalSend proto; TLS+PIN; explicit-send; ntfy.
+- Daily: zero-key trio; YT embed+Referer; WS relay; Masto+Bluesky>Reddit.
+- Trending: free gaps (no-login, no caps, privacy); HN topstories first.
+- Explore recon: discovery = NO for zero-skill users; first-fix = rails.
+
+## SPECS (V1-style, in tree)
+- v11-plan.md + v11-s1..s6 (story + tasks each) + v11-island.md (god).
+- Feats: 20 free ideas spec'd (transport/money Kevin, daily/glue Jim) +
+  level-ups (2 shared-lib proposals + 12 new ideas). Builds uncarded.
+
+## CANCELLED (human orders, nothing lost)
+- Flutter rails (file = React reference), s4-audit (React audit later).
+- Rides (indefinite), X/IG/TT, management console, OCR (follow-up),
+  YT background, email/bills, paid anything.
+
+## QUEUED CHAIN (owners + triggers)
+- spec-react (Kevin, now) → r-mirror → r-money (Kevin).
+- r-daily (Jim, now) → r-socials → r-rails (Jim) → mascot (recon-first).
+- s5-audit history stands; React audits card fresh per port close.
+
+## DEVICE TAPS OWED (human, 2 min each)
+- Pair/scan + both-way files; hotspot zero-data counter; WiFi join/leave.
+- Calendar grant; embed render (no err153); notif 3-app + reply + deny;
+  8h background + hotspot switch; airplane replies single-delivery.
+
+## STANDING DOCTRINE FROM THIS RUN
+- Verify-substance (hash+stat+tree) before every close. Accept-with-noted-
+  remainder only for device-side remainders, never builder work. Nits fold
+  forward, closed cards never reopen. Owner fixes foreign breaks (asked,
+  never taken). Titles v0.1.1; v11-* stay as stable keys.
