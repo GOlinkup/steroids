@@ -24,6 +24,8 @@ from urllib.parse import urlparse, parse_qs
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agentlog  # noqa: E402  (same CLI path as the desktop island app)
 import relay  # noqa: E402  (self WS relay: /relay/ws + qr/verify/send)
+import gigs  # noqa: E402  (gig adapters: native store + Remotive seed)
+import profile  # noqa: E402  (island profile: mirror-only)
 
 HOST, PORT = "127.0.0.1", 8096
 BODY_LIMIT = 64 * 1024
@@ -228,11 +230,23 @@ class Handler(SimpleHTTPRequestHandler):
             return
         elif parts.path == "/relay/qr":
             self._send(relay.qr_pair())
+        elif parts.path == "/gigs":
+            try:
+                limit = int((parse_qs(parts.query).get("limit") or ["10"])[0])
+            except ValueError:
+                limit = 10
+            self._send(gigs.load(max(1, min(limit, 50))))
+        elif parts.path == "/profile":
+            self._send({"ok": True, "profile": profile.mirror()})
         elif getattr(self.server, "serve_dir", None):
             super().do_GET()
         else:
             self._send({"ok": True, "usage": "GET /health, /sessions, "
-                                             "/skills?q=, /trending | POST /chat"},
+                                             "/skills?q=, /trending, /gigs, "
+                                             "/profile, /relay/qr | POST "
+                                             "/chat, /gigs/add, "
+                                             "/profile/unlink, /relay/verify, "
+                                             "/relay/send"},
                        404)
 
     def _read_json(self):
@@ -249,6 +263,21 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parts = urlparse(self.path)
+        if parts.path == "/gigs/add":
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            gid = gigs.add_native(req.get("title"), req.get("pay_cents"),
+                                  req.get("category") or "general",
+                                  req.get("location") or "",
+                                  bool(req.get("remote", False)))
+            if gid is None:
+                return self._send({"ok": False,
+                                   "error": "title str + pay_cents int"}, 400)
+            return self._send({"ok": True, "id": gid})
+        if parts.path == "/profile/unlink":
+            return self._send({"ok": True,
+                               "profile": profile.unlink()})
         if parts.path == "/relay/verify":
             req = self._read_json()
             if req is None:
