@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { PlusIcon, MicIcon, XIcon } from "./icons";
+import { ActivityOrb } from "../orb";
+import { IDLE_ACTIVITY } from "../orb_state";
 import {
   formatSize,
   type AgentSession,
@@ -375,6 +377,12 @@ export function ChatPanel({
         </div>
       </div>
       <div className="chat-log">
+        {messages.length === 0 && !thinking && (
+          <ActivityOrb
+            activity={{ ...IDLE_ACTIVITY, listening: recording }}
+            label={recording ? "listening" : "breathing"}
+          />
+        )}
         {messages.map((m) => (
           <div key={m.id} className={m.role === "user" ? "chat-row user" : "chat-row"}>
             <div className={m.role === "user" ? "bubble" : "reply"}>
