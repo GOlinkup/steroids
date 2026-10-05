@@ -10,6 +10,7 @@ import socket
 import struct
 import sys
 import threading
+import time
 import unittest
 from http.client import HTTPConnection
 from threading import Thread
@@ -95,6 +96,7 @@ class RelayTest(unittest.TestCase):
         _, key = self._pair()
         a = self._ws(key)
         b = self._ws(key)
+        time.sleep(0.3)  # let both hub registrations land
         frame = json.dumps({"type": "reply", "key": key, "text": "hi"})
         a.sendall(_masked(frame))
         op, data = _read_frame(b)
