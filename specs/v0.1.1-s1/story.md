@@ -1,3 +1,3 @@
-# Story S-V11-5: Money + onboarding (Sprint 5)
+# Story S-V0.1.1-1: Pair + Drop (Sprint 1)
 
 See tasks.md (same directory) for the full story, outcome, tasks, and checkpoints.

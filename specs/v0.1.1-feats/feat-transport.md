@@ -14,7 +14,7 @@ Acceptance:
 - [ ] phone keyboard types into the focused PC window
 - [ ] input stops the moment pairing is revoked (no orphan control)
 Verification: type a sentence + click a target on test PC; revoke pairing mid-session, input must die
-Dependencies: Sprint 1 pairing + LAN (V11-1-1..3)
+Dependencies: Sprint 1 pairing + LAN (V0.1.1-1-1..3)
 Files likely touched: new input module (native, lane owner decides)
 Size: M
 
