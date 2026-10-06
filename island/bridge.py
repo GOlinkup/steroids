@@ -13,11 +13,13 @@ answers 503 and the web UI silently falls back to its mock replies.
 """
 
 import json
+import base64
 import mimetypes
 import os
 import socket
 import subprocess
 import sys
+import threading
 import time
 from collections import Counter
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
@@ -31,7 +33,6 @@ import profile  # noqa: E402  (island profile: mirror-only)
 
 HOST, PORT = "127.0.0.1", 8096
 BODY_LIMIT = 64 * 1024
-TURN_TIMEOUT = 150  # real agent turns take a while; the UI shows thinking
 SEARCH_TIMEOUT = 20
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
@@ -53,6 +54,63 @@ def lens_lib():
         spec.loader.exec_module(m)
         _lens_lib = m
     return _lens_lib
+
+
+def daemon_clean(server, attr):
+    """Reap a dead daemon (fist-exit counts). Returns live proc or None."""
+    p = getattr(server, attr, None)
+    if p is not None and p.poll() is not None:
+        setattr(server, attr, None)
+        return None
+    return p
+
+
+def daemon_stop(server, attr):
+    p = daemon_clean(server, attr)
+    if p is None:
+        return
+    p.terminate()
+    try:
+        p.wait(timeout=3)
+    except Exception:
+        try:
+            p.kill()
+        except Exception:
+            pass
+    setattr(server, attr, None)
+
+
+def daemon_start(server, kind, extra=None):
+    """Start the hand|gaze daemon; stops the other (one camera between them)."""
+    daemon_stop(server, "gaze_proc" if kind == "hand" else "hand_proc")
+    attr = kind + "_proc"
+    if daemon_clean(server, attr) is not None:
+        return {"ok": True, "running": True}
+    script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
+                          "handd.py" if kind == "hand" else "gazed.py")
+    args = [sys.executable, script, "--no-preview"] + list(extra or [])
+    # self-view rides the lens page (/gaze-frame) — never an OS popup.
+    try:
+        os.makedirs(os.path.expanduser("~/.config/steroids"), exist_ok=True)
+        logo = open(os.path.expanduser("~/.config/steroids/%s.log" % kind), "a")
+    except Exception:
+        logo = subprocess.DEVNULL
+    try:
+        proc = subprocess.Popen(
+            args, stdout=logo, stderr=subprocess.STDOUT,
+            stdin=subprocess.DEVNULL, start_new_session=True)
+    except Exception as e:
+        return {"ok": False, "error": str(e)}
+    setattr(server, attr, proc)
+    time.sleep(1.5)  # let it grab the camera or die trying
+    if proc.poll() is not None:
+        setattr(server, attr, None)
+        if proc.returncode == 2:
+            return {"ok": False, "running": False,
+                    "error": "no camera — free the webcam, then retry"}
+        return {"ok": False, "running": False,
+                "error": "%s exited (code %s)" % (kind, proc.returncode)}
+    return {"ok": True, "running": True}
 
 
 def live_dir():
@@ -159,8 +217,114 @@ def trending(limit_rows=500):
             "recent": recent}
 
 
-def run_turn(msg, session_id=None, provider="opencode"):
-    """One agent turn via local CLI. argv list, no shell. Returns dict."""
+TURNS = {}  # tid -> live turn snapshot (the UI polls while it streams)
+TURNS_LOCK = threading.Lock()
+TURN_TTL = 600  # forget finished turns after 10 min
+
+
+def _turn_snapshot(t):
+    out = {"done": t["done"], "activity": t["activity"],
+           "partial": t["partial"][-4000:], "session": t.get("session"),
+           "elapsed": round(time.time() - t["started"], 1)}
+    if t["done"]:
+        out["ok"] = t.get("ok", True)
+        if t.get("text") is not None:
+            out["text"] = t["text"]
+        if t.get("error") is not None:
+            out["error"] = t["error"]
+    return out
+
+
+def _turn_sweep():
+    now = time.time()
+    stale = [k for k, t in TURNS.items()
+             if (t["done"] and now - t["started"] > TURN_TTL)
+             or (not t["done"] and now - t["started"] > 900)]
+    for tid in stale:
+        p = TURNS[tid].get("proc")
+        if p is not None:
+            try:
+                p.terminate()
+            except OSError:
+                pass
+        del TURNS[tid]
+
+
+def _pump_turn(tid, argv, stdin_data, provider):
+    """Read CLI JSON lines as they stream; the UI polls the snapshot."""
+    t = TURNS.get(tid)
+    if t is None:
+        return
+    try:
+        p = subprocess.Popen(
+            argv, stdin=subprocess.PIPE if stdin_data else None,
+            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
+            text=True, bufsize=1)
+    except FileNotFoundError:
+        with TURNS_LOCK:
+            t.update(done=True, ok=False,
+                     error="%s CLI not installed" % provider)
+        return
+    with TURNS_LOCK:
+        t["proc"] = p
+    if stdin_data:
+        try:
+            assert p.stdin is not None
+            p.stdin.write(stdin_data)
+            p.stdin.close()
+        except (BrokenPipeError, OSError):
+            pass
+    lines, partials, result = [], [], ""
+    try:
+        assert p.stdout is not None
+        for ln in p.stdout:
+            ln = ln.strip()
+            if not ln:
+                continue
+            lines.append(ln)
+            if len(lines) > 600:
+                del lines[:-600]
+            try:
+                j = json.loads(ln)
+            except ValueError:
+                continue
+            if not isinstance(j, dict):
+                continue
+            u = (agentlog.claude_line(j) if provider == "claude"
+                 else agentlog.opencode_line(j))
+            if not u:
+                continue
+            with TURNS_LOCK:
+                if u.get("session"):
+                    t["session"] = u["session"]
+                if u.get("activity"):
+                    t["activity"] = u["activity"]
+                if u.get("text"):
+                    partials.append(u["text"])
+                    t["partial"] = "\n".join(partials)[-4000:]
+                if u.get("result"):
+                    result = u["result"]
+        rc = p.wait()
+    except Exception as e:
+        with TURNS_LOCK:
+            t.update(done=True, ok=False, error=str(e))
+        return
+    plain = "\n".join(ln for ln in lines[-12:]
+                      if not ln.lstrip().startswith("{"))
+    text = (result or "\n".join(partials)[-4000:]
+            or plain[-4000:] or "…")[:4000]
+    with TURNS_LOCK:
+        if rc != 0 and not (result or partials):
+            t.update(done=True, ok=False,
+                     error="exit %s: %s" % (rc, text[-300:]))
+        else:
+            t.update(done=True, ok=True, text=text)
+
+
+def start_turn(msg, session_id=None, provider="opencode"):
+    """Spawn an agent turn in the background. Returns {ok, turn}."""
+    if provider == "auto":
+        provider = "opencode"  # router-pick default: local opencode, no keys
     if provider not in ("opencode", "claude"):
         return {"ok": False, "error": "unknown provider %r" % provider}
     if not agentlog.provider_available(provider):
@@ -168,49 +332,30 @@ def run_turn(msg, session_id=None, provider="opencode"):
                 "code": 503}
     try:
         argv, stdin_data = agentlog.describe_command(provider, msg, session_id)
-        p = subprocess.run(argv, input=stdin_data, capture_output=True,
-                           text=True, timeout=TURN_TIMEOUT)
-    except FileNotFoundError:
-        return {"ok": False, "error": "%s CLI not installed" % provider,
-                "code": 503}
-    except subprocess.TimeoutExpired:
-        return {"ok": False, "error": "turn timed out after %ss" % TURN_TIMEOUT,
-                "code": 504}
-    session, partial, result_text, ok, plain = "", "", "", True, []
-    for ln in (p.stdout or "").splitlines():
-        ln = ln.strip()
-        if not ln:
-            continue
-        plain.append(ln)
+    except ValueError as e:
+        return {"ok": False, "error": str(e)}
+    tid = os.urandom(8).hex()
+    with TURNS_LOCK:
+        _turn_sweep()
+        TURNS[tid] = {"done": False, "ok": True, "activity": "starting…",
+                      "partial": "", "session": session_id,
+                      "started": time.time(), "proc": None}
+    th = threading.Thread(target=_pump_turn,
+                          args=(tid, argv, stdin_data, provider), daemon=True)
+    th.start()
+    return {"ok": True, "turn": tid}
+
+
+def stop_turn(tid):
+    with TURNS_LOCK:
+        t = TURNS.get(tid)
+        p = t.get("proc") if t else None
+    if p is not None:
         try:
-            j = json.loads(ln)
-        except ValueError:
-            continue
-        if provider == "claude":
-            u = agentlog.claude_line(j)
-            if not u:
-                continue
-            session = u.get("session") or session
-            if u.get("assistant_text"):
-                partial = u["assistant_text"]
-            if "result" in u:
-                result_text = u.get("result") or partial
-                ok = bool(u.get("ok", True))
-        else:  # opencode run --format json
-            u = agentlog.opencode_line(j)
-            if not u:
-                continue
-            session = u.get("session") or session
-            if u.get("activity"):
-                activity = u["activity"]
-            if u.get("text"):
-                partial = u["text"]
-            if u.get("result"):
-                result_text = u["result"]
-    text = (result_text or partial or "\n".join(plain)[-4000:] or "…")[:4000]
-    if p.returncode != 0 and not (result_text or partial):
-        return {"ok": False, "error": "exit %s: %s" % (p.returncode, text[-300:])}
-    return {"ok": True, "text": text, "session": session or session_id or None}
+            p.terminate()
+        except OSError:
+            pass
+    return t is not None
 
 
 class Handler(SimpleHTTPRequestHandler):
@@ -228,10 +373,25 @@ class Handler(SimpleHTTPRequestHandler):
     def _local(self):
         return self.client_address[0] in ("127.0.0.1", "::1")
 
+    def do_DELETE(self):
+        # agent-session hides: the island history panel gets a delete affordance
+        # for terminal sessions too (opencode/claude rows). Hide, don't rm —
+        # the provider's own store stays intact.
+        if not self._local():
+            return self._send({"ok": False,
+                               "error": "delete from the PC itself"}, 403)
+        parts = urlparse(self.path)
+        if parts.path == "/agent-sessions":
+            sid = (parse_qs(parts.query).get("session") or [""])[0].strip()
+            if not sid:
+                return self._send({"ok": False, "error": "session id required"}, 400)
+            return self._send({"ok": True, "hidden": agentlog.hide_session(sid)})
+        return self._send({"ok": False, "error": "unknown endpoint"}, 404)
+
     def do_OPTIONS(self):  # browser preflight for POST /chat
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
-        self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
+        self.send_header("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
 
@@ -243,8 +403,23 @@ class Handler(SimpleHTTPRequestHandler):
                         "claude": agentlog.claude_available()})
         elif parts.path == "/sessions":
             try:
+                hidden = agentlog.hidden_sessions()
                 evs = agentlog.read_events(limit=300)
-                self._send({"sessions": agentlog.sessions(evs)})
+                hooked = agentlog.sessions(evs)
+                # plus every terminal chat from opencode's own db (pickup).
+                seen = {s["session"] for s in hooked}
+                extra = [s for s in agentlog.opencode_db_sessions()
+                         if s["session"] not in seen]
+                seen.update(s["session"] for s in extra)
+                # plus claude code's own transcripts when they exist.
+                extra += [s for s in agentlog.claude_projects_sessions()
+                          if s["session"] not in seen]
+                merged = sorted(hooked + extra,
+                                key=lambda s: s["ts"] or 0,
+                                reverse=True)
+                # respect UI hides: deleted from the island stays deleted.
+                merged = [s for s in merged if s["session"] not in hidden][:12]
+                self._send({"sessions": merged})
             except Exception as e:
                 self._send({"sessions": [], "error": str(e)})
         elif parts.path == "/skills":
@@ -284,6 +459,15 @@ class Handler(SimpleHTTPRequestHandler):
             except (AttributeError, IndexError):
                 pass
             self._send(out)
+        elif parts.path == "/relay/dl-qr":
+            # scan-to-get-the-app: QR of the plain LAN island URL.
+            try:
+                base = lan_base(self.server.server_address[1])
+            except (AttributeError, IndexError):
+                base = ""
+            if not base:
+                return self._send({"ok": False, "error": "no LAN url"}, 404)
+            self._send({"ok": True, **relay.dl_qr(base + "/?app=1")})
         elif parts.path == "/gigs":
             try:
                 limit = int((parse_qs(parts.query).get("limit") or ["10"])[0])
@@ -292,6 +476,34 @@ class Handler(SimpleHTTPRequestHandler):
             self._send(gigs.load(max(1, min(limit, 50))))
         elif parts.path == "/profile":
             self._send({"ok": True, "profile": profile.mirror()})
+        elif parts.path in ("/hand", "/gaze"):
+            # cursor-daemon status — moves the real OS cursor (localhost reads).
+            kind = parts.path[1:]
+            self._send({"running": daemon_clean(self.server, kind + "_proc") is not None})
+        elif parts.path == "/turn":
+            # live agent turn snapshot (polled while it streams).
+            tid = (parse_qs(parts.query).get("id") or [""])[0]
+            with TURNS_LOCK:
+                _turn_sweep()
+                t = TURNS.get(tid)
+                snap = _turn_snapshot(t) if t else None
+            if snap is None:
+                return self._send({"ok": False, "error": "no such turn"}, 404)
+            self._send(snap)
+        elif parts.path == "/gaze-frame":
+            # live self-view for the lens page (daemon drops it, no popup).
+            try:
+                with open(os.path.expanduser("~/.config/steroids/gaze_frame.jpg"), "rb") as f:
+                    body = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type", "image/jpeg")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Cache-Control", "no-store")
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                return self._send({"ok": False, "error": "no frame yet"}, 404)
+            return
         elif parts.path == "/shots":
             # live lens feed: newest-first shot cards from the watch dir.
             try:
@@ -332,7 +544,8 @@ class Handler(SimpleHTTPRequestHandler):
                                              "/profile, /relay/qr | POST "
                                              "/chat, /gigs/add, "
                                              "/profile/unlink, /relay/verify, "
-                                             "/relay/send"},
+                                             "/relay/send | DELETE "
+                                             "/agent-sessions"},
                        404)
 
     def _read_json(self):
@@ -349,6 +562,23 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parts = urlparse(self.path)
+        if parts.path in ("/hand", "/gaze"):
+            # cursor daemons: only the PC owner may start/stop them.
+            if not self._local():
+                return self._send({"ok": False,
+                                    "error": "cursor daemons run on the PC itself"}, 403)
+            kind = parts.path[1:]
+            req = self._read_json() or {}
+            action = req.get("action") or "status"
+            if action == "stop":
+                daemon_stop(self.server, kind + "_proc")
+                return self._send({"ok": True, "running": False})
+            if action == "start":
+                return self._send(daemon_start(self.server, kind))
+            if action == "calibrate":
+                # 9-dot absolute fit (~1 min, stare each dot). Precision path.
+                return self._send(daemon_start(self.server, kind, ["--recalibrate"]))
+            return self._send({"running": daemon_clean(self.server, kind + "_proc") is not None})
         if parts.path == "/gigs/add":
             req = self._read_json()
             if req is None:
@@ -398,6 +628,40 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._send({"ok": False, "error": "bad json"}, 400)
             relay.hub_send(req["key"], json.dumps(req.get("frame", {})))
             return self._send({"ok": True})
+        if parts.path == "/upload":
+            # file landing for agent turns (chat carries @paths, opencode
+            # opens them). Own 30MB cap — BODY_LIMIT is for chat JSON.
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                n = 0
+            if n <= 0 or n > 30 * 1024 * 1024:
+                return self._send({"ok": False, "error": "bad size"}, 400)
+            try:
+                req = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            name = os.path.basename(str(req.get("name") or "file"))[:80] or "file"
+            data = str(req.get("data") or "")
+            if data.startswith("data:") and "," in data:
+                data = data.split(",", 1)[1]
+            try:
+                raw = base64.b64decode(data)
+            except Exception:
+                return self._send({"ok": False, "error": "bad base64"}, 400)
+            if not raw:
+                return self._send({"ok": False, "error": "empty file"}, 400)
+            updir = os.path.join(live_dir(), "uploads")
+            try:
+                os.makedirs(updir, exist_ok=True)
+                stamp = "%d-%s-%s" % (int(time.time()),
+                                      os.urandom(4).hex(), name)
+                p = os.path.join(updir, stamp)
+                with open(p, "wb") as f:
+                    f.write(raw)
+            except OSError as e:
+                return self._send({"ok": False, "error": str(e)}, 500)
+            return self._send({"ok": True, "path": p})
         if parts.path != "/chat":
             return self._send({"ok": False, "error": "use POST /chat"}, 404)
         try:
@@ -413,9 +677,18 @@ class Handler(SimpleHTTPRequestHandler):
         msg = str(req.get("message") or "").strip()[:4000]
         if not msg:
             return self._send({"ok": False, "error": "empty message"}, 400)
-        out = run_turn(msg, req.get("session_id"),
-                       req.get("provider") or "opencode")
+        out = start_turn(msg, req.get("session_id"),
+                         req.get("provider") or "opencode")
         self._send(out, out.pop("code", 200) if not out.get("ok") else 200)
+
+    def do_DELETE(self):
+        parts = urlparse(self.path)
+        if parts.path == "/turn":
+            tid = (parse_qs(parts.query).get("id") or [""])[0]
+            if not stop_turn(tid):
+                return self._send({"ok": False, "error": "no such turn"}, 404)
+            return self._send({"ok": True})
+        return self._send({"ok": False, "error": "nope"}, 404)
 
     def log_message(self, *a):  # quiet unless asked
         if os.environ.get("BRIDGE_VERBOSE"):
@@ -464,6 +737,8 @@ def main(argv):
     srv = ThreadingHTTPServer((host, port), handler)
     srv.serve_dir = serve_dir
     srv.lens_watch = lens_watch
+    srv.hand_proc = None
+    srv.gaze_proc = None
     if serve_dir:
         print("nicki: http://%s:%s  (UI + opencode bridge)" % (host, port))
         if host in ("0.0.0.0", "::"):

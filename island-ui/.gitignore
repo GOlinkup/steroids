@@ -11,6 +11,9 @@ node_modules
 dist
 dist-ssr
 *.local
+.env
+public/intro.mp4
+public/intro-poster.jpg
 
 # Editor directories and files
 .vscode/*

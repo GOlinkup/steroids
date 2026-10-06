@@ -8,6 +8,12 @@ import {
 } from "./store";
 import type { Shot } from "./components/LensView";
 import { PairPanel, isPcSide, type LinkRequest, type SettingsState } from "./components/Cards";
+import { AccountPanel } from "./components/Account";
+import {
+  accountEmail, sendCode, verifyCode, signOut, pullChats, pushChats,
+  deleteCloudChat, tombstones, addTombstone,
+  type CloudRow,
+} from "./sync";
 import { Sound, setMuted, setVolume } from "./sound";
 import { RelayClient } from "./relay";
 import { OutboxStore } from "./outbox";
@@ -15,6 +21,28 @@ import "./index.css";
 
 let msgId = 1;
 let sessionId = 1;
+
+// History survives reloads: archived chats live in localStorage (blob URLs
+// stripped — bytes don't survive a restart, the transcript does).
+const SESS_KEY = "island.sessions.v1";
+function loadSessions(): ChatSession[] {
+  try {
+    const raw = localStorage.getItem(SESS_KEY);
+    if (!raw) return [];
+    const arr: unknown = JSON.parse(raw);
+    if (!Array.isArray(arr)) return [];
+    const ok = arr.filter(
+      (s): s is ChatSession =>
+        typeof s === "object" && s !== null &&
+        typeof (s as ChatSession).id === "number" &&
+        Array.isArray((s as ChatSession).messages),
+    ).slice(0, 20);
+    for (const s of ok) if (s.id >= sessionId) sessionId = s.id + 1;
+    return ok;
+  } catch {
+    return [];
+  }
+}
 
 const GREETING = "Ask anything…";
 
@@ -33,10 +61,13 @@ export default function App() {
   const [hint, setHint] = useState(ROUTE_SAMPLES[0]);
   const [, setPills] = useState<Pill[]>(HARNESS_PILLS);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>(loadSessions);
   const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
   const [thinking, setThinking] = useState(false);
   const [bridgeOn, setBridgeOn] = useState(false);
+  const [liveTurn, setLiveTurn] = useState<{ activity: string; partial: string } | null>(null);
+  const [turnEngine, setTurnEngine] = useState("");
+  const [caps, setCaps] = useState({ opencode: true, claude: true });
   const [ocSession, setOcSession] = useState<string | null>(null);
   const [agentSessions, setAgentSessions] = useState<AgentSession[]>([]);
   const [exploreFeed, setExploreFeed] = useState<ExploreFeed | null>(null);
@@ -79,9 +110,15 @@ export default function App() {
   settingsRef.current = settings;
   const ocSessionRef = useRef<string | null>(null);
   ocSessionRef.current = ocSession;
+  // auto's choice sticks here: continuing a chat reuses its engine.
+  const ocProvider = useRef<string | null>(null);
   const [linkReqs, setLinkReqs] = useState<LinkRequest[]>([]);
-  const [lanUrl, setLanUrl] = useState("");
   const seenKnocks = useRef(new Set<string>());
+  // cloud account (same Supabase login as GOlinkup) — history sync only,
+  // everything still works logged out.
+  const [account, setAccount] = useState<string | null>(null);
+  const [syncMsg, setSyncMsg] = useState("");
+  const [syncBusy, setSyncBusy] = useState(false);
 
   const applySettings = (s: SettingsState) => {
     setSettingsState(s);
@@ -170,6 +207,7 @@ export default function App() {
       .then((r) => r.json())
       .then((j) => {
         if (dead) return;
+        setCaps({ opencode: !!j.opencode, claude: !!j.claude });
         if (j.opencode || j.claude) {
           setBridgeOn(true);
           say("nicki bridge live — real opencode chat");
@@ -182,6 +220,15 @@ export default function App() {
         if (!dead && Array.isArray(j.sessions)) setAgentSessions(j.sessions);
       })
       .catch(() => {});
+    const pullSessions = () => {
+      fetch(`${BRIDGE}/sessions`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (!dead && Array.isArray(j.sessions)) setAgentSessions(j.sessions);
+        })
+        .catch(() => {});
+    };
+    const sessionsTimer = setInterval(pullSessions, 15000);
     fetch(`${BRIDGE}/trending`)
       .then((r) => r.json())
       .then((j) => {
@@ -209,7 +256,7 @@ export default function App() {
     };
     pullShots();
     const shotsTimer = setInterval(pullShots, 3000);
-    return () => { dead = true; clearInterval(shotsTimer); };
+    return () => { dead = true; clearInterval(shotsTimer); clearInterval(sessionsTimer); };
   }, []);
 
   const searchSkills = useCallback(async (q: string): Promise<SkillHit[]> => {
@@ -233,6 +280,119 @@ export default function App() {
     return () => stopGreet();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  // Archive persists: every sessions change is stamped to localStorage so
+  // the history panel survives restarts (attachment blob URLs excluded).
+  useEffect(() => {
+    try {
+      localStorage.setItem(SESS_KEY, JSON.stringify(sessions, (k, v) => (k === "url" ? undefined : v)));
+    } catch { /* quota/private mode: memory only */ }
+  }, [sessions]);
+
+  // Cloud mirror: logged in → sessions also land in your private
+  // steroid_chats rows (debounced). Login on the phone pulls them there.
+  const syncTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => {
+    if (!account) return;
+    if (syncTimer.current) clearTimeout(syncTimer.current);
+    syncTimer.current = setTimeout(() => {
+      void pushChats(sessions)
+        .then((n) => setSyncMsg(`synced ${n} chats ✓`))
+        .catch((e) => setSyncMsg(`sync failed: ${e instanceof Error ? e.message : e}`));
+    }, 2500);
+    return () => {
+      if (syncTimer.current) clearTimeout(syncTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessions, account]);
+
+  // Restore a previous login silently (supabase persists its own session).
+  useEffect(() => {
+    void accountEmail().then((e) => {
+      if (e) {
+        setAccount(e);
+        say(`signed in as ${e}`);
+      }
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  const mergeCloud = (rows: CloudRow[]) => {
+    // Deleted chats stay deleted: tombstoned ids never merge back, even
+    // when the row still exists server-side (older device re-pushed it).
+    const dead = new Set(tombstones());
+    const live = rows.filter((r) => !dead.has(r.chat_id));
+    if (!live.length) {
+      setSyncMsg("nothing new in the cloud");
+      return;
+    }
+    setSessions((cur) => {
+      const out = [...cur];
+      for (const r of live) {
+        const msgs = Array.isArray(r.messages) ? r.messages : [];
+        const at = Date.parse(r.updated_at) || Date.now();
+        const hit = out.find(
+          (x) => x.cloudId === r.chat_id || (!x.cloudId && x.title === r.title),
+        );
+        if (hit) {
+          if (at > hit.updatedAt) {
+            hit.messages = msgs;
+            hit.updatedAt = at;
+            hit.title = r.title;
+            hit.cloudId = r.chat_id;
+          }
+        } else {
+          out.push({
+            id: sessionId++,
+            title: r.title || "Cloud chat",
+            messages: msgs,
+            updatedAt: at,
+            cloudId: r.chat_id,
+          });
+        }
+      }
+      return out.slice(0, 20);
+    });
+    setSyncMsg(`pulled ${rows.length} chats ✓`);
+  };
+
+  const handleSendCode = (email: string) => {
+    setSyncBusy(true);
+    setSyncMsg("");
+    void sendCode(email)
+      .then(() => setSyncMsg(`code sent to ${email} — check inbox`))
+      .catch((e) => setSyncMsg(e instanceof Error ? e.message : String(e)))
+      .finally(() => setSyncBusy(false));
+  };
+  const handleVerify = (email: string, code: string) => {
+    setSyncBusy(true);
+    setSyncMsg("");
+    void verifyCode(email, code)
+      .then((e) => {
+        setAccount(e);
+        say(`signed in as ${e}`);
+        return pullChats();
+      })
+      .then(mergeCloud)
+      .catch((e) => setSyncMsg(e instanceof Error ? e.message : String(e)))
+      .finally(() => setSyncBusy(false));
+  };
+  const handleSignOut = () => {
+    void signOut().finally(() => {
+      setAccount(null);
+      setSyncMsg("");
+      say("signed out");
+    });
+  };
+  const handleSyncNow = () => {
+    if (!account) return;
+    setSyncBusy(true);
+    void pullChats()
+      .then(mergeCloud)
+      .then(() => pushChats(sessions))
+      .catch((e) => setSyncMsg(e instanceof Error ? e.message : String(e)))
+      .finally(() => setSyncBusy(false));
+  };
 
   // Phone↔PC pipe: same bot session both ends. Phone frames land in this
   // chat; drops ride relay live or outbox offline (never lost).
@@ -367,12 +527,12 @@ export default function App() {
       fetch(`${BRIDGE}/relay/pending`)
         .then((r) => r.json())
         .then((j) => {
-          if (j.lan) setLanUrl(j.lan);
           const reqs: LinkRequest[] = Array.isArray(j.pending) ? j.pending : [];
           setLinkReqs(reqs);
           for (const q of reqs) {
-            if (!seenKnocks.current.has(q.token)) {
-              seenKnocks.current.add(q.token);
+            // one notice per device: retries refresh the Allow row silently.
+            if (!seenKnocks.current.has(q.label)) {
+              seenKnocks.current.add(q.label);
               setView("chat");
               pushBot(`📲 ${q.label} wants to link — tap Allow in Settings → Phone link.`);
               say(`link knock from ${q.label}`);
@@ -486,11 +646,31 @@ export default function App() {
     if (greetTimer.current) clearTimeout(greetTimer.current);
   };
 
+  // reset archives: anything beyond the lone greeting is history, even an
+  // agent-only exchange (user never typed but turns happened).
+  const worthKeeping = (msgs: ChatMessage[]) =>
+    isDirtyChat(msgs) || msgs.length > 1;
+
+  // History shows the live chat too — otherwise the dropdown reads
+  // "No previous chats" while you're mid-conversation. id 0 is the
+  // unsaved live draft (sessionId starts at 1, never collides).
+  const LIVE_ID = 0;
+  const liveWorth = worthKeeping(messages);
+  const historySessions: ChatSession[] = liveWorth
+    ? activeSessionId === null
+      ? [{ id: LIVE_ID, title: sessionTitle(messages), messages, updatedAt: Date.now() }, ...sessions].slice(0, 20)
+      : sessions.map((x) =>
+          x.id === activeSessionId
+            ? { ...x, messages, title: sessionTitle(messages), updatedAt: Date.now() }
+            : x,
+        )
+    : sessions;
+
   const newChat = () => {
     Sound.pop();
     stopGreet();
     setMessages((cur) => {
-      if (isDirtyChat(cur)) {
+      if (worthKeeping(cur)) {
         setSessions((s) => [
           { id: sessionId++, title: sessionTitle(cur), messages: cur, updatedAt: Date.now() },
           ...s,
@@ -500,6 +680,7 @@ export default function App() {
     });
     setActiveSessionId(null);
     setOcSession(null);
+    ocProvider.current = null;
     setAttachments([]);
     setThinking(false);
     setUnread(0);
@@ -509,12 +690,14 @@ export default function App() {
     scheduleGreet();
   };
   const resumeSession = (id: number) => {
+    if (id === LIVE_ID && activeSessionId === null) return; // already viewing live draft
     Sound.pop();
     stopGreet();
-    const target = sessions.find((s) => s.id === id);
+    const target = (id === LIVE_ID ? undefined : sessions.find((s) => s.id === id))
+      ?? historySessions.find((s) => s.id === id);
     if (!target) return;
     setMessages((cur) => {
-      if (activeSessionId !== id && isDirtyChat(cur)) {
+      if (activeSessionId !== id && worthKeeping(cur)) {
         setSessions((s) =>
           activeSessionId === null
             ? [{ id: sessionId++, title: sessionTitle(cur), messages: cur, updatedAt: Date.now() }, ...s].slice(0, 20)
@@ -523,7 +706,8 @@ export default function App() {
       }
       return target.messages;
     });
-    setActiveSessionId(id);
+    // live row means "back to the draft", not a stored session.
+    setActiveSessionId(id === LIVE_ID ? null : id);
     setAttachments([]);
     setThinking(false);
     setUnread(0);
@@ -534,7 +718,15 @@ export default function App() {
 
   const deleteSession = (id: number) => {
     Sound.pop();
+    const dead = sessions.find((x) => x.id === id);
     setSessions((s) => s.filter((x) => x.id !== id));
+    // Tombstone the cloud row too, or the next pull resurrects it: sync is
+    // an additive upsert, so a local-only delete never sticks.
+    if (dead?.cloudId) {
+      addTombstone(dead.cloudId);
+      void deleteCloudChat(dead.cloudId).catch((e) =>
+        say(`cloud delete failed: ${e instanceof Error ? e.message : e}`));
+    }
     if (activeSessionId === id) {
       setActiveSessionId(null);
       setOcSession(null);
@@ -543,6 +735,16 @@ export default function App() {
       scheduleGreet();
     }
     say("chat deleted");
+  };
+
+  // Terminal (opencode/claude) rows: hide on the bridge so the 15s poll
+  // never re-lists them. The provider's own history is untouched.
+  const deleteAgentSession = (sid: string) => {
+    Sound.pop();
+    setAgentSessions((list) => list.filter((s) => s.session !== sid));
+    fetch(`${BRIDGE}/agent-sessions?session=${encodeURIComponent(sid)}`, { method: "DELETE" })
+      .catch(() => say("hide failed — bridge offline"));
+    say("session hidden");
   };
 
   const finishRoute = () => {
@@ -573,18 +775,6 @@ export default function App() {
     relayChat("assistant", content);
   };
 
-  const mockReply = (text: string, files: Attachment[]) => {
-    setTimeout(() => {
-      if (view !== "chat") setUnread((u) => u + 1);
-      const names = files.map((f) => f.name).join(", ");
-      announceBot(
-        files.length
-          ? `Got ${files.length} file${files.length > 1 ? "s" : ""} (${names}). ${text || "Here's the read"} → best local skill in 0.4s. No cloud touched.`
-          : `Routed “${text}” → best local skill in 0.4s. No cloud touched.`,
-      );
-    }, 900);
-  };
-
   const sendChat = (text: string, provider = "opencode", opts?: { model: string; effort: string }) => {
     Sound.send();
     stopGreet();
@@ -596,16 +786,77 @@ export default function App() {
     if (opts) say(`engine: ${provider}/${opts.model} · ${opts.effort} effort`);
     const files = attachments;
     setAttachments([]);
-    setMessages((m) => [...m, { id: msgId++, role: "user", content: text, attachments: files }]);
-    relayChat("user", text);
+    // auto chooses: stay on the current chat's engine, else first live one.
+    let eng = provider;
+    if (provider === "auto") {
+      eng = (ocSessionRef.current && ocProvider.current) ||
+        (caps.opencode ? "opencode" : "claude");
+      say(`auto → ${eng}`);
+    }
+    // files alone are a complete turn: caption them so the bridge (which
+    // refuses empty messages) and the agent both get something to chew on.
+    const caption = text.trim() || (files.length ? "Look at the attached files and tell me what you see." : "");
+    if (!caption) return;
+    setMessages((m) => [...m, { id: msgId++, role: "user", content: caption, attachments: files }]);
+    relayChat("user", caption);
     mascotRef.current?.celebrate();
     setThinking(true);
-    if (!bridgeOn) {
-      mockReply(text, files);
-      return;
+    void sendWithFiles(caption, files, eng, opts);
+  };
+
+  // uploads attachments so the agent can actually open them: @paths ride
+  // the message (opencode reads them), bare names when upload fails.
+  const sendWithFiles = async (
+    caption: string,
+    files: Attachment[],
+    provider: string,
+    opts?: { model: string; effort: string },
+  ) => {
+    let msg = caption;
+    if (files.length) {
+      const paths: string[] = [];
+      for (const a of files) {
+        const handle = fileHandles.current.get(a.id);
+        if (!handle) {
+          paths.push(a.name);
+          continue;
+        }
+        try {
+          const dataUrl = await readDataUrl(handle);
+          const r = await fetch(`${BRIDGE}/upload`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ name: a.name, data: dataUrl }),
+          });
+          const j = await r.json();
+          paths.push(j.ok && j.path ? `@${j.path}` : a.name);
+        } catch {
+          paths.push(a.name);
+        }
+      }
+      if (paths.length) msg += `\n\n[attached files: ${paths.join(", ")}]`;
     }
+    postChat(msg, provider, opts);
+  };
+
+  const postChat = (
+    text: string,
+    provider = "opencode",
+    opts?: { model: string; effort: string },
+  ) => {
     const ctl = new AbortController();
+    const label = `${provider}${opts?.model && opts.model !== "router-pick" ? `/${opts.model}` : ""}`;
+    setTurnEngine(label);
+    setLiveTurn({ activity: "starting…", partial: "" });
     const timer = setTimeout(() => ctl.abort(), 160000);
+    let poll: ReturnType<typeof setInterval> | null = null;
+    let finished = false;
+    const finish = () => {
+      finished = true;
+      if (poll) clearInterval(poll);
+      clearTimeout(timer);
+      setLiveTurn(null);
+    };
     fetch(`${BRIDGE}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -614,20 +865,65 @@ export default function App() {
     })
       .then((r) => r.json())
       .then((j) => {
-        if (!j.ok) throw new Error(j.error || "bridge failed");
-        if (j.session) setOcSession(j.session);
-        if (view !== "chat") setUnread((u) => u + 1);
-        say(`opencode turn done${j.session ? ` · ${String(j.session).slice(0, 12)}…` : ""}`);
-        announceBot(j.text);
+        // bridge answered but refused: show its reason, not "unreachable".
+        // Keep the session — a retry continues it instead of orphaning it.
+        if (!j.ok || !j.turn) {
+          finish();
+          if (j.session) setOcSession(j.session);
+          pushBot(`Agent couldn't run: ${j.error || "bridge failed"}`);
+          say(`chat refused: ${j.error || "bridge failed"}`);
+          return;
+        }
+        const id = j.turn as string;
+        poll = setInterval(() => {
+          fetch(`${BRIDGE}/turn?id=${id}`, { signal: ctl.signal })
+            .then((r) => r.json())
+            .then((s) => {
+              if (s.session) setOcSession(s.session);
+              if (!s.done) {
+                setLiveTurn({ activity: s.activity || "working…", partial: s.partial || "" });
+                return;
+              }
+              finish();
+              if (!s.ok) {
+                pushBot(`Agent couldn't run: ${s.error || "bridge failed"}`);
+                say(`chat refused: ${s.error || "bridge failed"}`);
+                return;
+              }
+              ocProvider.current = provider;
+              if (view !== "chat") setUnread((u) => u + 1);
+              say(`opencode turn done${s.session ? ` · ${String(s.session).slice(0, 12)}…` : ""}`);
+              announceBot(s.text);
+            })
+            .catch(() => {
+              // aborted (160s) or dead poll: stop the turn, say so honestly.
+              if (ctl.signal.aborted && !finished) {
+                finish();
+                fetch(`${BRIDGE}/turn?id=${id}`, { method: "DELETE" }).catch(() => {});
+                pushBot(`Turn stopped after 160s (${provider}) — send again, it continues the same session.`);
+                say("chat aborted: 160s timeout");
+              }
+              // transient poll blip: keep waiting for the next tick.
+            });
+        }, 1000);
       })
-      .catch(() => mockReply(text, files))
-      .finally(() => clearTimeout(timer));
+      .catch(() => {
+        if (finished) return;
+        finish();
+        pushBot("Bridge unreachable — start it (`python3 island/bridge.py --serve`) and send again. Nothing was answered.");
+        say("chat failed: bridge unreachable");
+      });
   };
 
   const resumeAgentSession = (sid: string, first: string) => {
     Sound.pop();
     stopGreet();
     setOcSession(sid);
+    // terminal chats keep their engine when continued here.
+    ocProvider.current =
+      agentSessions.find((s) => s.session === sid)?.agent === "claude"
+        ? "claude"
+        : "opencode";
     setUnread(0);
     setView("chat");
     fsm.forceJacked();
@@ -762,8 +1058,8 @@ export default function App() {
     say(`${a.name} sent in ${fmtEta(el)} (${fmtSize(handle.size / Math.max(el, 0.1))}/s)`);
     return "sent";
   };
-  const dropToPhone = async () => {
-    const files = attachments;
+  const dropToPhone = async (list?: Attachment[]) => {
+    const files = list ?? attachments;
     if (!files.length) return;
     const relay = relayRef.current!;
     const outbox = outboxRef.current!;
@@ -822,35 +1118,50 @@ export default function App() {
     say(`drop → phone: ${sent} live, ${queued} queued`);
   };
 
+  const buildAttachments = (files: File[], room: number): Attachment[] => {
+    const accepted = files.slice(0, Math.max(0, room));
+    const fresh: Attachment[] = [];
+    for (const f of accepted) {
+      // no size cap: big files stream chunked (resumable); small go inline.
+      const kind = classifyAttachment(f.name, f.type);
+      const id = attachId.current++;
+      fileHandles.current.set(id, f);
+      fresh.push({
+        id,
+        name: f.name,
+        size: f.size,
+        kind,
+        url: kind === "image" || kind === "audio" ? URL.createObjectURL(f) : undefined,
+      });
+    }
+    if (files.length > accepted.length) say(`attachment cap: 5 files max`);
+    return fresh;
+  };
+
   const addFiles = (files: File[]) => {
-    setAttachments((cur) => {
-      const room = 5 - cur.length;
-      const accepted = files.slice(0, Math.max(0, room));
-      const fresh: Attachment[] = [];
-      for (const f of accepted) {
-        // no size cap: big files stream chunked (resumable); small go inline.
-        const kind = classifyAttachment(f.name, f.type);
-        const id = attachId.current++;
-        fileHandles.current.set(id, f);
-        fresh.push({
-          id,
-          name: f.name,
-          size: f.size,
-          kind,
-          url: kind === "image" || kind === "audio" ? URL.createObjectURL(f) : undefined,
-        });
-      }
-      if (files.length > accepted.length) say(`attachment cap: 5 files max`);
-      if (fresh.length) {
-        mascotRef.current?.poke();
-        say(`attached: ${fresh.map((f) => f.name).join(", ")}`);
-        if (fsm.state !== "jacked" || view !== "chat") {
-          setView("chat");
-          fsm.forceJacked();
-        }
-      }
-      return [...cur, ...fresh];
-    });
+    const fresh = buildAttachments(files, 5 - attachments.length);
+    if (!fresh.length) return;
+    setAttachments((cur) => [...cur, ...fresh]);
+    mascotRef.current?.poke();
+    say(`attached: ${fresh.map((f) => f.name).join(", ")}`);
+    if (fsm.state !== "jacked" || view !== "chat") {
+      setView("chat");
+      fsm.forceJacked();
+    }
+  };
+
+  // files dropped on the phone zone go straight to the phone (and stay
+  // attached, so you can still ask the agent about them after).
+  const dropFilesToPhone = (files: File[]) => {
+    const fresh = buildAttachments(files, 5 - attachments.length);
+    if (!fresh.length) return;
+    setAttachments((cur) => [...cur, ...fresh]);
+    say(`dropped: ${fresh.map((f) => f.name).join(", ")} → phone`);
+    if (fsm.state !== "jacked" || view !== "chat") {
+      setView("chat");
+      fsm.forceJacked();
+    }
+    void dropToPhone(fresh);
   };
 
   const removeAttachment = (id: number) => {
@@ -924,6 +1235,9 @@ export default function App() {
         question={question}
         messages={messages}
         thinking={thinking}
+        liveActivity={liveTurn?.activity ?? null}
+        livePartial={liveTurn?.partial ?? null}
+        turnEngine={turnEngine}
         attachments={attachments}
         onFiles={addFiles}
         onRemoveAttachment={removeAttachment}
@@ -947,7 +1261,7 @@ export default function App() {
           mascotRef.current?.celebrate();
         }}
         onSend={sendChat}
-        sessions={sessions}
+        sessions={historySessions}
         activeSessionId={activeSessionId}
         onResumeSession={resumeSession}
         onDeleteSession={deleteSession}
@@ -957,21 +1271,33 @@ export default function App() {
         onSearchSkills={searchSkills}
         agentSessions={agentSessions}
         onResumeAgentSession={resumeAgentSession}
+        onDeleteAgentSession={deleteAgentSession}
         settings={settings}
         onSettings={applySettings}
         onTab={handleTab}
         unread={unread}
         onDropToPhone={() => void dropToPhone()}
+        onDropFilesToPhone={dropFilesToPhone}
         phoneLinked={phoneLinked}
         queuedDrops={queuedDrops}
         pairNode={
           <PairPanel
             linked={phoneLinked}
             pending={linkReqs}
-            lan={lanUrl}
             onPaired={handlePaired}
             onApprove={(t) => void handleApprove(t)}
             onUnpair={handleUnpair}
+          />
+        }
+        accountNode={
+          <AccountPanel
+            email={account}
+            msg={syncMsg}
+            busy={syncBusy}
+            onSendCode={handleSendCode}
+            onVerify={handleVerify}
+            onSignOut={handleSignOut}
+            onSyncNow={handleSyncNow}
           />
         }
       />

@@ -43,6 +43,7 @@ export interface ChatSession {
   title: string;
   messages: ChatMessage[];
   updatedAt: number;
+  cloudId?: string; // steroid_chats.chat_id — set on cloud merge, sent back on push
 }
 
 export function sessionTitle(messages: ChatMessage[]): string {

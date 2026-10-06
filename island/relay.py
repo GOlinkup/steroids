@@ -34,11 +34,17 @@ LINK_TTL = 300  # a link knock lives 5 minutes unanswered
 
 
 def request_link(label="Phone"):
-    """A new device knocks: returns a token the PC owner approves one-tap."""
+    """A new device knocks: returns a token the PC owner approves one-tap.
+    One knock per label — a retry replaces the stale one, so the PC never
+    stacks duplicate Allow rows (or double notices) for the same phone."""
     _sweep()
+    label = str(label or "Phone")[:40]
     token = secrets.token_hex(8)
     with _link_lock:
-        _link_reqs[token] = {"label": str(label or "Phone")[:40],
+        for t, v in list(_link_reqs.items()):
+            if v["label"] == label and not v["key"]:
+                del _link_reqs[t]
+        _link_reqs[token] = {"label": label,
                              "expires": time.time() + LINK_TTL,
                              "key": None}
     return token
@@ -112,6 +118,14 @@ def qr_pair(include_key=False):
     if include_key:
         out["key"] = key
     return out
+
+
+def dl_qr(url):
+    """QR of a plain URL (scan → opens in any camera app). Powers the
+    scan-to-get-the-app card: no custom scheme, instant PWA install page."""
+    mat, _ver = drop_qr.encode(url)
+    return {"png_b64": base64.b64encode(drop_qr.to_png(mat)).decode(),
+            "url": url}
 
 
 _local_key = None

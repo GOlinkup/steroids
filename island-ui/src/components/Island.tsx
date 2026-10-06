@@ -16,6 +16,9 @@ interface Props {
   question: Question | null;
   messages: ChatMessage[];
   thinking: boolean;
+  liveActivity?: string | null;
+  livePartial?: string | null;
+  turnEngine?: string;
   attachments: Attachment[];
   onFiles: (files: File[]) => void;
   onRemoveAttachment: (id: number) => void;
@@ -34,6 +37,7 @@ interface Props {
   onNewChat: () => void;
   agentSessions: AgentSession[];
   onResumeAgentSession: (sid: string, first: string) => void;
+  onDeleteAgentSession: (sid: string) => void;
   exploreLive: boolean;
   exploreFeed: ExploreFeed | null;
   onSearchSkills: (q: string) => Promise<SkillHit[]>;
@@ -43,24 +47,26 @@ interface Props {
   onTab: (v: IslandView) => void;
   unread: number;
   onDropToPhone?: () => void;
+  onDropFilesToPhone?: (files: File[]) => void;
   phoneLinked?: boolean;
   queuedDrops?: number;
   pairNode?: React.ReactNode;
+  accountNode?: React.ReactNode;
 }
 
 // Island shell — steroids spotter bar. Ranked routes, plate snap.
 const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
   const {
     fsmState, view, mascotRef, routeHint,
-    approval, question, messages, thinking, attachments,
+    approval, question, messages, thinking, liveActivity, livePartial, turnEngine, attachments,
     onFiles, onRemoveAttachment, onOpenLens, shots,
     onMouseEnter, onMouseLeave, onMascotTap,
     onDecide, onAnswer, onSend,
     sessions, activeSessionId, onResumeSession, onDeleteSession, onNewChat,
-    agentSessions, onResumeAgentSession,
+    agentSessions, onResumeAgentSession, onDeleteAgentSession,
     exploreLive, exploreFeed, onSearchSkills,
     settings, onSettings, onTab, unread, zoomShot,
-    onDropToPhone, phoneLinked, queuedDrops, pairNode,
+    onDropToPhone, onDropFilesToPhone, phoneLinked, queuedDrops, pairNode, accountNode,
   } = props;
 
   return (
@@ -68,10 +74,11 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
       ref={ref}
       id="island"
       data-state={fsmState}
+      data-view={view}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
     >
-      <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />
+      {fsmState !== "jacked" && <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />}
       {fsmState === "hidden" ? null : fsmState === "jacked" ? (
         <div className="jacked-body">
           <Header
@@ -83,9 +90,15 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             onResumeSession={onResumeSession}
             onDeleteSession={onDeleteSession}
             onNewChat={onNewChat}
+            agentSessions={agentSessions}
+            onResumeAgent={onResumeAgentSession}
+            onDeleteAgent={onDeleteAgentSession}
           />
+          <div className="mascot-top">
+            <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />
+          </div>
           {view === "settings" && (
-            <SettingsView settings={settings} onChange={onSettings} pair={pairNode} />
+            <SettingsView settings={settings} onChange={onSettings} pair={pairNode} extra={accountNode} />
           )}
           {view === "explore" && (
             <ExploreView
@@ -113,9 +126,14 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
               onRemoveAttachment={onRemoveAttachment}
               onOpenLens={onOpenLens}
               onDropToPhone={onDropToPhone}
+              onDropFilesToPhone={onDropFilesToPhone}
               phoneLinked={phoneLinked}
               queuedDrops={queuedDrops}
               liveShots={shots}
+              bridgeOn={exploreLive}
+              liveActivity={liveActivity}
+              livePartial={livePartial}
+              turnEngine={turnEngine}
             />
           )}
           {view === "lens" && <LensView shots={shots} initialZoom={zoomShot} />}

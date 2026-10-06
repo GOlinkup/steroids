@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
-import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, PhoneIcon } from "./icons";
-import { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
+import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon } from "./icons";
+import { EffortPicker, ProviderPicker, useDismiss, ENGINES, displayModel } from "./pickers";
 export { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
 import { ActivityOrb } from "../orb";
 import { IDLE_ACTIVITY } from "../orb_state";
@@ -14,6 +14,24 @@ import {
   type Question,
   type SkillHit,
 } from "../store";
+
+// Card shell — one OOP base for every view card (home/daily + chat +
+// approval/question/finished). Radius + side/bottom padding live in
+// `.card` (index.css) only; variants add width/state, never geometry.
+export function Card({
+  className = "",
+  children,
+  ...rest
+}: {
+  className?: string;
+  children: React.ReactNode;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`card${className ? ` ${className}` : ""}`} {...rest}>
+      {children}
+    </div>
+  );
+}
 
 // Explore view — the live surface: search all 1,357 skills, trending,
 // recent routes, agent sessions. Everything taps through to chat.
@@ -204,11 +222,22 @@ export function QuestionCard({
 // animated token meter, square OpenAI-style composer, history lives top-right.
 // Engine control lives in ./pickers.tsx (reusable OOP base).
 
+// Dashed rounded frame drawn as SVG so the dashes march — ported from
+// the Coucou drop card (docs/coucou-study, MIT code). Rendered only while
+// a drag hovers, never idle.
+function DropFrame({ rx = 20 }: { rx?: number }) {
+  return (
+    <svg className="drop-frame" preserveAspectRatio="none" aria-hidden>
+      <rect rx={rx} />
+    </svg>
+  );
+}
+
 // Composer status: last-turn time + phone-pipe state. Provider/model
 // already show in the pills above, so this line carries what they can't:
 // relay live vs offline + how many drops are queued to fire on reconnect.
 export function StatusLine({ thinking, turnMs, linked, queued }: { thinking: boolean; turnMs: number | null; linked: boolean; queued: number }) {
-  const link = linked ? "linked" : queued > 0 ? `offline · queued ${queued}` : "offline";
+  const link = linked ? "phone linked" : queued > 0 ? `phone offline · queued ${queued}` : "phone offline";
   const bits = [thinking ? "…" : turnMs !== null ? `${turnMs.toFixed(1)}s` : null, link].filter(
     (b): b is string => b !== null,
   );
@@ -228,9 +257,14 @@ export function ChatPanel({
   onRemoveAttachment,
   onOpenLens,
   onDropToPhone,
+  onDropFilesToPhone,
   phoneLinked = false,
   queuedDrops = 0,
   liveShots = [],
+  bridgeOn = false,
+  liveActivity = null,
+  livePartial = null,
+  turnEngine = "",
 }: {
   messages: ChatMessage[];
   onSend: (text: string, provider?: string, opts?: { model: string; effort: string }) => void;
@@ -240,9 +274,14 @@ export function ChatPanel({
   onRemoveAttachment: (id: number) => void;
   onOpenLens: () => void;
   onDropToPhone?: () => void;
+  onDropFilesToPhone?: (files: File[]) => void;
   phoneLinked?: boolean;
   queuedDrops?: number;
   liveShots?: Array<{ src: string; label: string }>;
+  bridgeOn?: boolean;
+  liveActivity?: string | null;
+  livePartial?: string | null;
+  turnEngine?: string;
 }) {
   const [provider, setProvider] = useState(ENGINES[0].id);
   const [model, setModel] = useState(ENGINES[0].models[0]);
@@ -253,8 +292,24 @@ export function ChatPanel({
   const [recording, setRecording] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
   const [turnMs, setTurnMs] = useState<number | null>(null);
+  const [workSecs, setWorkSecs] = useState(0);
+  const [filmFrame, setFilmFrame] = useState(0);
+  useEffect(() => {
+    if (!thinking) return;
+    setWorkSecs(0);
+    setFilmFrame(0);
+    const t0 = Date.now();
+    const timer = setInterval(() => setWorkSecs(Math.floor((Date.now() - t0) / 1000)), 1000);
+    // film runs in JS (100ms/step), not CSS — visible even where
+    // stylesheets kill animations, and it stops the instant thinking ends.
+    const film = setInterval(() => setFilmFrame((f) => (f + 1) % 29), 100);
+    return () => { clearInterval(timer); clearInterval(film); };
+  }, [thinking]);
   const [attachOpen, setAttachOpen] = useState(false);
-  const [composerDrag, setComposerDrag] = useState(false);
+  const [votes, setVotes] = useState<Record<number, 1 | -1>>({});
+  const [copiedId, setCopiedId] = useState<number | null>(null);
+  const attachDismiss = useDismiss<HTMLDivElement>(attachOpen, () => setAttachOpen(false));  const [composerDrag, setComposerDrag] = useState(false);
+  const [phoneDrag, setPhoneDrag] = useState(false);
   const dragDepth = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
   const snapRef = useRef<HTMLInputElement>(null);
@@ -278,6 +333,49 @@ export function ChatPanel({
     onSend(t, provider, { model, effort });
   };
   const canSend = draft.trim().length > 0 || attachments.length > 0;
+
+  // edit a sent message back into the composer; regen re-sends the last
+  // user turn as a fresh turn (no fake branching — both stay visible).
+  const editBack = (text: string) => {
+    setDraft(text);
+    const el = boxRef.current;
+    if (el) {
+      el.style.height = "auto";
+      el.style.height = Math.min(120, el.scrollHeight) + "px";
+      el.focus();
+    }
+  };
+  const regenLast = () => {
+    const last = [...messages].reverse().find((m) => m.role === "user");
+    if (!last || thinking) return;
+    sentAt.current = performance.now();
+    setTurnMs(null);
+    onSend(last.content, provider, { model, effort });
+  };
+  const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
+
+  // message actions: copy the reply, like what the agent sent. Local only.
+  const copyMsg = async (id: number, text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+    } catch {
+      const ta = document.createElement("textarea");
+      ta.value = text;
+      document.body.appendChild(ta);
+      ta.select();
+      document.execCommand("copy");
+      ta.remove();
+    }
+    setCopiedId(id);
+    setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1200);
+  };
+  const toggleVote = (id: number, v: 1 | -1) =>
+    setVotes((prev) => {
+      const n = { ...prev };
+      if (n[id] === v) delete n[id];
+      else n[id] = v;
+      return n;
+    });
 
   const stopRecording = (cancel = false) => {
     const r = recRef.current;
@@ -321,8 +419,7 @@ export function ChatPanel({
     }
   };
   // stamp turn time when the reply lands
-  const wasThinking = useRef(false);
-  useEffect(() => {
+  const wasThinking = useRef(false);  useEffect(() => {
     if (wasThinking.current && !thinking && sentAt.current) {
       setTurnMs((performance.now() - sentAt.current) / 1000);
       sentAt.current = 0;
@@ -330,8 +427,8 @@ export function ChatPanel({
     wasThinking.current = thinking;
   }, [thinking]);
   return (
-    <div
-      className={dragOver ? "card chat-card dragover" : "card chat-card"}
+    <Card
+      className={dragOver ? "chat-card dragover" : "chat-card"}
       onDragOver={(e) => {
         if (!e.dataTransfer?.types.includes("Files")) return;
         e.preventDefault();
@@ -382,12 +479,81 @@ export function ChatPanel({
                 <span key={a.id} className="inline-chip"><b className="kind-tag">{kindIcon(a.kind)}</b> {a.name}</span>
               ))}
               {m.content && <div>{md(m.content)}</div>}
+              {m.role === "user" && m.content && (
+                <div className="msg-actions">
+                  <button
+                    className="msg-act"
+                    title="Copy message"
+                    onClick={() => void copyMsg(m.id, m.content)}
+                  >
+                    {copiedId === m.id ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+                  </button>
+                  <button
+                    className="msg-act"
+                    title="Edit in composer"
+                    onClick={() => editBack(m.content)}
+                  >
+                    <PencilIcon size={14} />
+                  </button>
+                </div>
+              )}
+              {m.role === "assistant" && m.content && (
+                <div className="msg-actions">
+                  <button
+                    className="msg-act"
+                    title={copiedId === m.id ? "Copied" : "Copy reply"}
+                    onClick={() => void copyMsg(m.id, m.content)}
+                  >
+                    {copiedId === m.id ? <CheckIcon size={14} /> : <CopyIcon size={14} />}
+                  </button>
+                  <button
+                    className={votes[m.id] === 1 ? "msg-act on" : "msg-act"}
+                    title="Good reply"
+                    onClick={() => toggleVote(m.id, 1)}
+                  >
+                    <ThumbUpIcon size={14} />
+                  </button>
+                  <button
+                    className={votes[m.id] === -1 ? "msg-act on" : "msg-act"}
+                    title="Bad reply"
+                    onClick={() => toggleVote(m.id, -1)}
+                  >
+                    <ThumbDownIcon size={14} />
+                  </button>
+                  {m.id === lastAssistantId && (
+                    <button
+                      className="msg-act"
+                      title="Regenerate reply"
+                      onClick={regenLast}
+                    >
+                      <ResetIcon size={14} />
+                    </button>
+                  )}
+                </div>
+              )}
             </div>
           </div>
         ))}
         {thinking && (
           <div className="chat-row">
             <div className="reply working">
+              <div
+                className="work-film"
+                aria-hidden
+                style={{ backgroundPositionX: `${-(filmFrame * (3687 / 28))}px` }}
+              />
+              <div className="work-meta">
+                <span className="work-cap">
+                  <i className={bridgeOn ? "live-dot" : "dead-dot"} />
+                  {bridgeOn ? (liveActivity || `talking to ${turnEngine || `${provider}/${displayModel(model)}`}`) : "bridge down — nothing running"}
+                </span>
+                <span className="work-sub">
+                  {workSecs}s{liveShots[0] ? ` · seeing ${liveShots[0].label}` : ""}
+                </span>
+                {!!livePartial && (
+                  <div className="work-partial">{livePartial.slice(-600)}</div>
+                )}
+              </div>
               {liveShots[0] && (
                 <img
                   src={liveShots[0].src}
@@ -396,10 +562,6 @@ export function ChatPanel({
                   onClick={onOpenLens}
                 />
               )}
-              <div className="typing"><i /><i /><i /></div>
-              <span className="work-cap">
-                <i className="live-dot" />working{liveShots[0] ? ` · ${liveShots[0].label}` : ""}
-              </span>
             </div>
           </div>
         )}
@@ -464,7 +626,10 @@ export function ChatPanel({
         }}
       >
         {composerDrag && (
-          <div className="composer-drop-hint" aria-hidden>Release to attach 📎</div>
+          <>
+            <DropFrame />
+            <div className="composer-drop-hint" aria-hidden>Drop to ask the agent 📎</div>
+          </>
         )}
         <input
           ref={fileRef}
@@ -509,7 +674,7 @@ export function ChatPanel({
           }}
         />
         <div className="composer-innerbar">
-          <div className="attach-wrap">
+          <div ref={attachDismiss} className="attach-wrap">
             <button
               className="tool-btn"
               title="Attach or link — files, camera, more"
@@ -518,7 +683,7 @@ export function ChatPanel({
               <PlusIcon size={20} />
             </button>
             {attachOpen && (
-              <div className="attach-menu" role="menu" aria-label="Attach options">
+              <div className="sheet attach-menu" role="menu" aria-label="Attach options">
                 <button
                   className="attach-opt"
                   onClick={() => { setAttachOpen(false); fileRef.current?.click(); }}
@@ -534,14 +699,36 @@ export function ChatPanel({
               </div>
             )}
           </div>
-          <button
-            className="effort-pill drop-btn"
-            title={phoneLinked ? "Send attached files via the paired phone pipe" : "No pair yet — queues, fires on reconnect"}
-            onClick={() => onDropToPhone?.()}
-            disabled={!attachments.length}
+          <span
+            className="drop-wrap"
+            onDragOver={(e) => {
+              if (!e.dataTransfer?.types.includes("Files")) return;
+              e.preventDefault();
+              e.stopPropagation();
+              setPhoneDrag(true);
+            }}
+            onDragLeave={() => setPhoneDrag(false)}
+            onDrop={(e) => {
+              const files = Array.from(e.dataTransfer?.files ?? []);
+              if (!files.length) return;
+              e.preventDefault();
+              e.stopPropagation();
+              setPhoneDrag(false);
+              onDropFilesToPhone?.(files);
+            }}
           >
-            <PhoneIcon size={14} /> {isPcSide ? "Drop to phone" : "Drop to PC"}
-          </button>
+            <button
+              className={phoneDrag ? "effort-pill drop-btn dragover" : "effort-pill drop-btn"}
+              title={phoneLinked ? "Send attached files via the paired phone pipe — or drop files here" : "No pair yet — queues, fires on reconnect — or drop files here"}
+              aria-label={isPcSide ? "Drop to phone" : "Drop to PC"}
+              onClick={() => onDropToPhone?.()}
+              disabled={!attachments.length && !phoneDrag}
+            >
+              <DropIcon size={14} /> {isPcSide ? "Send to phone" : "Send to PC"}
+            </button>
+            {phoneDrag && <DropFrame rx={99} />}
+            {phoneDrag && <span className="drop-hint-phone" aria-hidden>Release to send to phone 📲</span>}
+          </span>
           <div className="picker-group">
             <ProviderPicker
               provider={provider}
@@ -572,7 +759,7 @@ export function ChatPanel({
       <div className="composer-status">
         <StatusLine thinking={thinking} turnMs={turnMs} linked={phoneLinked} queued={queuedDrops} />
       </div>
-    </div>
+    </Card>
   );
 }
 
@@ -637,14 +824,12 @@ export const isPcSide =
 export function PairPanel({
   linked,
   pending,
-  lan,
   onPaired,
   onApprove,
   onUnpair,
 }: {
   linked: boolean;
   pending: LinkRequest[];
-  lan: string;
   onPaired: (endpoint: string, key: string) => void;
   onApprove: (token: string) => void;
   onUnpair: () => void;
@@ -652,6 +837,16 @@ export function PairPanel({
   const [knocking, setKnocking] = useState(false);
   const [msg, setMsg] = useState("");
   const origin = window.location.origin;
+  // scan-to-get-the-app QR (plain LAN URL — any camera app opens it).
+  const [dlQr, setDlQr] = useState<{ png: string; url: string } | null>(null);
+  useEffect(() => {
+    fetch(`${origin}/relay/dl-qr`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (j.png_b64) setDlQr({ png: j.png_b64, url: j.url });
+      })
+      .catch(() => {});
+  }, [origin]);
   const knock = async () => {
     setKnocking(true);
     setMsg("knocking — tap Allow on the PC…");
@@ -697,8 +892,11 @@ export function PairPanel({
       <span className="set-label">Phone link</span>
       {isPcSide ? (
         <>
-          {!!lan && <div className="card-detail">on your phone open {lan} → Settings → Link this phone</div>}
-          {pending.length === 0 && <div className="card-detail">no phones knocking</div>}
+          {dlQr && (
+            <div className="qr-card">
+              <img src={`data:image/png;base64,${dlQr.png}`} alt="Scan to get the app" title={dlQr.url} />
+            </div>
+          )}
           {pending.map((p) => (
             <div className="btn-row" key={p.token}>
               <span>📲 {p.label} wants to link</span>
@@ -722,10 +920,12 @@ export function SettingsView({
   settings,
   onChange,
   pair,
+  extra,
 }: {
   settings: SettingsState;
   onChange: (s: SettingsState) => void;
   pair?: React.ReactNode;
+  extra?: React.ReactNode;
 }) {
   const set = (patch: Partial<SettingsState>) => onChange({ ...settings, ...patch });
   const togglePill = (id: string) =>
@@ -736,6 +936,8 @@ export function SettingsView({
     });
   return (
     <div className="card settings">
+      <div className="set-grid">
+        <div className="set-col">
       <div className="set-row">
         <button
           className={settings.autoSave ? "switch on" : "switch"}
@@ -792,21 +994,13 @@ export function SettingsView({
           ))}
         </div>
       </div>
-      <div className="set-row">
-        <span className="set-label">Auto-close</span>
-        <div className="seg">
-          {[10, 15, 30].map((s) => (
-            <button
-              key={s}
-              className={settings.autoClose === s ? "seg-btn on" : "seg-btn"}
-              onClick={() => set({ autoClose: s })}
-            >
-              {s}s
-            </button>
-          ))}
+      {pair}
+      {extra}
+        </div>
+        <div className="ts-hero">
+          <video src="intro.mp4" autoPlay muted loop playsInline preload="metadata" poster="intro-poster.jpg" />
         </div>
       </div>
-      {pair}
     </div>
   );
 }

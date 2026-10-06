@@ -36,4 +36,8 @@
   --size-floor:.7rem;
   --size-note:.75rem;
   --weight-em:600;
+  /* corners — one knob: cards, composer, sheets/dropdowns all follow */
+  --radius:20px;
+  /* gradient — one reusable: effort fill, ready send, every CTA */
+  --grad:linear-gradient(90deg,var(--info),var(--purple));
 }

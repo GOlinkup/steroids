@@ -12,6 +12,7 @@ Everything survives reboots (files, not RAM). Never throws on data.
 """
 import json
 import os
+import sqlite3
 import time
 
 # --- storage (same live dirs app.py uses for served.jsonl) ---------------
@@ -273,6 +274,131 @@ def sessions(evs, limit=12):
                     'first': str(first)[:60]})
         if len(out) >= limit:
             break
+    return out
+
+# --- hidden agent sessions (island UI delete) ------------------------------
+
+def hidden_path():
+    return os.path.join(live_dir(), 'hidden-sessions.json')
+
+def hidden_sessions():
+    """Session ids hidden from the island history. Never throws."""
+    try:
+        with open(hidden_path(), encoding='utf-8') as f:
+            data = json.load(f)
+        return set(data) if isinstance(data, list) else set()
+    except (OSError, ValueError):
+        return set()
+
+def hide_session(sid):
+    """Hide one agent session everywhere the island lists it (survives
+    restarts; opencode/claude's own stores are never touched)."""
+    sid = str(sid or '').strip()
+    if not sid:
+        return []
+    hidden = hidden_sessions()
+    hidden.add(sid)
+    try:
+        with open(hidden_path(), 'w', encoding='utf-8') as f:
+            json.dump(sorted(hidden), f)
+    except OSError:
+        pass
+    return sorted(hidden)
+
+def opencode_db_sessions(limit=12):
+    """Terminal sessions straight from opencode's own sqlite (read-only).
+    The hooks log only sees sessions that emitted events; the db sees every
+    chat ever started in opencode, so the island can pick them up. Never
+    throws — a locked/missing db just yields []."""
+    db = os.path.join(os.path.expanduser('~'), '.local', 'share',
+                      'opencode', 'opencode.db')
+    try:
+        c = sqlite3.connect('file:%s?mode=ro' % db.replace('%', '%25'),
+                            uri=True, timeout=2)
+    except Exception:
+        return []
+    try:
+        rows = c.execute(
+            'SELECT id, title, time_updated FROM session '
+            'ORDER BY time_updated DESC LIMIT ?', (limit,)).fetchall()
+        out = []
+        for sid, title, updated in rows:
+            first = title or '?'
+            try:
+                parts = c.execute(
+                    'SELECT data FROM part WHERE session_id=? '
+                    'ORDER BY time_created LIMIT 8', (sid,)).fetchall()
+                for (data,) in parts:
+                    try:
+                        p = json.loads(data)
+                    except ValueError:
+                        continue
+                    if p.get('type') == 'text' and (p.get('text') or '').strip():
+                        first = p['text'].strip()
+                        break
+            except Exception:
+                pass
+            out.append({'session': sid,
+                        'ts': (updated or 0) / 1000.0,
+                        'agent': 'opencode',
+                        'first': str(first)[:60]})
+        return out
+    except Exception:
+        return []
+    finally:
+        try:
+            c.close()
+        except Exception:
+            pass
+
+def claude_projects_sessions(limit=12):
+    """Claude Code chats from ~/.claude/projects (one .jsonl per session).
+    Same pickup idea as opencode_db_sessions; empty today (no runs yet on
+    this machine), automatic the moment claude chats exist. Never throws."""
+    import glob
+    base = os.path.join(os.path.expanduser('~'), '.claude', 'projects')
+    try:
+        files = glob.glob(os.path.join(base, '*', '*.jsonl'))
+    except Exception:
+        return []
+    try:
+        files = sorted(files, key=lambda p: os.path.getmtime(p),
+                       reverse=True)[:limit]
+    except OSError:
+        return []
+    out = []
+    for p in files:
+        try:
+            first = None
+            with open(p, encoding='utf-8') as f:
+                for ln in f:
+                    ln = ln.strip()
+                    if not ln:
+                        continue
+                    try:
+                        e = json.loads(ln)
+                    except ValueError:
+                        continue
+                    if e.get('type') != 'user':
+                        continue
+                    msg = e.get('message') or {}
+                    bits = []
+                    for b in (msg.get('content') or []):
+                        if isinstance(b, dict) and b.get('type') == 'text':
+                            bits.append(b.get('text') or '')
+                        elif isinstance(b, str):
+                            bits.append(b)
+                    text = ''.join(bits).strip()
+                    if text:
+                        first = text
+                        break
+                    # tool_result-only user turns aren't chat openers; keep scanning
+            out.append({'session': os.path.splitext(os.path.basename(p))[0],
+                        'ts': os.path.getmtime(p),
+                        'agent': 'claude',
+                        'first': str(first or '?')[:60]})
+        except (OSError, ValueError):
+            continue
     return out
 
 # --- chat persistence (sent messages, editable) ---------------------------

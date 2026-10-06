@@ -1,6 +1,48 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BoltIcon, ChevronDownIcon, ResetIcon } from "./icons";
 
+// PillButton — the ONE pill button: composer pills, home buttons, history
+// "+ New" all reuse it. Shape/size live in `.effort-pill` (index.css);
+// variants add tone, never geometry.
+export function PillButton({
+  className = "",
+  children,
+  ...rest
+}: {
+  className?: string;
+  children?: ReactNode;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  return (
+    <button className={`effort-pill${className ? ` ${className}` : ""}`} {...rest}>
+      {children}
+    </button>
+  );
+}
+
+// useDismiss — the ONE dropdown closer: wrap toggle + panel in the ref and
+// any outside pointerdown or Escape fires onClose. No listeners while closed.
+export function useDismiss<T extends HTMLElement>(open: boolean, onClose: () => void) {
+  const ref = useRef<T>(null);
+  const closeRef = useRef(onClose);
+  closeRef.current = onClose;
+  useEffect(() => {
+    if (!open) return;
+    const onDown = (e: PointerEvent) => {
+      if (ref.current && !ref.current.contains(e.target as Node)) closeRef.current();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeRef.current();
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [open]);
+  return ref;
+}
+
 // Reusable picker OOP base: compact pill (20px), centered content.
 // Both dropdowns share sizing/alignment via this shell.
 // ponytail: 20px pills below 24px WCAG min — explicit request, bump back if miss-taps rise.
@@ -19,11 +61,13 @@ export function PickerShell({
   sheet?: ReactNode;
   kind?: "provider" | "effort";
 }) {
+  // listeners live only while open, so onToggle here always means close.
+  const dismissRef = useDismiss<HTMLDivElement>(open, onToggle);
   return (
-    <div className={`effort-wrap kind-${kind}`}>
-      <button className="effort-pill" aria-label={label} onClick={onToggle}>
+    <div ref={dismissRef} className={`effort-wrap kind-${kind}`}>
+      <PillButton aria-label={label} onClick={onToggle}>
         {children}
-      </button>
+      </PillButton>
       {open && sheet}
     </div>
   );
@@ -93,14 +137,10 @@ export function ProviderPicker({
       sheet={
         <div
           ref={listRef}
-          className="effort-sheet pick-list"
+          className="sheet effort-sheet pick-list"
           role="listbox"
           aria-label="Model"
           onKeyDown={(e) => {
-            if (e.key === "Escape") {
-              onToggle();
-              return;
-            }
             if (e.key === "ArrowDown") {
               e.preventDefault();
               const n = (cursor + 1) % ENGINES.length;
@@ -205,12 +245,9 @@ export function EffortPicker({
       onToggle={onToggle}
       sheet={
         <div
-          className="effort-sheet"
+          className="sheet effort-sheet"
           role="dialog"
           aria-label="Effort"
-          onKeyDown={(e) => {
-            if (e.key === "Escape") onToggle();
-          }}
         >
           <div className="effort-top">
             <span className={maxed ? "bolt on" : "bolt"} title="effort">
@@ -245,7 +282,7 @@ export function EffortPicker({
           >
             <div
               className="effort-fill"
-              style={{ width: `${pct}%`, backgroundImage: "linear-gradient(90deg,var(--info),var(--purple))" }}
+              style={{ width: `${pct}%` }}
             >
               {maxed && (
                 <span className="sparkles on-fill" aria-hidden="true">

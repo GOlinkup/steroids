@@ -1,4 +1,6 @@
 import { useEffect, useState } from "react";
+import { Card } from "./Cards";
+import { PillButton } from "./pickers";
 
 // React daily — briefing + day loop + music, zero keys anywhere.
 // All data rides the island backend (:8906, keyless GDELT/RSS/Meteo).
@@ -83,7 +85,7 @@ export function DailyView() {
   }
 
   return (
-    <div className="card daily">
+    <Card className="daily">
       {/* Day-open: the briefing opens the day. One tap skips. */}
       {!dismissed && (
         <div className="card-row">
@@ -117,7 +119,7 @@ export function DailyView() {
             )}
           </div>
           <div className="btn-row">
-            <button onClick={dismiss}>Skip day →</button>
+            <PillButton onClick={dismiss}>Skip day →</PillButton>
           </div>
         </div>
       )}
@@ -169,9 +171,9 @@ export function DailyView() {
               if (e.key === "Enter") ask(query);
             }}
           />
-          <button className="primary" onClick={() => ask(query)}>
+          <PillButton className="primary" onClick={() => ask(query)}>
             Play
-          </button>
+          </PillButton>
         </div>
         {musicMiss && (
           <div className="card-detail">
@@ -199,6 +201,6 @@ export function DailyView() {
           </>
         )}
       </div>
-    </div>
+    </Card>
   );
 }

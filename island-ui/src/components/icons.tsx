@@ -175,6 +175,16 @@ export function XIcon({ size = 12 }: P) {  return (
     </svg>
   );
 }
+// Trash — history row delete (chat + terminal session rows).
+export function TrashIcon({ size = 14 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M4 7h16M10 11v6M14 11v6M6.5 7l.8 12.1A2 2 0 0 0 9.3 21h5.4a2 2 0 0 0 2-1.9L17.5 7M9.5 7V5.5A1.5 1.5 0 0 1 11 4h2a1.5 1.5 0 0 1 1.5 1.5V7" />
+    </svg>
+  );
+}
 export function MicIcon({ size = 16 }: P) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
@@ -214,8 +224,63 @@ export function HistoryIcon({ size = 20 }: P) {
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"
       aria-hidden style={{ display: "block", flex: "none" }}>
-      <circle cx="12" cy="12" r="8.5" />
+      <circle cx="12" cy="12" r="10" />
       <path d="M12 7.5V12l3 2" />
+    </svg>
+  );
+}
+
+// Copy — message action: copy reply text.
+export function CopyIcon({ size = 14 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <rect x="9" y="9" width="11" height="11" rx="2.5" />
+      <path d="M5 15V6a2 2 0 0 1 2-2h9" />
+    </svg>
+  );
+}
+
+// Check — copy confirmation swap.
+export function CheckIcon({ size = 14 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="m4.5 12.5 5 5 10-11" />
+    </svg>
+  );
+}
+
+// Thumbs up / down — message vote pair, same plain stroke as PlusIcon.
+export function ThumbUpIcon({ size = 14 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M7 11v9H4a1 1 0 0 1-1-1v-7a1 1 0 0 1 1-1h3Zm0 0 4-7c1.5 0 2.5 1 2.5 2.5V9h5.6a2 2 0 0 1 2 2.4l-1.2 6A2 2 0 0 1 17.4 19H7" />
+    </svg>
+  );
+}
+
+export function ThumbDownIcon({ size = 14 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M17 13V4h3a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1h-3Zm0 0-4 7c-1.5 0-2.5-1-2.5-2.5V15H4.9a2 2 0 0 1-2-2.4l1.2-6A2 2 0 0 1 6.6 5H17" />
+    </svg>
+  );
+}
+
+// Pencil — edit a sent user message back into the composer.
+export function PencilIcon({ size = 14 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M17 3a2.8 2.8 0 1 1 4 4L7.5 20.5 2 22l1.5-5.5Z" />
     </svg>
   );
 }
@@ -270,6 +335,18 @@ export function PhoneIcon({ size = 10 }: P) {
       stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
       aria-hidden style={{ display: "block", flex: "none" }}>
       <path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" />
+    </svg>
+  );
+}
+
+// Drop — send-to-device button. Droplet, not a handset: no call vibes.
+export function DropIcon({ size = 16 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M12 3.5c3.2 4.2 5.5 7.5 5.5 10.7a5.5 5.5 0 0 1-11 0C6.5 11 8.8 7.7 12 3.5Z" />
+      <path d="M12 12.5v5m0 0-2-2m2 2 2-2" />
     </svg>
   );
 }

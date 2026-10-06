@@ -11,6 +11,7 @@
   },
   "dependencies": {
     "@mediapipe/hands": "^0.4.1675469240",
+    "@supabase/supabase-js": "^2.117.2",
     "@tensorflow-models/hand-pose-detection": "^2.0.1",
     "@tensorflow/tfjs-backend-webgl": "^4.22.0",
     "@tensorflow/tfjs-converter": "^4.22.0",
