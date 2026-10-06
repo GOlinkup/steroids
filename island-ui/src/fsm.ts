@@ -1,7 +1,5 @@
 // Steroids island FSM — hidden | flex | jacked | pump are gym states.
-// Plate snap, no bounce. Logic mirrors island/fsm.js.
-// PARITY: keep delay defaults in sync with island/fsm.js —
-// tests/test_island_fsm_parity.py fails if they drift.
+// Plate snap, no bounce.
 // Version comes from pyproject.toml — do not stamp here.
 
 export type IslandState = "hidden" | "flex" | "jacked" | "pump";

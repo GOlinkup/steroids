@@ -1,5 +1,5 @@
-// Steroids island mascot — Canvas 2D pixel renderer, TypeScript port.
-// Ours: headband + right-side knot tails, plate-snap motion (see island/mascot.js).
+// Steroids island mascot — Canvas 2D pixel renderer, TypeScript.
+// Ours: headband + right-side knot tails, plate-snap motion.
 
 const C = {
   skin: "#e8823c",

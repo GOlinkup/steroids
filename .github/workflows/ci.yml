@@ -26,7 +26,5 @@ jobs:
         run: python3 tests/benchmark.py --check
       - name: skill lint
         run: python3 scripts/lint_skills.py
-      - name: island FSM js/ts parity
-        run: python3 tests/test_island_fsm_parity.py
       - name: agent ledger (hooks, chat, sessions)
         run: python3 tests/test_agentlog.py
