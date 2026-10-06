@@ -13,7 +13,9 @@ answers 503 and the web UI silently falls back to its mock replies.
 """
 
 import json
+import mimetypes
 import os
+import socket
 import subprocess
 import sys
 import time
@@ -35,6 +37,22 @@ SEARCH_TIMEOUT = 20
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROUTER = os.path.join(REPO_ROOT, "src", "steroids", "router.py")
 SKILLS_DIR = os.path.join(REPO_ROOT, "skills")
+SHOTS_DIR = os.path.join(REPO_ROOT, "shots")
+
+_lens_lib = None
+
+
+def lens_lib():
+    """lens.py pure helpers (collect_shots, safe_name). Never throws."""
+    global _lens_lib
+    if _lens_lib is None:
+        import importlib.util
+        p = os.path.join(REPO_ROOT, "src", "steroids", "lens.py")
+        spec = importlib.util.spec_from_file_location("steroids_lens", p)
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        _lens_lib = m
+    return _lens_lib
 
 
 def live_dir():
@@ -42,6 +60,19 @@ def live_dir():
     if os.path.isdir(cand):
         return cand
     return os.path.expanduser("~/.config/opencode/plugins/steroids")
+
+
+def lan_base(port):
+    """This machine's LAN URL, so a phone browser can reach the bridge."""
+    ip = "127.0.0.1"
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.connect(("8.8.8.8", 80))  # no traffic sent; reveals the route IP
+        ip = s.getsockname()[0]
+        s.close()
+    except OSError:
+        pass
+    return "http://%s:%s" % (ip, port)
 
 
 _DESCS = None
@@ -194,6 +225,9 @@ class Handler(SimpleHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(body)
 
+    def _local(self):
+        return self.client_address[0] in ("127.0.0.1", "::1")
+
     def do_OPTIONS(self):  # browser preflight for POST /chat
         self.send_response(204)
         self.send_header("Access-Control-Allow-Origin", "*")
@@ -228,8 +262,28 @@ class Handler(SimpleHTTPRequestHandler):
             key = (parse_qs(parts.query).get("key") or [""])[0]
             relay.handle_ws(self, key)
             return
+        elif parts.path == "/relay/pending":
+            try:
+                lan = lan_base(self.server.server_address[1])
+            except (AttributeError, IndexError):
+                lan = ""
+            self._send({"pending": relay.pending_links(), "lan": lan})
+        elif parts.path == "/relay/link-status":
+            tok = (parse_qs(parts.query).get("token") or [""])[0]
+            self._send(relay.link_status(tok))
+        elif parts.path == "/relay/local-key":
+            # this PC joining its own hub: localhost only, never LAN.
+            if not self._local():
+                return self._send({"ok": False,
+                                   "error": "localhost only"}, 403)
+            self._send({"ok": True, "key": relay.local_key()})
         elif parts.path == "/relay/qr":
-            self._send(relay.qr_pair())
+            out = relay.qr_pair(include_key=self._local())
+            try:
+                out["lan"] = lan_base(self.server.server_address[1])
+            except (AttributeError, IndexError):
+                pass
+            self._send(out)
         elif parts.path == "/gigs":
             try:
                 limit = int((parse_qs(parts.query).get("limit") or ["10"])[0])
@@ -238,6 +292,38 @@ class Handler(SimpleHTTPRequestHandler):
             self._send(gigs.load(max(1, min(limit, 50))))
         elif parts.path == "/profile":
             self._send({"ok": True, "profile": profile.mirror()})
+        elif parts.path == "/shots":
+            # live lens feed: newest-first shot cards from the watch dir.
+            try:
+                lib = lens_lib()
+                watch = getattr(self.server, "lens_watch", SHOTS_DIR)
+                cards = lib.collect_shots(watch, limit=lib.PAGE_SCOPE_N)
+                self._send({"shots": [{
+                    "name": s["name"], "label": s["label"], "time": s["time"],
+                    "url": "/shots-file/" + s["name"],
+                } for s in cards]})
+            except Exception as e:
+                self._send({"shots": [], "error": str(e)})
+        elif parts.path.startswith("/shots-file/"):
+            try:
+                lib = lens_lib()
+                watch = getattr(self.server, "lens_watch", SHOTS_DIR)
+                p = lib.safe_name(watch, parts.path[len("/shots-file/"):])
+                if not p:
+                    return self._send({"ok": False, "error": "nope"}, 404)
+                with open(p, "rb") as f:
+                    body = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type",
+                                 mimetypes.guess_type(p)[0] or "image/png")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "max-age=5")
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                return self._send({"ok": False, "error": "gone"}, 404)
+            return
         elif getattr(self.server, "serve_dir", None):
             super().do_GET()
         else:
@@ -286,6 +372,26 @@ class Handler(SimpleHTTPRequestHandler):
             if hit is None:
                 return self._send({"ok": False, "error": "bad pin"}, 404)
             return self._send({"ok": True, **hit})
+        if parts.path == "/relay/link-request":
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            return self._send({"ok": True,
+                               "token": relay.request_link(req.get("label"))})
+        if parts.path == "/relay/link-approve":
+            # only the PC owner taps Allow: localhost only, never LAN.
+            if not self._local():
+                return self._send({"ok": False,
+                                   "error": "approve on the PC itself"}, 403)
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            key = relay.approve_link(req.get("token"),
+                                     req.get("key") or None)
+            if key is None:
+                return self._send({"ok": False,
+                                   "error": "stale request"}, 404)
+            return self._send({"ok": True, "key": key})
         if parts.path == "/relay/send":
             req = self._read_json()
             if req is None or not req.get("key"):
@@ -318,7 +424,9 @@ class Handler(SimpleHTTPRequestHandler):
 
 def main(argv):
     port = PORT
+    host = HOST
     serve_dir = None
+    lens_watch = SHOTS_DIR
     args = list(argv)
     if "--check" in args:
         print(json.dumps({"opencode": agentlog.opencode_available(),
@@ -330,16 +438,39 @@ def main(argv):
             os.path.dirname(os.path.abspath(__file__))), "island-ui", "dist")
         if not os.path.isdir(serve_dir):
             sys.exit("build the UI first: (cd island-ui && npm run build)")
+    if "--host" in args:
+        i = args.index("--host")
+        try:
+            host = args[i + 1]
+            del args[i:i + 2]
+        except IndexError:
+            sys.exit("--host needs an address, e.g. --host 0.0.0.0")
+    if "--watch" in args:
+        i = args.index("--watch")
+        try:
+            lens_watch = os.path.abspath(args[i + 1])
+            del args[i:i + 2]
+        except IndexError:
+            sys.exit("--watch needs a dir, e.g. --watch ~/shots")
     rest = [a for a in args if not a.startswith("-")]
     if rest:
         port = int(rest[0])
-    srv = ThreadingHTTPServer((HOST, port), Handler)
+    # NOTE: directory must ride the constructor (instance attr). Setting
+    # Handler.directory on the class is silently shadowed by __init__'s
+    # directory=None default — that bug served the repo root instead of dist.
+    def handler(*a, **k):
+        return Handler(*a, directory=serve_dir, **k)
+
+    srv = ThreadingHTTPServer((host, port), handler)
     srv.serve_dir = serve_dir
+    srv.lens_watch = lens_watch
     if serve_dir:
-        Handler.directory = serve_dir  # type: ignore[attr-defined]
-        print("nicki: http://%s:%s  (UI + opencode bridge)" % (HOST, port))
+        print("nicki: http://%s:%s  (UI + opencode bridge)" % (host, port))
+        if host in ("0.0.0.0", "::"):
+            print("nicki phone: %s  (same WiFi, pair in Settings)" %
+                  lan_base(port))
     else:
-        print("nicki bridge: http://%s:%s  (API only)" % (HOST, port))
+        print("nicki bridge: http://%s:%s  (API only)" % (host, port))
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

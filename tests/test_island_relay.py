@@ -102,6 +102,10 @@ class RelayTest(unittest.TestCase):
         op, data = _read_frame(b)
         self.assertEqual(op, 0x1)
         self.assertEqual(json.loads(data)["text"], "hi")
+        # sender never hears its own frame back (no self echo).
+        a.settimeout(0.5)
+        with self.assertRaises(socket.timeout):
+            _read_frame(a)
         # Mismatched frame key: dropped, never routed.
         a.sendall(_masked(json.dumps({"type": "x", "key": "wrong"})))
         b.settimeout(0.5)

@@ -1,5 +1,7 @@
 import { useEffect, useRef, useState } from "react";
-import { PlusIcon, MicIcon, XIcon } from "./icons";
+import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, PhoneIcon } from "./icons";
+import { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
+export { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
 import { ActivityOrb } from "../orb";
 import { IDLE_ACTIVITY } from "../orb_state";
 import {
@@ -200,167 +202,19 @@ export function QuestionCard({
 
 // Chat panel — engine picker (provider + model + effort, or Auto),
 // animated token meter, square OpenAI-style composer, history lives top-right.
-// Engine control: provider + model + effort go out with every send.
-const ENGINES: Array<{ id: string; label: string; mark: string; outcome: string; models: string[] }> = [
-  { id: "auto", label: "auto", mark: "A", outcome: "router picks", models: ["router-pick"] },
-  { id: "steroids", label: "steroids", mark: "S", outcome: "local only", models: ["router-local"] },
-  { id: "opencode", label: "opencode", mark: "O", outcome: "everyday", models: ["auto", "gpt", "claude"] },
-  { id: "claude", label: "claude", mark: "C", outcome: "complex", models: ["sonnet", "opus", "haiku"] },
-  { id: "codex", label: "codex", mark: "X", outcome: "code", models: ["gpt-5", "codex-mini"] },
-  { id: "ollama", label: "ollama", mark: "L", outcome: "offline", models: ["local"] },
-];
-/// Effort tiers (designspells-333 motion spec): 4 detents, gradient
-/// fill blue->purple, label recolors by tier, lightning chip + sparkles
-/// at max. Sent values stay free-string on the wire (bridge passes thru).
-const EFFORT_TIERS = [
-  { id: "low", label: "Low", color: "#9ca3af" },
-  { id: "med", label: "Med", color: "#9ca3af" },
-  { id: "high", label: "High", color: "#3b82f6" },
-  { id: "ultra", label: "Ultra", color: "#a855f7" },
-] as const;
+// Engine control lives in ./pickers.tsx (reusable OOP base).
 
-/// Effort picker (designspells-333): pill button in the composer opens a
-/// floating sheet — bolt left, big centered label + chevron (crossfades +
-/// recolors by tier), reset right, static model below, thick track with
-/// detent dots ON it, gradient fill blue->purple, big thumb drag,
-/// lightning chip + sparkles on the fill at max.
-export function EffortPicker({
-  value,
-  model,
-  onChange,
-  defaultOpen,
-}: {
-  value: string;
-  model: string;
-  onChange: (id: string) => void;
-  defaultOpen?: boolean;
-}) {
-  const [open, setOpen] = useState(defaultOpen ?? false);
-  const trackRef = useRef<HTMLDivElement>(null);
-  const idx = Math.max(0, EFFORT_TIERS.findIndex((t) => t.id === value));
-  const tier = EFFORT_TIERS[idx];
-  const maxed = idx === EFFORT_TIERS.length - 1;
-  const pct = (idx / (EFFORT_TIERS.length - 1)) * 100;
-  const pick = (i: number) => {
-    const c = Math.max(0, Math.min(EFFORT_TIERS.length - 1, i));
-    onChange(EFFORT_TIERS[c].id);
-  };
-  const fromPointer = (clientX: number) => {
-    const el = trackRef.current;
-    if (!el) return;
-    const r = el.getBoundingClientRect();
-    pick(Math.round(((clientX - r.left) / r.width) * (EFFORT_TIERS.length - 1)));
-  };
-  return (
-    <div className="effort-wrap">
-      <button
-        className="effort-pill"
-        aria-label="Select effort"
-        onClick={() => setOpen((o) => !o)}
-      >
-        {tier.label} <span aria-hidden="true">⌄</span>
-      </button>
-      {open && (
-        <div className="effort-sheet" role="dialog" aria-label="Effort">
-          <div className="effort-top">
-            <span className={maxed ? "bolt on" : "bolt"} title="effort">
-              ⚡
-            </span>
-            <span
-              key={tier.id}
-              className="effort-label"
-              style={{ color: tier.color }}
-            >
-              {tier.label} <span aria-hidden="true">›</span>
-            </span>
-            <button
-              className="effort-reset"
-              title="Reset effort"
-              onClick={() => onChange("med")}
-            >
-              ↻
-            </button>
-          </div>
-          <div className="effort-model">{model}</div>
-          <div
-            ref={trackRef}
-            className="effort-track"
-            role="slider"
-            aria-valuemin={0}
-            aria-valuemax={EFFORT_TIERS.length - 1}
-            aria-valuenow={idx}
-            aria-label="Effort"
-            onPointerDown={(e) => {
-              (e.target as Element).setPointerCapture?.(e.pointerId);
-              fromPointer(e.clientX);
-            }}
-            onPointerMove={(e) => {
-              if (e.buttons > 0) fromPointer(e.clientX);
-            }}
-          >
-            <div
-              className="effort-fill"
-              style={{
-                width: `${pct}%`,
-                backgroundImage:
-                  "linear-gradient(90deg,#3b82f6,#a855f7)",
-              }}
-            >
-              {maxed && (
-                <span className="sparkles on-fill" aria-hidden="true">
-                  <i />
-                  <i />
-                  <i />
-                </span>
-              )}
-            </div>
-            {EFFORT_TIERS.map((t, i) => (
-              <i
-                key={t.id}
-                className={
-                  i <= idx ? "detent on" : "detent"
-                }
-                style={{
-                  left: `${(i / (EFFORT_TIERS.length - 1)) * 100}%`,
-                }}
-              />
-            ))}
-            <span
-              className="effort-thumb"
-              style={{ left: `${pct}%` }}
-            />
-          </div>
-        </div>
-      )}
-    </div>
+// Composer status: last-turn time + phone-pipe state. Provider/model
+// already show in the pills above, so this line carries what they can't:
+// relay live vs offline + how many drops are queued to fire on reconnect.
+export function StatusLine({ thinking, turnMs, linked, queued }: { thinking: boolean; turnMs: number | null; linked: boolean; queued: number }) {
+  const link = linked ? "linked" : queued > 0 ? `offline · queued ${queued}` : "offline";
+  const bits = [thinking ? "…" : turnMs !== null ? `${turnMs.toFixed(1)}s` : null, link].filter(
+    (b): b is string => b !== null,
   );
-}
-
-// ~4 chars per token — estimate, labeled as such.
-export function estTokens(text: string): number {
-  return Math.max(1, Math.round(text.length / 4));
-}
-
-// Animated token readout: counts toward the live draft estimate,
-// stamps last-turn time when a reply lands. Model name rides along.
-export function TokenMeter({ text, thinking, turnMs, model }: { text: string; thinking: boolean; turnMs: number | null; model: string }) {
-  const target = estTokens(text);
-  const [shown, setShown] = useState(target);
-  useEffect(() => {
-    let raf = 0;
-    const from = shown, t0 = performance.now();
-    const step = (t: number) => {
-      const p = Math.min(1, (t - t0) / 400);
-      setShown(Math.round(from + (target - from) * p));
-      if (p < 1) raf = requestAnimationFrame(step);
-    };
-    raf = requestAnimationFrame(step);
-    return () => cancelAnimationFrame(raf);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [target]);
   return (
-    <span className="tokens" title="estimated input tokens · last turn time · model">
-      ~{shown} tok{turnMs !== null && !thinking ? ` · ${turnMs.toFixed(1)}s` : thinking ? " · …" : ""} · {model}
+    <span className="tokens" title="last turn time · phone pipe (relay live, outbox offline)">
+      {bits.join(" · ")}
     </span>
   );
 }
@@ -373,6 +227,10 @@ export function ChatPanel({
   onFiles,
   onRemoveAttachment,
   onOpenLens,
+  onDropToPhone,
+  phoneLinked = false,
+  queuedDrops = 0,
+  liveShots = [],
 }: {
   messages: ChatMessage[];
   onSend: (text: string, provider?: string, opts?: { model: string; effort: string }) => void;
@@ -381,23 +239,35 @@ export function ChatPanel({
   onFiles: (files: File[]) => void;
   onRemoveAttachment: (id: number) => void;
   onOpenLens: () => void;
+  onDropToPhone?: () => void;
+  phoneLinked?: boolean;
+  queuedDrops?: number;
+  liveShots?: Array<{ src: string; label: string }>;
 }) {
   const [provider, setProvider] = useState(ENGINES[0].id);
+  const [model, setModel] = useState(ENGINES[0].models[0]);
   const [effort, setEffort] = useState<string>("med");
+  const [openPicker, setOpenPicker] = useState<null | "provider" | "effort">(null);
   const [draft, setDraft] = useState("");
   const [dragOver, setDragOver] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
   const [turnMs, setTurnMs] = useState<number | null>(null);
+  const [attachOpen, setAttachOpen] = useState(false);
+  const [composerDrag, setComposerDrag] = useState(false);
+  const dragDepth = useRef(0);
   const fileRef = useRef<HTMLInputElement>(null);
+  const snapRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const sentAt = useRef(0);
   const recRef = useRef<{ rec: MediaRecorder; chunks: Blob[]; timer: ReturnType<typeof setInterval> } | null>(null);
-  const engine = ENGINES.find((e) => e.id === provider) ?? ENGINES[0];
-  const model = engine.models[0];
   const pickProvider = (id: string) => {
-    setProvider(id);
+    const eng = ENGINES.find((e) => e.id === id) ?? ENGINES[0];
+    setProvider(eng.id);
+    setModel(eng.models[0]);
   };
+  const togglePicker = (which: "provider" | "effort") =>
+    setOpenPicker((cur) => (cur === which ? null : which));
   const submit = () => {
     const t = draft.trim();
     if ((!t && !attachments.length) || thinking) return;
@@ -462,12 +332,21 @@ export function ChatPanel({
   return (
     <div
       className={dragOver ? "card chat-card dragover" : "card chat-card"}
-      onDragOver={(e) => { e.preventDefault(); setDragOver(true); }}
+      onDragOver={(e) => {
+        if (!e.dataTransfer?.types.includes("Files")) return;
+        e.preventDefault();
+        setDragOver(true);
+      }}
       onDragLeave={() => setDragOver(false)}
       onDrop={(e) => {
+        // card-level catch-all; composer handles its own drops (stopPropagation
+        // there) so a file never attaches twice via the page handler.
+        const files = Array.from(e.dataTransfer?.files ?? []);
+        if (!files.length) return;
         e.preventDefault();
+        e.stopPropagation();
         setDragOver(false);
-        onFiles(Array.from(e.dataTransfer.files ?? []));
+        onFiles(files);
       }}
       onPaste={(e) => {
         const files = Array.from(e.clipboardData?.files ?? []);
@@ -508,7 +387,20 @@ export function ChatPanel({
         ))}
         {thinking && (
           <div className="chat-row">
-            <div className="typing"><i /><i /><i /></div>
+            <div className="reply working">
+              {liveShots[0] && (
+                <img
+                  src={liveShots[0].src}
+                  alt={liveShots[0].label}
+                  className="bubble-img"
+                  onClick={onOpenLens}
+                />
+              )}
+              <div className="typing"><i /><i /><i /></div>
+              <span className="work-cap">
+                <i className="live-dot" />working{liveShots[0] ? ` · ${liveShots[0].label}` : ""}
+              </span>
+            </div>
           </div>
         )}
       </div>
@@ -533,7 +425,47 @@ export function ChatPanel({
           ))}
         </div>
       )}
-      <div className="composer-box">
+      <div
+        className={composerDrag ? "composer-box dragover" : "composer-box"}
+        onDragEnter={(e) => {
+          if (!e.dataTransfer?.types.includes("Files")) return;
+          e.preventDefault();
+          e.stopPropagation();
+          dragDepth.current++;
+          setComposerDrag(true);
+        }}
+        onDragOver={(e) => {
+          if (!e.dataTransfer?.types.includes("Files")) return;
+          e.preventDefault();
+          e.stopPropagation();
+        }}
+        onDragLeave={(e) => {
+          e.stopPropagation();
+          dragDepth.current = Math.max(0, dragDepth.current - 1);
+          if (dragDepth.current === 0) setComposerDrag(false);
+        }}
+        onDrop={(e) => {
+          e.stopPropagation();
+          dragDepth.current = 0;
+          setComposerDrag(false);
+          const files = Array.from(e.dataTransfer?.files ?? []);
+          if (files.length) {
+            e.preventDefault();
+            setAttachOpen(false);
+            onFiles(files);
+            return;
+          }
+          // text/URL drop: insert into the draft instead of swallowing it.
+          const text = e.dataTransfer?.getData("text") ?? "";
+          if (text) {
+            e.preventDefault();
+            setDraft((d) => (d ? `${d} ${text}` : text));
+          }
+        }}
+      >
+        {composerDrag && (
+          <div className="composer-drop-hint" aria-hidden>Release to attach 📎</div>
+        )}
         <input
           ref={fileRef}
           type="file"
@@ -544,11 +476,22 @@ export function ChatPanel({
             e.target.value = "";
           }}
         />
+        <input
+          ref={snapRef}
+          type="file"
+          accept="image/*"
+          capture="environment"
+          style={{ display: "none" }}
+          onChange={(e) => {
+            onFiles(Array.from(e.target.files ?? []));
+            e.target.value = "";
+          }}
+        />
         <textarea
           ref={boxRef}
           className="composer-input"
           rows={1}
-          placeholder={attachments.length ? "Ask about these files…" : `Ask ${engine.label} anything…`}
+          placeholder={attachments.length ? "Ask about these files…" : `Ask ${displayModel(model)} anything…`}
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value);
@@ -566,43 +509,68 @@ export function ChatPanel({
           }}
         />
         <div className="composer-innerbar">
+          <div className="attach-wrap">
+            <button
+              className="tool-btn"
+              title="Attach or link — files, camera, more"
+              onClick={() => setAttachOpen((o) => !o)}
+            >
+              <PlusIcon size={20} />
+            </button>
+            {attachOpen && (
+              <div className="attach-menu" role="menu" aria-label="Attach options">
+                <button
+                  className="attach-opt"
+                  onClick={() => { setAttachOpen(false); fileRef.current?.click(); }}
+                >
+                  📎 Attach files
+                </button>
+                <button
+                  className="attach-opt"
+                  onClick={() => { setAttachOpen(false); snapRef.current?.click(); }}
+                >
+                  📷 Snap from camera
+                </button>
+              </div>
+            )}
+          </div>
           <button
-            className="tool-btn"
-            title="Attach files"
-            onClick={() => fileRef.current?.click()}
+            className="effort-pill drop-btn"
+            title={phoneLinked ? "Send attached files via the paired phone pipe" : "No pair yet — queues, fires on reconnect"}
+            onClick={() => onDropToPhone?.()}
+            disabled={!attachments.length}
           >
-            <PlusIcon size={18} />
+            <PhoneIcon size={14} /> {isPcSide ? "Drop to phone" : "Drop to PC"}
           </button>
-          <select
-            className="tune provider-pick"
-            aria-label="Provider"
-            title="engine provider"
-            value={provider}
-            onChange={(e) => pickProvider(e.target.value)}
-          >
-            {ENGINES.map((e) => (
-              <option key={e.id} value={e.id}>
-                {e.mark} {e.label} — {e.outcome}
-              </option>
-            ))}
-          </select>
-        <EffortPicker
-          value={effort}
-          model={model}
-          onChange={setEffort}
-        />
+          <div className="picker-group">
+            <ProviderPicker
+              provider={provider}
+              model={model}
+              onProvider={pickProvider}
+              onModel={setModel}
+              open={openPicker === "provider"}
+              onToggle={() => togglePicker("provider")}
+            />
+            <EffortPicker
+              value={effort}
+              model={displayModel(model)}
+              onChange={setEffort}
+              open={openPicker === "effort"}
+              onToggle={() => togglePicker("effort")}
+            />
+          </div>
           <button
             className={recording ? "tool-btn recording" : "tool-btn"}
             title={recording ? `Stop recording (${recSecs}s)` : "Record voice note"}
             onClick={toggleRecording}
           >
-            {recording ? <span className="rec-dot" /> : <MicIcon size={18} />}
+            {recording ? <span className="rec-dot" /> : <MicIcon size={20} />}
           </button>
-          <button className={canSend ? "send-btn ready" : "send-btn"} onClick={submit} aria-label="Send" disabled={!canSend}>↑</button>
+          <button className={canSend ? "send-btn ready" : "send-btn"} onClick={submit} aria-label="Send" disabled={!canSend}><ArrowUpIcon size={20} /></button>
         </div>
       </div>
       <div className="composer-status">
-        <TokenMeter text={draft} thinking={thinking} turnMs={turnMs} model={`${provider}/${model}`} />
+        <StatusLine thinking={thinking} turnMs={turnMs} linked={phoneLinked} queued={queuedDrops} />
       </div>
     </div>
   );
@@ -649,16 +617,115 @@ export interface SettingsState {
   provider: string;
   activePills: string[];
   autoClose: number;
+  autoSave: boolean;
 }
 
 const ALL_PILLS = ["steroids", "opencode", "claude", "codex", "ollama"];
 
+// Pair panel — links this browser with the phone over the self relay.
+// Zero typing: the phone knocks, the PC taps Allow once, linked forever.
+// PC side shows knocks + the LAN URL to open on the phone. Same WiFi, no cloud.
+export interface LinkRequest {
+  token: string;
+  label: string;
+}
+
+export const isPcSide =
+  typeof window !== "undefined" &&
+  /^(localhost|127\.0\.0\.1)$/.test(window.location.hostname);
+
+export function PairPanel({
+  linked,
+  pending,
+  lan,
+  onPaired,
+  onApprove,
+  onUnpair,
+}: {
+  linked: boolean;
+  pending: LinkRequest[];
+  lan: string;
+  onPaired: (endpoint: string, key: string) => void;
+  onApprove: (token: string) => void;
+  onUnpair: () => void;
+}) {
+  const [knocking, setKnocking] = useState(false);
+  const [msg, setMsg] = useState("");
+  const origin = window.location.origin;
+  const knock = async () => {
+    setKnocking(true);
+    setMsg("knocking — tap Allow on the PC…");
+    try {
+      const r = await fetch(`${origin}/relay/link-request`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ label: "Phone" }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error("knock refused");
+      const t0 = Date.now();
+      while (Date.now() - t0 < 5 * 60 * 1000) {
+        await new Promise((w) => setTimeout(w, 2000));
+        const s = await fetch(`${origin}/relay/link-status?token=${j.token}`)
+          .then((x) => x.json()).catch(() => null);
+        if (s?.approved && s.key) {
+          setKnocking(false);
+          setMsg("");
+          onPaired(origin, s.key);
+          return;
+        }
+      }
+      setMsg("no answer — knock again while the PC island is open");
+    } catch {
+      setMsg("bridge not reachable — same WiFi as the PC?");
+    }
+    setKnocking(false);
+  };
+  if (linked) {
+    return (
+      <div className="set-row col">
+        <span className="set-label">Phone link</span>
+        <div className="btn-row">
+          <button className="primary" disabled>✓ Phone linked</button>
+          <button onClick={onUnpair}>Unpair</button>
+        </div>
+      </div>
+    );
+  }
+  return (
+    <div className="set-row col">
+      <span className="set-label">Phone link</span>
+      {isPcSide ? (
+        <>
+          {!!lan && <div className="card-detail">on your phone open {lan} → Settings → Link this phone</div>}
+          {pending.length === 0 && <div className="card-detail">no phones knocking</div>}
+          {pending.map((p) => (
+            <div className="btn-row" key={p.token}>
+              <span>📲 {p.label} wants to link</span>
+              <button className="primary" onClick={() => onApprove(p.token)}>Allow</button>
+            </div>
+          ))}
+        </>
+      ) : (
+        <div className="btn-row">
+          <button className="primary" onClick={() => void knock()} disabled={knocking}>
+            {knocking ? "Waiting for PC…" : "Link this phone"}
+          </button>
+        </div>
+      )}
+      {!!msg && <div className="card-detail">{msg}</div>}
+    </div>
+  );
+}
+
 export function SettingsView({
   settings,
   onChange,
+  pair,
 }: {
   settings: SettingsState;
   onChange: (s: SettingsState) => void;
+  pair?: React.ReactNode;
 }) {
   const set = (patch: Partial<SettingsState>) => onChange({ ...settings, ...patch });
   const togglePill = (id: string) =>
@@ -669,6 +736,16 @@ export function SettingsView({
     });
   return (
     <div className="card settings">
+      <div className="set-row">
+        <button
+          className={settings.autoSave ? "switch on" : "switch"}
+          onClick={() => set({ autoSave: !settings.autoSave })}
+          aria-label="Auto-save incoming drops"
+        >
+          <i />
+        </button>
+        <span>Auto-save incoming drops</span>
+      </div>
       <div className="set-row">
         <button
           className={settings.soundOn ? "switch on" : "switch"}
@@ -729,6 +806,7 @@ export function SettingsView({
           ))}
         </div>
       </div>
+      {pair}
     </div>
   );
 }

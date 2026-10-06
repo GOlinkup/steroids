@@ -43,15 +43,25 @@ main{padding-top:0;max-width:1440px;margin:0 auto;width:100%}
 .wordmark:hover{text-decoration:none}
 .wordmark em{font-style:normal;color:var(--accent)}
 .logo-wrap{position:relative;display:inline-flex;flex:none;margin-right:.5rem;z-index:20}
-.logo-mascot{height:2.4em;width:2.4em;user-select:none;-webkit-user-drag:none;shape-rendering:crispEdges;overflow:visible}
-.logo-mascot .eye{transform-box:fill-box;transform-origin:center;animation:logo-blink 4.6s infinite}
+.logo-mascot{height:2.4em;width:2.4em;user-select:none;-webkit-user-drag:none;shape-rendering:crispEdges;overflow:visible;transform-box:fill-box;transform-origin:50% 100%;animation:logo-breathe 3s ease-in-out infinite}
+.logo-mascot .eye{transform-box:fill-box;transform-origin:center;animation:logo-blink 4.6s infinite;transition:transform .14s ease}
+.logo-wrap:hover .logo-mascot .eye{transform:scale(1.15)}
 @keyframes logo-blink{0%,94%,100%{transform:scaleY(1)}97%{transform:scaleY(.08)}}
+@keyframes logo-breathe{0%,100%{transform:scale(1,1)}50%{transform:scale(1.015,1.03)}}
+@keyframes logo-squish{0%{transform:scale(1,1)}40%{transform:scale(1.15,.85)}100%{transform:scale(1,1)}}
+@keyframes logo-dizzy{0%{transform:rotate(0)}100%{transform:rotate(720deg)}}
+@keyframes logo-jump{0%{transform:translateY(0) scale(1,1)}35%{transform:translateY(-30%) scale(.95,1.08)}70%{transform:translateY(0) scale(1.08,.92)}100%{transform:translateY(0) scale(1,1)}}
+.logo-mascot.is-squish{animation:logo-squish .14s ease,logo-breathe 3s ease-in-out .14s infinite}
+.logo-mascot.is-annoyed .eye{animation:none;transform:scaleY(.12)}
+.logo-mascot.is-dizzy{animation:logo-dizzy 1.3s linear}
+.logo-mascot.is-dizzy .eye{animation:none}
+.logo-mascot.is-jump{animation:logo-jump .5s ease,logo-breathe 3s ease-in-out .5s infinite}
 .logo-say{position:absolute;z-index:30;left:calc(100% + 14px);top:50%;transform:translateY(-50%) scale(.85);transform-origin:left center;opacity:0;pointer-events:none;transition:opacity .18s ease,transform .18s ease;background:#fff;color:#000;font-family:ui-monospace,SFMono-Regular,Menlo,Consolas,monospace;font-size:.68rem;font-weight:600;white-space:nowrap;padding:.35rem .7rem;border-radius:1rem;box-shadow:0 6px 20px rgba(0,0,0,.4)}
 .logo-say::before,.logo-say::after{content:"";position:absolute;background:#fff;border-radius:50%}
 .logo-say::before{width:8px;height:8px;left:-8px;top:58%}
 .logo-say::after{width:5px;height:5px;left:-15px;top:72%}
 .logo-wrap:hover .logo-say,.logo-wrap:focus-within .logo-say,.logo-wrap.on .logo-say{opacity:1;transform:translateY(-50%) scale(1)}
-@media (prefers-reduced-motion:reduce){.logo-mascot .eye{animation:none}}
+@media (prefers-reduced-motion:reduce){.logo-mascot,.logo-mascot .eye,.logo-mascot.is-squish,.logo-mascot.is-dizzy,.logo-mascot.is-jump{animation:none}}
 @media (max-width:700px){.logo-say{font-size:.6rem;max-width:60vw;white-space:normal}}
 .glass{
   position:relative;justify-self:center;width:fit-content;max-width:100%;min-width:0;
@@ -370,7 +380,7 @@ html{scroll-behavior:smooth}
 <body>
 
 <header class="shell-row">
-  <a class="wordmark" href="index.html" title="Home: you are here"><span class="logo-wrap"><svg class="logo-mascot" viewBox="0 0 14 14" width="28" height="28" role="img" aria-label="Steroids mascot"><title>Steroids mascot</title><g><rect x="4" y="3" width="6" height="1" fill="#f2c184"/><rect x="2" y="4" width="10" height="1" fill="#f7cf9f"/><rect x="1" y="5" width="12" height="1" fill="#e8823c"/><rect x="0" y="5" width="1" height="3" fill="#b95f26"/><rect x="13" y="5" width="1" height="3" fill="#b95f26"/><rect x="1" y="6" width="1" height="2" fill="#e8823c"/><g class="eye"><rect x="2" y="6" width="3" height="1" fill="#fff6ea"/><rect x="2" y="7" width="1" height="1" fill="#fff6ea"/><rect class="pupil" x="3" y="7" width="1" height="1" fill="#14100b"/><rect x="4" y="7" width="1" height="1" fill="#fff6ea"/></g><rect x="5" y="6" width="4" height="2" fill="#e8823c"/><g class="eye"><rect x="9" y="6" width="3" height="1" fill="#fff6ea"/><rect x="9" y="7" width="1" height="1" fill="#fff6ea"/><rect class="pupil" x="10" y="7" width="1" height="1" fill="#14100b"/><rect x="11" y="7" width="1" height="1" fill="#fff6ea"/></g><rect x="12" y="6" width="1" height="2" fill="#e8823c"/><rect x="1" y="8" width="1" height="1" fill="#e8823c"/><rect x="2" y="8" width="3" height="1" fill="#fff6ea"/><rect x="5" y="8" width="4" height="1" fill="#e8823c"/><rect x="9" y="8" width="3" height="1" fill="#fff6ea"/><rect x="12" y="8" width="1" height="1" fill="#e8823c"/><rect x="2" y="9" width="10" height="1" fill="#e8823c"/></g></svg></span>STEROIDS</a>
+  <a class="wordmark" href="index.html" title="Home: you are here"><span class="logo-wrap"><svg class="logo-mascot" viewBox="0 0 14 14" width="28" height="28" role="img" aria-label="Steroids mascot"><title>Steroids mascot</title><g><rect x="4" y="3" width="6" height="1" fill="#f2c184"/><rect x="2" y="4" width="10" height="1" fill="#f7cf9f"/><rect x="1" y="5" width="12" height="1" fill="#e8823c"/><rect x="0" y="5" width="1" height="3" fill="#b95f26"/><rect x="13" y="5" width="1" height="3" fill="#b95f26"/><rect x="1" y="6" width="1" height="2" fill="#e8823c"/><g class="eye"><rect x="2" y="6" width="3" height="1" fill="#fff6ea"/><rect x="2" y="7" width="1" height="1" fill="#fff6ea"/><rect class="pupil" x="3" y="7" width="1" height="1" fill="#14100b"/><rect x="4" y="7" width="1" height="1" fill="#fff6ea"/></g><rect x="5" y="6" width="4" height="2" fill="#e8823c"/><g class="eye"><rect x="9" y="6" width="3" height="1" fill="#fff6ea"/><rect x="9" y="7" width="1" height="1" fill="#fff6ea"/><rect class="pupil" x="10" y="7" width="1" height="1" fill="#14100b"/><rect x="11" y="7" width="1" height="1" fill="#fff6ea"/></g><rect x="12" y="6" width="1" height="2" fill="#e8823c"/><rect x="1" y="8" width="1" height="1" fill="#e8823c"/><rect x="2" y="8" width="3" height="1" fill="#fff6ea"/><rect x="5" y="8" width="4" height="1" fill="#e8823c"/><rect x="9" y="8" width="3" height="1" fill="#fff6ea"/><rect x="12" y="8" width="1" height="1" fill="#e8823c"/><rect x="2" y="9" width="10" height="1" fill="#e8823c"/></g></svg><span class="logo-say" id="logoSay" role="status"></span></span>STEROIDS</a>
   <div class="glass">
     <span class="selector" aria-hidden="true"></span>
     <nav>
@@ -886,9 +896,20 @@ html{scroll-behavior:smooth}
       say=document.getElementById('logoSay');
   var lines=['P@1 0.993 · live golden','P@3 1.000','~190 ms p50 · CPU','Competitors: 0.6B–16B params · GPU · 496 ms–2.9 s'],
       li=0,
-      reduce=matchMedia('(prefers-reduced-motion: reduce)').matches;
+      reduce=matchMedia('(prefers-reduced-motion: reduce)').matches,
+      taps=[],
+      dizzyUntil=0;
+  function speak(t){ if(say){ say.textContent=t; wrap.classList.add('on'); } }
+  // ponytail: single shared celebrate (happy jump); call window.steroidsCelebrate() on task-done
+  window.steroidsCelebrate=function(msg){
+    if(reduce||!svg)return;
+    svg.classList.remove('is-jump'); void svg.getBoundingClientRect();
+    svg.classList.add('is-jump');
+    speak(msg||'routed ✓');
+    setTimeout(function(){svg.classList.remove('is-jump');},550);
+  };
   document.addEventListener('pointermove',function(e){
-    if(reduce||!pupils.length)return;
+    if(reduce||!pupils.length||Date.now()<dizzyUntil)return;
     var cx=(e.clientX!==undefined)?e.clientX:(e.touches&&e.touches[0].clientX),
         cy=(e.clientY!==undefined)?e.clientY:(e.touches&&e.touches[0].clientY);
     if(cx===undefined||cy===undefined)return;
@@ -901,9 +922,25 @@ html{scroll-behavior:smooth}
   },{passive:true});
   wrap.addEventListener('click',function(e){
     e.preventDefault();
+    var now=Date.now();
+    taps=taps.filter(function(t){return now-t<600;}); taps.push(now);
     li=(li+1)%lines.length;
-    say.textContent=lines[li];
-    wrap.classList.add('on');
+    if(reduce){ speak(lines[li]); return; }
+    if(taps.length>=3){ // dizzy: 3 rapid taps -> 720deg spin 1300ms (BotEngine doRoll)
+      dizzyUntil=now+1300; taps=[];
+      svg.classList.remove('is-dizzy'); void svg.getBoundingClientRect();
+      svg.classList.add('is-dizzy'); speak('😵‍💫 ok ok… routing!');
+      setTimeout(function(){svg.classList.remove('is-dizzy');},1350);
+      return;
+    }
+    svg.classList.remove('is-squish'); void svg.getBoundingClientRect();
+    svg.classList.add('is-squish'); // squish 140ms spring (BotEngine 100-180ms)
+    if(taps.length===2){ // annoyed: line eyes 800ms on 2nd rapid tap
+      svg.classList.add('is-annoyed');
+      speak('hey! poking degrades P@1');
+      setTimeout(function(){svg.classList.remove('is-annoyed');},800);
+    } else speak(lines[li]);
+    setTimeout(function(){svg.classList.remove('is-squish');},160);
   });
 })();
 

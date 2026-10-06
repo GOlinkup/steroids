@@ -1,0 +1,997 @@
+import { useCallback, useEffect, useRef, useState } from "react";
+import Island from "./components/Island";
+import type { MascotHandle } from "./components/Mascot";
+import { IslandFSM, type IslandState } from "./fsm";
+import {
+  HARNESS_PILLS, ROUTE_SAMPLES, classifyAttachment, sessionTitle,
+  type AgentSession, type Approval, type Attachment, type ChatMessage, type ChatSession, type ExploreFeed, type IslandView, type Pill, type Question, type SkillHit,
+} from "./store";
+import type { Shot } from "./components/LensView";
+import { PairPanel, isPcSide, type LinkRequest, type SettingsState } from "./components/Cards";
+import { Sound, setMuted, setVolume } from "./sound";
+import { RelayClient } from "./relay";
+import { OutboxStore } from "./outbox";
+import "./index.css";
+
+let msgId = 1;
+let sessionId = 1;
+
+const GREETING = "Ask anything…";
+
+const BRIDGE =
+  new URLSearchParams(window.location.search).get("bridge") ||
+  window.location.origin;
+
+// installed-app mode (?app=1): the island itself, not the QA preview
+// harness — no wordmark, no dev buttons, no event log. Starts flexed.
+const APP_MODE =
+  new URLSearchParams(window.location.search).get("app") === "1";
+
+export default function App() {
+  const [fsmState, setFsmState] = useState<IslandState>("hidden");
+  const [view, setView] = useState<IslandView>("chat");
+  const [hint, setHint] = useState(ROUTE_SAMPLES[0]);
+  const [, setPills] = useState<Pill[]>(HARNESS_PILLS);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [sessions, setSessions] = useState<ChatSession[]>([]);
+  const [activeSessionId, setActiveSessionId] = useState<number | null>(null);
+  const [thinking, setThinking] = useState(false);
+  const [bridgeOn, setBridgeOn] = useState(false);
+  const [ocSession, setOcSession] = useState<string | null>(null);
+  const [agentSessions, setAgentSessions] = useState<AgentSession[]>([]);
+  const [exploreFeed, setExploreFeed] = useState<ExploreFeed | null>(null);
+  const [approval, setApproval] = useState<Approval | null>(null);
+  const [question, setQuestion] = useState<Question | null>(null);
+  const [shots, setShots] = useState<Shot[]>([]);
+  const [zoomShot] = useState<string | null>(() => new URLSearchParams(window.location.search).get("zoom"));
+  const [attachments, setAttachments] = useState<Attachment[]>([]);
+  const [unread, setUnread] = useState(0);
+  const [phoneLinked, setPhoneLinked] = useState(false);
+  const [queuedDrops, setQueuedDrops] = useState(0);
+  const relayRef = useRef<RelayClient | null>(null);
+  const outboxRef = useRef<OutboxStore | null>(null);
+  if (!outboxRef.current) outboxRef.current = new OutboxStore();
+  if (!relayRef.current) {
+    relayRef.current = new RelayClient({
+      urlOf: () => {
+        const ep = localStorage.getItem("relay_endpoint") ?? BRIDGE;
+        return ep.replace(/^http/, "ws") + "/relay/ws";
+      },
+    });
+  }
+  const attachId = useRef(1);
+  const fileHandles = useRef(new Map<number, File>());
+  interface Incoming {
+    name: string; size: number; kind: Attachment["kind"];
+    session: string | null; n: number;
+    parts: Uint8Array<ArrayBuffer>[]; got: number; ts: number;
+  }
+  const incomingRef = useRef(new Map<string, Incoming>());
+  const [settings, setSettingsState] = useState<SettingsState>({
+    soundOn: true,
+    volume: 0.5,
+    provider: "opencode",
+    activePills: ["steroids", "opencode", "claude"],
+    autoClose: 15,
+    autoSave: true,
+  });
+  const settingsRef = useRef(settings);
+  settingsRef.current = settings;
+  const ocSessionRef = useRef<string | null>(null);
+  ocSessionRef.current = ocSession;
+  const [linkReqs, setLinkReqs] = useState<LinkRequest[]>([]);
+  const [lanUrl, setLanUrl] = useState("");
+  const seenKnocks = useRef(new Set<string>());
+
+  const applySettings = (s: SettingsState) => {
+    setSettingsState(s);
+    setMuted(!s.soundOn);
+    setVolume(s.volume);
+    fsm.setAutoClose(s.autoClose);
+    setPills((p) =>
+      HARNESS_PILLS.filter((h) => s.activePills.includes(h.id)).map((h) => {
+        const old = p.find((x) => x.id === h.id);
+        return old ?? h;
+      }),
+    );
+    say(`settings: sound ${s.soundOn ? "on" : "off"} · ${s.provider} · close ${s.autoClose}s`);
+  };
+
+  const handleTab = (v: IslandView) => {
+    Sound.pop();
+    if (v === "chat") setUnread(0);
+    setView(v);
+    fsm.forceJacked();
+  };
+  const [log, setLog] = useState<string[]>(["island preview ready — state: hidden"]);
+
+  const fsmRef = useRef<IslandFSM | null>(null);
+  const mascotRef = useRef<MascotHandle>(null);
+  const islandRef = useRef<HTMLDivElement>(null);
+  const sampleIdx = useRef(0);
+  if (!fsmRef.current) {
+    const fsm = new IslandFSM();
+    fsm.onTransition = (from, to) => {
+      setFsmState(to);
+      say(`${from} → ${to}`);
+    };
+    fsmRef.current = fsm;
+  }
+  const fsm = fsmRef.current;
+
+  function say(m: string) {
+    setLog((l) => [`${new Date().toLocaleTimeString()}  ${m}`, ...l].slice(0, 30));
+  }
+
+  useEffect(() => {
+    // QA hook: ?view=chat&state=jacked&demo=approval seeds views for screenshots
+    const q = new URLSearchParams(window.location.search);
+    const v = q.get("view");
+    const s = q.get("state");
+    if (v === "explore" || v === "approval" || v === "question" || v === "chat" || v === "daily" || v === "lens" || v === "settings" || v === "finished") setView(v);
+    if (s === "jacked") fsm.forceJacked();
+    else if (s === "flex") fsm.forceFlex();
+    else if (s === "hidden") fsm.forceHidden();
+    const d = q.get("demo");
+    if (d === "approval") {
+      setApproval({
+        requestId: "qa",
+        title: "Teach this close call?",
+        detail: "“deploi preview” → vercel-deploy (0.71, below 0.80 bar)",
+        options: ["Allow", "Always", "Deny"],
+      });
+    }
+    if (d === "question") {
+      setQuestion({
+        title: "Which skill should own “preview”?",
+        choices: ["vercel-deploy", "demo-serve", "docs-preview", "abstain"],
+        multi: false,
+      });
+    }
+    if (d === "attach") {
+      setAttachments([
+        { id: 9001, name: "chart-accuracy.png", size: 148616, kind: "image", url: "shots/chart-accuracy.png" },
+        { id: 9002, name: "router.py", size: 4210, kind: "code" },
+      ]);
+    }
+    if (d === "chathistory") {
+      setMessages((m) => [
+        ...m,
+        { id: msgId++, role: "user", content: "route my flutter build" },
+        { id: msgId++, role: "assistant", content: "Routed → dart-flutter-patterns in 0.4s. No cloud touched." },
+      ]);
+    }
+  }, [fsm]);
+
+  useEffect(() => {
+    // Nicki bridge: if it's up, chat goes to real local opencode, else mock.
+    let dead = false;
+    fetch(`${BRIDGE}/health`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (dead) return;
+        if (j.opencode || j.claude) {
+          setBridgeOn(true);
+          say("nicki bridge live — real opencode chat");
+        }
+      })
+      .catch(() => {});
+    fetch(`${BRIDGE}/sessions`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!dead && Array.isArray(j.sessions)) setAgentSessions(j.sessions);
+      })
+      .catch(() => {});
+    fetch(`${BRIDGE}/trending`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!dead && Array.isArray(j.trending)) {
+          setExploreFeed({ trending: j.trending, recent: j.recent ?? [] });
+        }
+      })
+      .catch(() => {});
+    // live lens feed: real shots or honest empty (never stale demo).
+    const pullShots = () => {
+      fetch(`${BRIDGE}/shots`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (dead || !Array.isArray(j.shots)) return;
+          setShots(
+            j.shots.map((s: { name: string; label: string; time: string; url: string }) => ({
+              name: s.name,
+              src: `${BRIDGE}${s.url}`,
+              label: s.label,
+              time: s.time,
+            })),
+          );
+        })
+        .catch(() => {});
+    };
+    pullShots();
+    const shotsTimer = setInterval(pullShots, 3000);
+    return () => { dead = true; clearInterval(shotsTimer); };
+  }, []);
+
+  const searchSkills = useCallback(async (q: string): Promise<SkillHit[]> => {
+    try {
+      const r = await fetch(`${BRIDGE}/skills?q=${encodeURIComponent(q)}&n=8`);
+      const j = await r.json();
+      return Array.isArray(j.hits) ? j.hits : [];
+    } catch {
+      return [];
+    }
+  }, []);
+
+  useEffect(() => {
+    scheduleGreet();
+    if (APP_MODE) {
+      // floating over the phone: no page background at all, island floats.
+      document.body.style.background = "transparent";
+      // explicit ?state= wins (QA); otherwise the installed app starts flexed.
+      if (!new URLSearchParams(window.location.search).get("state")) fsm.forceFlex();
+    }
+    return () => stopGreet();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Phone↔PC pipe: same bot session both ends. Phone frames land in this
+  // chat; drops ride relay live or outbox offline (never lost).
+  useEffect(() => {
+    const relay = relayRef.current!;
+    const outbox = outboxRef.current!;
+    setQueuedDrops(outbox.pending().length);
+    const offStatus = relay.onStatus((s) => {
+      setPhoneLinked(s === "connected");
+      if (s === "connected") {
+        void outbox.flush(async (frame) => {
+          // big inline files ride the socket only (POST caps at 64KB).
+          if (JSON.stringify(frame).length > 48 * 1024) {
+            return relay.send(String(frame.type ?? "file"), frame);
+          }
+          const res = await fetch(`${BRIDGE}/relay/send`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ key: localStorage.getItem("relay_key") ?? "", frame }),
+          }).catch(() => null);
+          return !!res?.ok || relay.send(String(frame.type ?? "file"), frame);
+        }).then(() => setQueuedDrops(outbox.pending().length));
+      }
+    });
+    const offMsg = relay.onMessage((f) => {
+      // Phone→PC: camera snap or file lands in the SAME chat + same session,
+      // so the bot continues what you were doing on the phone.
+      if (f.type === "chat" && typeof f.text === "string") {
+        // shared transcript, display-only: the bot turn already ran on the
+        // sending side, so this never triggers a second turn here.
+        if (typeof f.session === "string" && f.session) setOcSession(f.session);
+        const role = f.role === "assistant" ? "assistant" : "user";
+        setMessages((m) => [...m, { id: msgId++, role, content: f.text as string }]);
+        setView("chat");
+        say("shared line from the other screen");
+      } else if (f.type === "file-start" && typeof f.id === "string" && typeof f.n === "number") {
+        // big file incoming: collect chunks, assemble on file-end. Partials
+        // survive across attempts (stable id), so a retry resumes by telling
+        // the sender exactly which chunks are missing.
+        if (typeof f.session === "string" && f.session) setOcSession(f.session);
+        setView("chat");
+        const id = f.id as string;
+        const n = f.n as number;
+        const kept = incomingRef.current.get(id);
+        if (kept && kept.n === n) {
+          kept.ts = Date.now();
+          const have: number[] = [];
+          for (let i = 0; i < kept.n; i++) if (kept.parts[i]) have.push(i);
+          relayRef.current?.send("file-got", { id, have });
+          say(`resuming ${kept.name} — holding ${have.length}/${kept.n} chunks…`);
+        } else {
+          incomingRef.current.set(id, {
+            name: String(f.name ?? "file"), size: Number(f.size ?? 0),
+            kind: validKind(f.kind),
+            session: typeof f.session === "string" ? (f.session as string) : null,
+            n, parts: new Array(n), got: 0, ts: Date.now(),
+          });
+          say(`receiving ${String(f.name ?? "file")} (${fmtSize(Number(f.size ?? 0))}) in ${n} chunks…`);
+          const sweep = () => {
+            const inc = incomingRef.current.get(id);
+            if (!inc || inc.got >= inc.n) return;
+            if (Date.now() - inc.ts > 10 * 60 * 1000) {
+              incomingRef.current.delete(id);
+              pushBot(`${inc.name} stalled — drop it again to resume where it stopped.`);
+            } else {
+              setTimeout(sweep, 60 * 1000);
+            }
+          };
+          setTimeout(sweep, 10 * 60 * 1000);
+        }
+      } else if (f.type === "file-chunk" && typeof f.id === "string" && typeof f.i === "number") {
+        const inc = incomingRef.current.get(f.id as string);
+        if (inc && typeof f.data === "string" && !inc.parts[f.i as number]) {
+          try {
+            inc.parts[f.i as number] = b64ToBytes(f.data as string);
+            inc.got++;
+            inc.ts = Date.now();
+            const pc = Math.floor((inc.got / inc.n) * 100);
+            if (pc === 25 || pc === 50 || pc === 75) say(`receiving ${inc.name} ${pc}%…`);
+          } catch { /* corrupt chunk: file-end reports the gap */ }
+        }
+      } else if (f.type === "file-end" && typeof f.id === "string") {
+        const inc = incomingRef.current.get(f.id as string);
+        if (inc) {
+          if (typeof inc.session === "string" && inc.session) setOcSession(inc.session);
+          setView("chat");
+          if (inc.got < inc.n) {
+            // keep partials: the next drop of the same file resumes them.
+            pushBot(`${inc.name} interrupted (${inc.got}/${inc.n} chunks held) — drop it again to resume.`);
+          } else {
+            incomingRef.current.delete(f.id as string);
+            landFile(inc.name, new Blob(inc.parts, { type: "application/octet-stream" }));
+          }
+        }
+      } else if (f.type === "file" && typeof f.name === "string") {
+        if (typeof f.session === "string" && f.session) setOcSession(f.session);
+        setView("chat");
+        const from = isPcSide ? "Phone" : "PC";
+        // small file, bytes inline as a data URL.
+        if (typeof f.data === "string" && (f.data as string).startsWith("data:")) {
+          void fetch(f.data as string)
+            .then((r) => r.blob())
+            .then((blob) => landFile(String(f.name), blob))
+            .catch(() => {
+              pushBot(`${from} dropped ${String(f.name)} — ask me about it, same session continues here.`);
+            });
+        } else {
+          pushBot(`${from} dropped ${String(f.name)} (name card — bytes need a live link).`);
+          say(`file card ${String(f.name)}`);
+        }
+      }
+    });
+    // zero-tap start: this PC (or USB-forwarded phone) always resolves a
+    // fresh hub key — bridge restarts invalidate keys, so never trust a
+    // stored one here. LAN phones keep their approved key and reconnect.
+    if (isPcSide) {
+      fetch(`${BRIDGE}/relay/local-key`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (j.key) {
+            relay.pair(BRIDGE, j.key);
+            relay.connect();
+            say("phone pipe: this PC joined its hub");
+          }
+        })
+        .catch(() => {});
+    } else if (relay.endpoint) {
+      relay.connect();
+    }
+    // knock watch: a linking phone pops up here, one Allow in Settings.
+    const pollPending = () => {
+      fetch(`${BRIDGE}/relay/pending`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (j.lan) setLanUrl(j.lan);
+          const reqs: LinkRequest[] = Array.isArray(j.pending) ? j.pending : [];
+          setLinkReqs(reqs);
+          for (const q of reqs) {
+            if (!seenKnocks.current.has(q.token)) {
+              seenKnocks.current.add(q.token);
+              setView("chat");
+              pushBot(`📲 ${q.label} wants to link — tap Allow in Settings → Phone link.`);
+              say(`link knock from ${q.label}`);
+            }
+          }
+        })
+        .catch(() => {});
+    };
+    pollPending();
+    const pendingTimer = setInterval(pollPending, 8000);
+    return () => { offStatus(); offMsg(); clearInterval(pendingTimer); relay.disconnect(); };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // pupils follow cursor
+  useEffect(() => {
+    const reduce = matchMedia("(prefers-reduced-motion: reduce)").matches;
+    const onMove = (e: PointerEvent) => {
+      if (reduce || !islandRef.current) return;
+      const r = islandRef.current.getBoundingClientRect();
+      mascotRef.current?.setLook(
+        Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / 200)),
+        Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / 200)),
+      );
+    };
+    document.addEventListener("pointermove", onMove, { passive: true });
+    return () => document.removeEventListener("pointermove", onMove);
+  }, []);
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") fsm.forceFlex();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [fsm]);
+
+  const nextRoute = () => {
+    sampleIdx.current = (sampleIdx.current + 1) % ROUTE_SAMPLES.length;
+    const h = ROUTE_SAMPLES[sampleIdx.current];
+    setHint(h);
+    setPills((p) => p.map((x) => (x.id === "router" ? { ...x, badge: "routed" } : x)));
+    mascotRef.current?.celebrate();
+    say(`route: ${h}`);
+  };
+
+  const handleTap = (taps: number) => {
+    fsm.click();
+    if (taps < 3) nextRoute();
+    say(taps === 3 ? "mascot: dizzy 1300ms" : taps === 2 ? "mascot: annoyed 800ms" : "mascot: squish 140ms");
+  };
+
+  const askTeach = () => {
+    setApproval({
+      requestId: `t${Date.now()}`,
+      title: "Teach this close call?",
+      detail: "“deploi preview” → vercel-deploy (0.71, below 0.80 bar)",
+      options: ["Allow", "Always", "Deny"],
+    });
+    setView("approval");
+    fsm.forceJacked();
+    say("approval requested: teach close call");
+  };
+
+  const askQuestion = () => {
+    setQuestion({
+      title: "Which skill should own “preview”?",
+      choices: ["vercel-deploy", "demo-serve", "docs-preview", "abstain"],
+      multi: false,
+    });
+    setView("question");
+    fsm.forceJacked();
+    say("question asked: skill owner");
+  };
+
+  const openChat = () => {
+    setView("chat");
+    fsm.forceJacked();
+    say("chat opened");
+  };
+
+  const openLens = () => {
+    setView("lens");
+    fsm.forceJacked();
+    say(`lens opened: ${shots.length} shots`);
+  };
+
+  const isDirtyChat = (msgs: ChatMessage[]) => msgs.some((m) => m.role === "user");
+
+  const greetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const greetOn = useRef(false);
+
+  // Nicki types hello herself: thinking dots, then the greeting is sent.
+  // Never pre-written — chat starts empty and she pokes you to begin.
+  const scheduleGreet = () => {
+    if (greetTimer.current) clearTimeout(greetTimer.current);
+    greetOn.current = true;
+    setThinking(true);
+    greetTimer.current = setTimeout(() => {
+      if (!greetOn.current) return;
+      greetOn.current = false;
+      setMessages((m) =>
+        m.length ? m : [...m, { id: msgId++, role: "assistant", content: GREETING }],
+      );
+      setThinking(false);
+    }, 1100);
+  };
+
+  const stopGreet = () => {
+    greetOn.current = false;
+    if (greetTimer.current) clearTimeout(greetTimer.current);
+  };
+
+  const newChat = () => {
+    Sound.pop();
+    stopGreet();
+    setMessages((cur) => {
+      if (isDirtyChat(cur)) {
+        setSessions((s) => [
+          { id: sessionId++, title: sessionTitle(cur), messages: cur, updatedAt: Date.now() },
+          ...s,
+        ].slice(0, 20));
+      }
+      return [];
+    });
+    setActiveSessionId(null);
+    setOcSession(null);
+    setAttachments([]);
+    setThinking(false);
+    setUnread(0);
+    setView("chat");
+    fsm.forceJacked();
+    say("new chat started");
+    scheduleGreet();
+  };
+  const resumeSession = (id: number) => {
+    Sound.pop();
+    stopGreet();
+    const target = sessions.find((s) => s.id === id);
+    if (!target) return;
+    setMessages((cur) => {
+      if (activeSessionId !== id && isDirtyChat(cur)) {
+        setSessions((s) =>
+          activeSessionId === null
+            ? [{ id: sessionId++, title: sessionTitle(cur), messages: cur, updatedAt: Date.now() }, ...s].slice(0, 20)
+            : s.map((x) => (x.id === activeSessionId ? { ...x, messages: cur, updatedAt: Date.now() } : x)),
+        );
+      }
+      return target.messages;
+    });
+    setActiveSessionId(id);
+    setAttachments([]);
+    setThinking(false);
+    setUnread(0);
+    setView("chat");
+    fsm.forceJacked();
+    say(`resumed chat: ${target.title}`);
+  };
+
+  const deleteSession = (id: number) => {
+    Sound.pop();
+    setSessions((s) => s.filter((x) => x.id !== id));
+    if (activeSessionId === id) {
+      setActiveSessionId(null);
+      setOcSession(null);
+      setMessages([]);
+      setView("chat");
+      scheduleGreet();
+    }
+    say("chat deleted");
+  };
+
+  const finishRoute = () => {
+    Sound.approve();
+    setView("finished");
+    fsm.forceJacked();
+    mascotRef.current?.celebrate();
+    setPills((p) => p.map((x) => ({ ...x, badge: null })));
+    say("route finished ✓");
+  };
+
+  const pushBot = (content: string) => {
+    setThinking(false);
+    setMessages((m) => [...m, { id: msgId++, role: "assistant", content }]);
+  };
+
+  // one shared conversation across both screens: every turn is announced
+  // over the relay (display-only there — the bot turn runs once, here).
+  // The hub skips the sender, so our own lines never echo back.
+  const relayChat = (role: "user" | "assistant", text: string) => {
+    const relay = relayRef.current;
+    if (!relay || !text) return;
+    relay.send("chat", { role, text, session: ocSessionRef.current });
+  };
+
+  const announceBot = (content: string) => {
+    pushBot(content);
+    relayChat("assistant", content);
+  };
+
+  const mockReply = (text: string, files: Attachment[]) => {
+    setTimeout(() => {
+      if (view !== "chat") setUnread((u) => u + 1);
+      const names = files.map((f) => f.name).join(", ");
+      announceBot(
+        files.length
+          ? `Got ${files.length} file${files.length > 1 ? "s" : ""} (${names}). ${text || "Here's the read"} → best local skill in 0.4s. No cloud touched.`
+          : `Routed “${text}” → best local skill in 0.4s. No cloud touched.`,
+      );
+    }, 900);
+  };
+
+  const sendChat = (text: string, provider = "opencode", opts?: { model: string; effort: string }) => {
+    Sound.send();
+    stopGreet();
+    setUnread(0);
+    if (view !== "chat") {
+      setView("chat");
+      fsm.forceJacked();
+    }
+    if (opts) say(`engine: ${provider}/${opts.model} · ${opts.effort} effort`);
+    const files = attachments;
+    setAttachments([]);
+    setMessages((m) => [...m, { id: msgId++, role: "user", content: text, attachments: files }]);
+    relayChat("user", text);
+    mascotRef.current?.celebrate();
+    setThinking(true);
+    if (!bridgeOn) {
+      mockReply(text, files);
+      return;
+    }
+    const ctl = new AbortController();
+    const timer = setTimeout(() => ctl.abort(), 160000);
+    fetch(`${BRIDGE}/chat`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ message: text, session_id: ocSession, provider, model: opts?.model, effort: opts?.effort }),
+      signal: ctl.signal,
+    })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j.ok) throw new Error(j.error || "bridge failed");
+        if (j.session) setOcSession(j.session);
+        if (view !== "chat") setUnread((u) => u + 1);
+        say(`opencode turn done${j.session ? ` · ${String(j.session).slice(0, 12)}…` : ""}`);
+        announceBot(j.text);
+      })
+      .catch(() => mockReply(text, files))
+      .finally(() => clearTimeout(timer));
+  };
+
+  const resumeAgentSession = (sid: string, first: string) => {
+    Sound.pop();
+    stopGreet();
+    setOcSession(sid);
+    setUnread(0);
+    setView("chat");
+    fsm.forceJacked();
+    setMessages((m) => [
+      ...m,
+      { id: msgId++, role: "assistant", content: `Resumed “${first}” — Nicki has the full context. Ask away.` },
+    ]);
+    say(`resumed agent session ${sid.slice(0, 12)}…`);
+  };
+
+  // PC→phone: bytes ride the paired pipe. Small files go inline in one
+  // frame; big ones stream in 512KB chunks (memory-safe both ends, the hub
+  // just routes small frames). Offline: small files queue, big ones queue
+  // as name-cards — bytes need a live link. Files stay in the composer too,
+  // so you can ask the same bot about them.
+  const INLINE_MAX = 8 * 1024 * 1024;
+  const CHUNK = 1024 * 1024; // 1MB frames: hub-friendly, atob-fast
+  const fmtSize = (b: number): string => {
+    if (b < 1024) return `${Math.max(0, Math.floor(b))}B`;
+    if (b < 1048576) return `${(b / 1024).toFixed(1)}KB`;
+    if (b < 1073741824) return `${(b / 1048576).toFixed(1)}MB`;
+    return `${(b / 1073741824).toFixed(2)}GB`;
+  };
+  const fmtEta = (s: number): string => {
+    s = Math.max(0, Math.round(s));
+    if (s < 60) return `${s}s`;
+    const m = Math.floor(s / 60);
+    if (m < 60) return `${m}m ${s % 60}s`;
+    return `${Math.floor(m / 60)}h ${m % 60}m`;
+  };
+  const readDataUrl = (f: File) =>
+    new Promise<string>((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result));
+      r.onerror = () => rej(new Error("read failed"));
+      r.readAsDataURL(f);
+    });
+  const readSliceB64 = (f: File, start: number, end: number) =>
+    new Promise<string>((res, rej) => {
+      const r = new FileReader();
+      r.onload = () => res(String(r.result).split(",")[1] ?? "");
+      r.onerror = () => rej(new Error("slice read failed"));
+      r.readAsDataURL(f.slice(start, end, f.type));
+    });
+  const b64ToBytes = (b64: string): Uint8Array<ArrayBuffer> => {
+    const bin = atob(b64);
+    const out = new Uint8Array(new ArrayBuffer(bin.length));
+    for (let i = 0; i < bin.length; i++) out[i] = bin.charCodeAt(i);
+    return out;
+  };
+  const validKind = (k: unknown): Attachment["kind"] =>
+    k === "image" || k === "code" || k === "doc" || k === "audio" ? k : "other";
+  // a landed file, either direction: into the composer like a local attach
+  // (ready to ask the bot about) + auto-saved per the once-asked preference.
+  const landFile = (name: string, blob: Blob) => {
+    const from = isPcSide ? "Phone" : "PC";
+    addFiles([new File([blob], name, { type: blob.type || "application/octet-stream" })]);
+    if (settingsRef.current.autoSave) {
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      setTimeout(() => URL.revokeObjectURL(url), 60_000);
+      pushBot(`${from} sent ${name} — saved ✓, same session continues here.`);
+    } else {
+      pushBot(`${from} sent ${name} — it's in the composer, ask me about it.`);
+    }
+    say(`${from.toLowerCase()} → ${isPcSide ? "pc" : "phone"}: file ${name} (bytes landed)`);
+  };
+  // big files stream in 1MB chunks with resume: the transfer id is stable
+  // per file, so a retry only fetches the chunks the far side is missing.
+  const dropBigFile = async (
+    relay: RelayClient,
+    a: Attachment,
+    handle: File,
+    session: string | null,
+  ): Promise<"sent" | "offline" | "failed"> => {
+    const id = `${handle.name}-${handle.size}-${handle.lastModified}`;
+    const n = Math.ceil(handle.size / CHUNK);
+    const have = new Set<number>();
+    const off = relay.onMessage((f) => {
+      if (f.type === "file-got" && f.id === id && Array.isArray(f.have)) {
+        for (const i of f.have as unknown[]) {
+          if (typeof i === "number") have.add(i);
+        }
+      }
+    });
+    const announced = relay.send("file-start", {
+      id, name: a.name, size: a.size, kind: a.kind, session, n,
+    });
+    if (!announced) {
+      off();
+      return "offline";
+    }
+    await new Promise((w) => setTimeout(w, 800)); // far side's inventory
+    off();
+    const missing: number[] = [];
+    for (let i = 0; i < n; i++) if (!have.has(i)) missing.push(i);
+    if (!missing.length) {
+      relay.send("file-end", { id }); // they already hold it all
+      return "sent";
+    }
+    say(have.size
+      ? `resuming ${a.name} at ${have.size}/${n} chunks…`
+      : `sending ${a.name} (${fmtSize(a.size)}) in ${n} chunks…`);
+    const t0 = performance.now();
+    let doneBytes = have.size * CHUNK;
+    let lastPc = -1;
+    for (const i of missing) {
+      let b64: string;
+      try {
+        b64 = await readSliceB64(handle, i * CHUNK, Math.min(handle.size, (i + 1) * CHUNK));
+      } catch {
+        return "failed";
+      }
+      if (!relay.send("file-chunk", { id, i, data: b64 })) return "failed";
+      doneBytes += Math.min(CHUNK, handle.size - i * CHUNK);
+      const pc = Math.floor((doneBytes / handle.size) * 100);
+      if (pc >= lastPc + 10) {
+        lastPc = pc - (pc % 10);
+        const el = (performance.now() - t0) / 1000;
+        const rate = doneBytes / Math.max(el, 0.1);
+        say(`${a.name} ${pc}% · ${fmtSize(rate)}/s · ~${fmtEta((handle.size - doneBytes) / Math.max(rate, 1))} left`);
+      }
+      if (i % 20 === 19) await new Promise((w) => setTimeout(w, 0));
+    }
+    relay.send("file-end", { id });
+    const el = (performance.now() - t0) / 1000;
+    say(`${a.name} sent in ${fmtEta(el)} (${fmtSize(handle.size / Math.max(el, 0.1))}/s)`);
+    return "sent";
+  };
+  const dropToPhone = async () => {
+    const files = attachments;
+    if (!files.length) return;
+    const relay = relayRef.current!;
+    const outbox = outboxRef.current!;
+    let sent = 0, queued = 0, cards = 0;
+    for (const a of files) {
+      const frame: Record<string, unknown> = {
+        name: a.name, size: a.size, kind: a.kind, session: ocSession,
+      };
+      const handle = fileHandles.current.get(a.id);
+      if (handle && handle.size > INLINE_MAX) {
+        // big file: chunked live (resumable); offline it rides as a name-card.
+        const r = await dropBigFile(relay, a, handle, ocSession);
+        if (r === "sent") {
+          pushBot(`Sent ${a.name} (${fmtSize(a.size)}) ✓ — same session continues on the phone.`);
+          sent++;
+          continue;
+        }
+        if (r === "failed") pushBot(`${a.name} interrupted — drop it again to resume where it stopped.`);
+        cards++;
+      } else if (handle) {
+        try {
+          frame.data = await readDataUrl(handle);
+        } catch {
+          cards++;
+        }
+      }
+      if (frame.data !== undefined) {
+        if (relay.send("file", frame)) {
+          sent++;
+          continue;
+        }
+        try {
+          outbox.enqueue("file", frame); // small bytes survive offline
+          queued++;
+          continue;
+        } catch {
+          delete frame.data; // storage full: card only, said once below
+          cards++;
+        }
+      } else if (handle && handle.size > INLINE_MAX) {
+        cards++; // chunked send failed above: bytes need a live link
+      }
+      try {
+        outbox.enqueue("file", frame);
+        queued++;
+      } catch {
+        continue;
+      }
+    }
+    setQueuedDrops(outbox.pending().length);
+    const s = (n: number) => (n === 1 ? "" : "s");
+    if (sent && !queued) pushBot(`Sent ${sent} file${s(sent)} to phone ✓ — same session continues there.`);
+    else if (queued && !sent) pushBot(`${queued} file${s(queued)} queued — pair the phone in Settings and they fire on link.`);
+    else if (queued) pushBot(`Sent ${sent}, queued ${queued} — pairing fires the rest.`);
+    if (cards) pushBot(`Note: ${cards} file${s(cards)} travelled as name card${s(cards)} (offline or unreadable) — bytes need a live link.`);
+    say(`drop → phone: ${sent} live, ${queued} queued`);
+  };
+
+  const addFiles = (files: File[]) => {
+    setAttachments((cur) => {
+      const room = 5 - cur.length;
+      const accepted = files.slice(0, Math.max(0, room));
+      const fresh: Attachment[] = [];
+      for (const f of accepted) {
+        // no size cap: big files stream chunked (resumable); small go inline.
+        const kind = classifyAttachment(f.name, f.type);
+        const id = attachId.current++;
+        fileHandles.current.set(id, f);
+        fresh.push({
+          id,
+          name: f.name,
+          size: f.size,
+          kind,
+          url: kind === "image" || kind === "audio" ? URL.createObjectURL(f) : undefined,
+        });
+      }
+      if (files.length > accepted.length) say(`attachment cap: 5 files max`);
+      if (fresh.length) {
+        mascotRef.current?.poke();
+        say(`attached: ${fresh.map((f) => f.name).join(", ")}`);
+        if (fsm.state !== "jacked" || view !== "chat") {
+          setView("chat");
+          fsm.forceJacked();
+        }
+      }
+      return [...cur, ...fresh];
+    });
+  };
+
+  const removeAttachment = (id: number) => {
+    fileHandles.current.delete(id);
+    setAttachments((a) => a.filter((x) => x.id !== id));
+  };
+
+  const handlePaired = (endpoint: string, key: string) => {
+    const relay = relayRef.current!;
+    relay.pair(endpoint, key);
+    relay.connect();
+    say("phone paired — relay connecting");
+  };
+
+  const handleUnpair = () => {
+    relayRef.current!.disconnect();
+    localStorage.removeItem("relay_endpoint");
+    localStorage.removeItem("relay_key");
+    setPhoneLinked(false);
+    say("phone unpaired");
+  };
+
+  // one tap: grant this knock our hub key so the phone joins the SAME room.
+  const handleApprove = async (token: string) => {
+    try {
+      const r = await fetch(`${BRIDGE}/relay/link-approve`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          token,
+          key: localStorage.getItem("relay_key") || null,
+        }),
+      });
+      const j = await r.json();
+      if (!j.ok) throw new Error(j.error || "stale");
+      // approved but this PC holds no key (fresh boot race): adopt it.
+      const relay = relayRef.current!;
+      if (!localStorage.getItem("relay_key") && j.key) {
+        relay.pair(BRIDGE, j.key);
+        relay.connect();
+      }
+      setLinkReqs((q) => q.filter((x) => x.token !== token));
+      say("phone allowed — linked");
+    } catch {
+      say("approve failed — knock again");
+    }
+  };
+
+  return (
+    <div
+      className={APP_MODE ? "stage app" : "stage"}
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        const files = Array.from(e.dataTransfer.files ?? []);
+        if (files.length) addFiles(files);
+        else openChat();
+      }}
+    >
+      <header className="wordmark">
+        <b>STEROIDS</b><span>island · v0.1.1</span>
+        <em className="live-dot" />
+      </header>
+      <Island
+        ref={islandRef}
+        fsmState={fsmState}
+        view={view}
+        mascotRef={mascotRef}
+        routeHint={hint}
+        approval={approval}
+        question={question}
+        messages={messages}
+        thinking={thinking}
+        attachments={attachments}
+        onFiles={addFiles}
+        onRemoveAttachment={removeAttachment}
+        onOpenLens={openLens}
+        shots={shots}
+        zoomShot={zoomShot}
+        onMouseEnter={() => fsm.mouseEntered()}
+        onMouseLeave={() => fsm.mouseLeft()}
+        onMascotTap={handleTap}
+        onDecide={(d) => {
+          if (d === "Deny") Sound.deny(); else Sound.approve();
+          say(`approval: ${d}`);
+          setApproval(null);
+          setView("explore");
+          if (d !== "Deny") mascotRef.current?.celebrate();
+        }}
+        onAnswer={(a) => {
+          say(`answered: ${a.join(", ")}`);
+          setQuestion(null);
+          setView("explore");
+          mascotRef.current?.celebrate();
+        }}
+        onSend={sendChat}
+        sessions={sessions}
+        activeSessionId={activeSessionId}
+        onResumeSession={resumeSession}
+        onDeleteSession={deleteSession}
+        onNewChat={newChat}
+        exploreLive={bridgeOn}
+        exploreFeed={exploreFeed}
+        onSearchSkills={searchSkills}
+        agentSessions={agentSessions}
+        onResumeAgentSession={resumeAgentSession}
+        settings={settings}
+        onSettings={applySettings}
+        onTab={handleTab}
+        unread={unread}
+        onDropToPhone={() => void dropToPhone()}
+        phoneLinked={phoneLinked}
+        queuedDrops={queuedDrops}
+        pairNode={
+          <PairPanel
+            linked={phoneLinked}
+            pending={linkReqs}
+            lan={lanUrl}
+            onPaired={handlePaired}
+            onApprove={(t) => void handleApprove(t)}
+            onUnpair={handleUnpair}
+          />
+        }
+      />
+      <p className="hint">hover = flex · click mascot = jacked · Esc = flex · drop a file anywhere to attach</p>
+      <div className="row">
+        <button onClick={() => { fsm.launch(); setTimeout(() => fsm.greetComplete(), 400); }}>launch (greet)</button>
+        <button onClick={() => fsm.reveal()}>reveal (work)</button>
+        <button onClick={nextRoute}>route event</button>
+        <button onClick={openChat}>chat</button>
+        <button onClick={openLens}>lens</button>
+        <button onClick={newChat}>new chat</button>
+        <button onClick={askTeach}>teach approval</button>
+        <button onClick={askQuestion}>ask question</button>
+        <button onClick={finishRoute}>finish ✓</button>
+        <button onClick={() => { fsm.forceJacked(); setView("explore"); }}>explore</button>
+        <button onClick={() => fsm.forceHidden()}>hide</button>
+      </div>
+      <div className="log" aria-live="polite">
+        {log.map((l, i) => <div key={i}>{l}</div>)}
+      </div>
+    </div>
+  );
+}

@@ -1,0 +1,123 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Steroids Island — preview</title>
+<style>
+  *{box-sizing:border-box}
+  body{margin:0;background:#101114;color:#fff;font-family:ui-sans-serif,system-ui,sans-serif;min-height:100vh}
+  @media (prefers-color-scheme: light){body{background:#c9ccd2;color:#111}}
+  .stage{display:flex;flex-direction:column;align-items:center;padding-top:48px;gap:18px}
+  /* island shell widths: notch 184 / flex +64 / jacked 640 — plate snap, no bounce */
+  #island{background:#000;border-radius:0 0 20px 20px;transition:width .18s cubic-bezier(.2,.9,.25,1);overflow:hidden;display:flex;align-items:center;gap:14px;padding:10px 18px;min-height:64px}
+  #island[data-state="hidden"]{width:184px}
+  #island[data-state="flex"]{width:248px}
+  #island[data-state="pump"]{width:248px}
+  #island[data-state="jacked"]{width:min(640px,92vw)}
+  #mascot{width:56px;height:56px;image-rendering:pixelated;flex:none}
+  #island[data-state="hidden"] #mascot{visibility:hidden}
+  #island[data-state="hidden"] #pill{visibility:hidden}
+  #pill{background:#17181c;border:1px solid rgba(255,255,255,.08);border-radius:14px;padding:.55rem .8rem;font-family:ui-monospace,Menlo,Consolas,monospace;font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+  #pill b{color:#ff4d1c}
+  .row{display:flex;gap:.5rem;flex-wrap:wrap;justify-content:center}
+  button{background:#26272c;color:#fff;border:1px solid rgba(255,255,255,.08);border-radius:10px;padding:.45rem .8rem;font-size:.82rem;cursor:pointer}
+  #log{width:min(640px,92vw);background:#17181c;color:#fff;border:1px solid rgba(0,0,0,.12);border-radius:12px;padding:.7rem .9rem;font-family:ui-monospace,Menlo,monospace;font-size:.75rem;max-height:180px;overflow:auto}
+  #log div{opacity:.85;padding:.1rem 0}
+  p.hint{opacity:.6;font-size:.82rem;margin:0;color:rgba(255,255,255,.6)}
+  @media (prefers-color-scheme: light){p.hint{color:#555}}
+</style>
+</head>
+<body>
+<div class="stage">
+  <div id="island" data-state="hidden">
+    <canvas id="mascot" width="112" height="112" aria-label="Steroids mascot"></canvas>
+    <div id="pill"><b>steroids</b> <span id="hint">build,flutter -&gt; dart-flutter-patterns/…</span></div>
+  </div>
+  <p class="hint">hover the island = flex · click mascot = get jacked · Esc = collapse (Steroids FSM)</p>
+  <div class="row">
+    <button id="bLaunch">launch (greet)</button>
+    <button id="bReveal">reveal (work)</button>
+    <button id="bJacked">force jacked</button>
+    <button id="bFlex">force flex</button>
+    <button id="bHidden">force hidden</button>
+    <button id="bPoke">poke</button>
+    <button id="bAnnoy">annoy</button>
+    <button id="bDizzy">3x tap → dizzy</button>
+    <button id="bJump">celebrate ✓</button>
+  </div>
+  <div id="log" aria-live="polite"></div>
+</div>
+<script src="fsm.js"></script>
+<script src="mascot.js"></script>
+<script>
+(function(){
+  var island = document.getElementById('island'),
+      log = document.getElementById('log'),
+      hint = document.getElementById('hint');
+  var samples = [
+    'build,flutter -> dart-flutter-patterns/…',
+    'write a git commit message -> git-commit-helper/…',
+    'no confident skill — abstaining',
+    'deploy preview -> vercel-deploy/…'
+  ], si = 0;
+
+  var fsm = new IslandFSM();
+  var mascot = new SteroidsMascot(document.getElementById('mascot'), { px: 8 });
+
+  function say(m){
+    var d = document.createElement('div');
+    d.textContent = new Date().toLocaleTimeString() + '  ' + m;
+    log.prepend(d);
+  }
+  fsm.onTransition = function(from, to){
+    island.dataset.state = to;
+    say(from + ' → ' + to);
+  };
+
+  island.addEventListener('mouseenter', function(){ fsm.mouseEntered(); });
+  island.addEventListener('mouseleave', function(){ fsm.mouseLeft(); });
+
+  var taps = [];
+  document.getElementById('mascot').addEventListener('click', function(){
+    var now = Date.now();
+    taps = taps.filter(function(t){ return now - t < 600; });
+    taps.push(now);
+    fsm.click();
+    si = (si + 1) % samples.length;
+    hint.textContent = samples[si];
+    if (taps.length >= 3) { taps = []; mascot.dizzy(); say('mascot: dizzy 1300ms'); }
+    else if (taps.length === 2) { mascot.annoy(); say('mascot: annoyed 800ms'); }
+    else { mascot.poke(); say('mascot: squish 140ms'); }
+  });
+
+  document.addEventListener('keydown', function(e){
+    if (e.key === 'Escape') fsm.forceFlex();
+  });
+
+  function bind(id, fn){ document.getElementById(id).addEventListener('click', fn); }
+  bind('bLaunch', function(){ fsm.launch(); setTimeout(function(){ fsm.greetComplete(); }, 400); });
+  bind('bReveal', function(){ fsm.reveal(); });
+  bind('bJacked', function(){ fsm.forceJacked(); });
+  bind('bFlex', function(){ fsm.forceFlex(); });
+  bind('bHidden', function(){ fsm.forceHidden(); });
+  bind('bPoke', function(){ mascot.poke(); });
+  bind('bAnnoy', function(){ mascot.annoy(); });
+  bind('bDizzy', function(){ mascot.dizzy(); });
+  bind('bJump', function(){ mascot.celebrate(); say('mascot: happy jump (task done)'); });
+
+  // pupils follow cursor (page-level, like the header mascot)
+  var reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+  document.addEventListener('pointermove', function(e){
+    if (reduce) return;
+    var r = island.getBoundingClientRect();
+    mascot.setLook(
+      Math.max(-1, Math.min(1, (e.clientX - (r.left + r.width / 2)) / 200)),
+      Math.max(-1, Math.min(1, (e.clientY - (r.top + r.height / 2)) / 200)));
+  }, { passive: true });
+
+  say('island preview ready — state: hidden');
+})();
+</script>
+</body>
+</html>

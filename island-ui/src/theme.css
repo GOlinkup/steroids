@@ -1,0 +1,39 @@
+/* Steroids theme tokens — GOlinkup AppColors/AppTextStyles equivalent.
+   Single source for app color + text. Change here, the whole UI follows.
+   Brand accents stay fixed (like GOlinkup BRAND); surfaces/text flip light/dark. */
+@font-face{font-family:'Montserrat';font-style:normal;font-weight:100 900;font-display:swap;src:url('/fonts/montserrat-latin.woff2') format('woff2')}
+:root{
+  /* brand (same in both themes) */
+  --brand:#ff4d1c;
+  --brand-light:#fb923c;
+  --brand-soft:rgba(255,77,28,.12);
+  --brand-chip:rgba(255,77,28,.16);
+  --thermal:#ff6b35;
+  --danger:#f87171;
+  --success:#34d399;
+  --info:#3b82f6;
+  --info-strong:#2563eb;
+  --purple:#a855f7;
+  /* surfaces */
+  --bg:#101114;
+  --ink:#000;
+  --surface:#17181c;
+  --surface-2:#26272c;
+  --field:#0b0c0e;
+  --overlay:rgba(0,0,0,.55);
+  /* text */
+  --text:#fff;
+  --text-dim:rgba(255,255,255,.75);
+  --text-mute:rgba(255,255,255,.6);
+  --text-faint:rgba(255,255,255,.45);
+  /* borders */
+  --border:rgba(255,255,255,.08);
+  --border-strong:rgba(255,255,255,.12);
+  /* type */
+  --font-ui:'Montserrat','Outfit',ui-sans-serif,system-ui,sans-serif;
+  --font-mono:ui-monospace,Menlo,Consolas,monospace;
+  /* type scale (iOS HIG: floor = Caption 2 11px, emphasis = Semibold 600) */
+  --size-floor:.7rem;
+  --size-note:.75rem;
+  --weight-em:600;
+}

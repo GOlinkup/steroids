@@ -1,8 +1,8 @@
-# STEROIDS v0.1.0
+# STEROIDS v0.1.1
 
 <img src="docs/img/logo.svg" width="96" alt="Steroids mascot">
 
-![offline-first](https://img.shields.io/badge/offline--first-yes-7ee787) ![P@1 blind-149](https://img.shields.io/badge/P%401_0.993-1f6feb) ![telemetry](https://img.shields.io/badge/telemetry-zero-8b949e) ![v0.1.0](https://img.shields.io/badge/version-0.1.0-8b949e)
+![offline-first](https://img.shields.io/badge/offline--first-yes-7ee787) ![P@1 blind-149](https://img.shields.io/badge/P%401_0.993-1f6feb) ![telemetry](https://img.shields.io/badge/telemetry-zero-8b949e) ![v0.1.1](https://img.shields.io/badge/version-0.1.1-8b949e)
 
 World fastest skill router plugin for AI coding tools. Steroids is not a model. It looks at the skills already on your machine and points you to the ones that fit your prompt.
 

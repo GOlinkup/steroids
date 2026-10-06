@@ -1,0 +1,8 @@
+[Desktop Entry]
+Type=Application
+Name=Steroids Island
+Comment=Steroids always-on-top top-edge companion
+Exec=/usr/bin/python3 /home/TWIG/steroids/island/app.py
+Terminal=false
+Categories=Utility;
+X-GNOME-Autostart-enabled=true

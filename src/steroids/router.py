@@ -2235,7 +2235,7 @@ def get_version():
                 return m.group(1)
         except OSError:
             pass
-    return "0.1.0"
+    return "unknown"  # single source of truth is pyproject.toml; never hardcode
 
 def self_update():
     # ponytail: git pull --ff-only + recopy live files (install.sh mirror) + reindex.
@@ -2287,7 +2287,7 @@ def _mcp_serve(rules, idx):
         mid, m, p = req.get("id"), req.get("method"), req.get("params") or {}
         if m == "initialize":
             res = {"protocolVersion": "2024-11-05", "capabilities": {"tools": {}},
-                   "serverInfo": {"name": "steroids", "version": "0.1.0"}}
+                   "serverInfo": {"name": "steroids", "version": get_version()}}
         elif m == "tools/list":
             res = {"tools": [{"name": "recommend_skills",
                 "description": "Recommend installed skills for a prompt (offline, zero telemetry).",
