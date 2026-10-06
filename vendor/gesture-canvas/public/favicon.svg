@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8" standalone="no"?>
+<svg width="512" height="512" viewBox="0 0 512 512" fill="none" xmlns="http://www.w3.org/2000/svg">
+  <rect width="512" height="512" rx="128" fill="url(#paint0_linear)" />
+  <path d="M346.5 290.5C346.5 290.5 346.5 226.5 346.5 196.5C346.5 166.5 326.5 156.5 311.5 156.5C296.5 156.5 281.5 166.5 281.5 186.5V116.5C281.5 101.5 266.5 86.5 246.5 86.5C226.5 86.5 211.5 101.5 211.5 116.5V176.5C211.5 161.5 196.5 146.5 176.5 146.5C156.5 146.5 141.5 161.5 141.5 176.5V236.5C141.5 221.5 126.5 206.5 106.5 206.5C86.5 206.5 71.5 221.5 71.5 236.5V316.5C71.5 376.5 121.5 426.5 181.5 426.5H236.5C296.5 426.5 346.5 376.5 346.5 316.5V290.5Z" fill="white" stroke="#4338CA" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M281.5 186.5V266.5" stroke="#4338CA" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M211.5 176.5V266.5" stroke="#4338CA" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M141.5 176.5V266.5" stroke="#4338CA" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <path d="M376.5 156.5C391.5 156.5 406.5 166.5 406.5 186.5V266.5C406.5 266.5 406.5 316.5 406.5 336.5C406.5 356.5 391.5 366.5 376.5 366.5C361.5 366.5 346.5 356.5 346.5 336.5" stroke="#4338CA" stroke-width="16" stroke-linecap="round" stroke-linejoin="round"/>
+  <defs>
+    <linearGradient id="paint0_linear" x1="0" y1="0" x2="512" y2="512" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#6366F1"/>
+      <stop offset="1" stop-color="#4338CA"/>
+    </linearGradient>
+  </defs>
+</svg>

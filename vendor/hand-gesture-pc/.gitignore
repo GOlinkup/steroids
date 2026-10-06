@@ -1,0 +1,56 @@
+
+# Python
+
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+*.spec
+
+
+# Virtual environment
+
+Include/
+Lib/
+Scripts/
+share/
+pyvenv.cfg
+.env
+.venv
+venv/
+env/
+
+
+# IDE / Editor
+
+.vscode/
+.idea/
+*.swp
+*.swo
+
+
+# OS artefacts
+
+.DS_Store
+Thumbs.db
+desktop.ini
+
+
+# Media / screenshots (generated at runtime)
+
+*.png
+*.jpg
+*.jpeg
+*.mp4
+*.avi
+
+
+# Misc
+
+*.cfg
+*.log

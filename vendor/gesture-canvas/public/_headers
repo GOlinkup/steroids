@@ -1,0 +1,20 @@
+# Netlify headers file
+
+# Global headers
+/*
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin
+
+# Assets
+/assets/*
+  Cache-Control: public, max-age=31536000, immutable
+
+# WASM files
+/*.wasm
+  Content-Type: application/wasm
+
+# MediaPipe WASM files
+/mediapipe/*.wasm
+  Content-Type: application/wasm
+  Cross-Origin-Embedder-Policy: require-corp
+  Cross-Origin-Opener-Policy: same-origin

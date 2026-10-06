@@ -1,0 +1,7 @@
+{
+  "venvPath": "/home/kzo/HandGestureAutomation",
+  "venv": "venv",
+  "extraPaths": [
+    "/home/kzo/HandGestureAutomation/venv/lib/python3.14/site-packages"
+  ]
+}
