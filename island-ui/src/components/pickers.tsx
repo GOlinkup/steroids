@@ -24,7 +24,11 @@ export function PillButton({
 export function useDismiss<T extends HTMLElement>(open: boolean, onClose: () => void) {
   const ref = useRef<T>(null);
   const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  // ponytail: ref assignment in an effect — writing .current during render
+  // tears concurrent renders (oxlint react/refs).
+  useEffect(() => {
+    closeRef.current = onClose;
+  });
   useEffect(() => {
     if (!open) return;
     const onDown = (e: PointerEvent) => {
@@ -111,12 +115,16 @@ export function ProviderPicker({
   const [expanded, setExpanded] = useState(provider);
   const [cursor, setCursor] = useState(0);
   const listRef = useRef<HTMLDivElement>(null);
-  useEffect(() => {
+  // ponytail: prop-to-state sync via render-adjust (React docs pattern),
+  // not an effect — sync setState in useEffect double-renders every open.
+  const [prevPick, setPrevPick] = useState({ open: false, provider });
+  if (open !== prevPick.open || provider !== prevPick.provider) {
+    setPrevPick({ open, provider });
     if (open) {
       setExpanded(provider);
       setCursor(Math.max(0, ENGINES.findIndex((e) => e.id === provider)));
     }
-  }, [open, provider]);
+  }
   const focusProv = (i: number) => {
     listRef.current?.querySelectorAll<HTMLButtonElement>("[data-prov]")[i]?.focus();
   };

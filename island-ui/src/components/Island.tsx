@@ -1,9 +1,12 @@
-import { forwardRef } from "react";
+import { forwardRef, lazy, Suspense } from "react";
 import Mascot, { type MascotHandle } from "./Mascot";
 import { ApprovalCard, QuestionCard, ChatPanel, ExploreView, SettingsView, type SettingsState } from "./Cards";
 import { Header } from "./Header";
-import { DailyView } from "./Daily";
-import { LensView, type Shot } from "./LensView";
+// ponytail: lens + daily ride separate chunks — default chat view stays lean,
+// vite warns over 500KB and these views load on tab tap, never at boot.
+const DailyView = lazy(() => import("./Daily").then((m) => ({ default: m.DailyView })));
+const LensView = lazy(() => import("./LensView").then((m) => ({ default: m.LensView })));
+import type { Shot } from "./LensView";
 import type { AgentSession, Approval, Attachment, ChatMessage, ChatSession, ExploreFeed, IslandView, Question, SkillHit } from "../store";
 import type { IslandState } from "../fsm";
 
@@ -136,8 +139,16 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
               turnEngine={turnEngine}
             />
           )}
-          {view === "lens" && <LensView shots={shots} initialZoom={zoomShot} />}
-          {view === "daily" && <DailyView />}
+          {view === "lens" && (
+            <Suspense fallback={<div className="card"><div className="card-detail">Opening lens…</div></div>}>
+              <LensView shots={shots} initialZoom={zoomShot} />
+            </Suspense>
+          )}
+          {view === "daily" && (
+            <Suspense fallback={<div className="card"><div className="card-detail">Opening daily…</div></div>}>
+              <DailyView />
+            </Suspense>
+          )}
           {view === "finished" && (
             <div className="card finished">
               <div className="card-title">Route complete ✓</div>

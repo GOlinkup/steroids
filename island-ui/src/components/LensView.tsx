@@ -42,23 +42,28 @@ export function LensView({ shots, initialZoom }: { shots: Shot[]; initialZoom?: 
     setIdx(0);
   }, []);
 
-  // Lense (island/gazed.py) via the bridge — eyes steer, blink clicks.
-  const refreshGaze = useCallback(async () => {
-    try {
-      const r = await fetch(`${window.location.origin}/gaze`);
-      const j = await r.json();
-      setGazeOn(!!j.running);
-      if (j.running) setGazeMsg("eyes steer · blink clicks");
-    } catch {
-      /* bridge off — lense unavailable */
-    }
-  }, []);
+// Lense (island/gazed.py) via the bridge — eyes steer, blink clicks.
+// Module scope: the effect below only wires the poll loop (external system);
+// state lands async after fetch, never synchronously in the effect.
+async function pollGaze(
+  setOn: (v: boolean) => void,
+  setMsg: (m: string) => void,
+) {
+  try {
+    const r = await fetch(`${window.location.origin}/gaze`);
+    const j = await r.json();
+    setOn(!!j.running);
+    if (j.running) setMsg("eyes steer · blink clicks");
+  } catch {
+    /* bridge off — lense unavailable */
+  }
+}
 
   useEffect(() => {
-    refreshGaze();
-    const t = setInterval(refreshGaze, 3000);
+    pollGaze(setGazeOn, setGazeMsg);
+    const t = setInterval(() => pollGaze(setGazeOn, setGazeMsg), 3000);
     return () => clearInterval(t);
-  }, [refreshGaze]);
+  }, []);
 
   const toggleGaze = useCallback(async () => {
     setGazeMsg("starting…");
