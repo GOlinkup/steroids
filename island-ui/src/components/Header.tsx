@@ -1,7 +1,7 @@
 import { useState } from "react";
-import type { AgentSession, ChatSession, IslandView } from "../store";
+import type { AgentSession, Approval, ChatSession, IslandView, Question } from "../store";
 import {
-  ChatIcon, ExploreIcon, GearIcon, HistoryIcon, HomeIcon, LensIcon, PlusIcon, TrashIcon,
+  CardIcon, ChatIcon, ExploreIcon, GearIcon, HelpIcon, HistoryIcon, HomeIcon, LensIcon, LogoutIcon, PersonIcon, PlusIcon, TrashIcon, BellIcon,
 } from "./icons";
 import { useDismiss } from "./pickers";
 
@@ -71,6 +71,78 @@ function HeaderIconButton({
   );
 }
 
+// Avatar menu — the ref's left card: rows only, no header block. Profile
+// scrolls to the identity card, Settings lands on the switches (same page,
+// different ends — see avatarNav). Subscription + Help render disabled
+// honest-soon: the look without a lie.
+function AvatarMenu({
+  email = null,
+  avatarUrl = null,
+  view,
+  onAvatarNav = () => {},
+  onSignOut = () => {},
+}: {
+  email?: string | null;
+  avatarUrl?: string | null;
+  view: IslandView;
+  onAvatarNav?: (page: "profile" | "explore" | "settings" | "account") => void;
+  onSignOut?: () => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [imgDead, setImgDead] = useState(false);
+  const dismiss = useDismiss<HTMLDivElement>(open, () => setOpen(false));
+  const go = (page: "profile" | "explore" | "settings" | "account") => { setOpen(false); onAvatarNav(page); };
+  const initial = (email ?? "").trim().charAt(0).toUpperCase() || "?";
+  const face = email && avatarUrl && !imgDead ? (
+    <img className="avatar-photo" src={avatarUrl} alt="" onError={() => setImgDead(true)} />
+  ) : email ? (
+    <span aria-hidden>{initial}</span>
+  ) : (
+    <PersonIcon size={18} />
+  );
+  return (
+    <div ref={dismiss} className="avatar-wrap">
+      <button
+        className={email ? "avatar-btn signed" : "avatar-btn"}
+        title={email ?? "Account — sign in"}
+        aria-label="Account menu"
+        onClick={() => setOpen((o) => !o)}
+      >
+        {face}
+      </button>
+      {open && (
+        <div className="sheet avatar-menu" role="menu" aria-label="Account">
+          <button role="menuitem" className={view === "settings" ? "am-row on" : "am-row"} onClick={() => go("profile")}>
+            <PersonIcon size={16} /> Profile
+          </button>
+          <button role="menuitem" className={view === "explore" ? "am-row on" : "am-row"} onClick={() => go("explore")}>
+            <ExploreIcon size={16} /> Community
+          </button>
+          <button role="menuitem" className="am-row" disabled title="Subscriptions aren't here yet">
+            <CardIcon size={16} /> Subscription <span className="pro-badge" aria-hidden>⚡PRO</span>
+          </button>
+          <button role="menuitem" className={view === "settings" ? "am-row on" : "am-row"} onClick={() => go("settings")}>
+            <GearIcon size={16} /> Settings
+          </button>
+          <div className="am-sep" aria-hidden />
+          <button role="menuitem" className="am-row" disabled title="Help center isn't here yet">
+            <HelpIcon size={16} /> Help center
+          </button>
+          {email ? (
+            <button role="menuitem" className="am-row danger" onClick={() => { setOpen(false); onSignOut(); }}>
+              <LogoutIcon size={16} /> Sign out
+            </button>
+          ) : (
+            <button role="menuitem" className="am-row" onClick={() => go("account")}>
+              <PersonIcon size={16} /> Sign in
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
 // Header navbar — 3 zones: tabs left / middle centered / actions right.
 // Grid keeps middle perfectly centered even with uneven sides.
 export function Header({
@@ -86,6 +158,12 @@ export function Header({
   agentSessions = [],
   onResumeAgent,
   onDeleteAgent,
+  email = null,
+  avatarUrl = null,
+  onAvatarNav = () => {},
+  onSignOut = () => {},
+  approval = null,
+  question = null,
 }: {
   view: IslandView;
   unread: number;
@@ -99,6 +177,12 @@ export function Header({
   agentSessions?: AgentSession[];
   onResumeAgent?: (sid: string, first: string) => void;
   onDeleteAgent?: (sid: string) => void;
+  email?: string | null;
+  avatarUrl?: string | null;
+  onAvatarNav?: (page: "profile" | "explore" | "settings" | "account") => void;
+  onSignOut?: () => void;
+  approval?: Approval | null;
+  question?: Question | null;
 }) {
   const tabs = TABS.map((t) => ({
     v: t.view,
@@ -107,8 +191,14 @@ export function Header({
     badge: t.view === "chat" ? unread : 0,
   }));
   const [histOpen, setHistOpen] = useState(false);
-  const histDismiss = useDismiss<HTMLDivElement>(histOpen, () => setHistOpen(false));
+  // Notifications live here now (gear removed — settings rides the avatar
+  // menu). Badge = actionable items; sheet rows jump straight to them.
+  const [notifOpen, setNotifOpen] = useState(false);
+  const notifCount = (approval ? 1 : 0) + (question ? 1 : 0) + unread;
+  const closeBoth = () => { setHistOpen(false); setNotifOpen(false); };
+  const histDismiss = useDismiss<HTMLDivElement>(histOpen || notifOpen, closeBoth);
   const closeHist = () => setHistOpen(false);
+  const goNotif = (v: IslandView) => { onTab(v); closeBoth(); };
   const hasChats = sessions.length > 0;
   const hasAgents = agentSessions.length > 0;
   return (
@@ -131,13 +221,49 @@ export function Header({
           <HistoryIcon size={22} />
         </HeaderIconButton>
         <HeaderIconButton
-          active={view === "settings"}
-          title="Settings"
-          onClick={() => { onTab("settings"); closeHist(); }}
+          active={notifOpen}
+          title="Notifications"
+          badge={notifCount}
+          onClick={() => { setNotifOpen((o) => !o); closeHist(); }}
         >
-          <GearIcon bold={view === "settings"} size={22} />
+          <BellIcon bold={notifOpen} size={22} />
         </HeaderIconButton>
+        <AvatarMenu email={email} avatarUrl={avatarUrl} view={view} onAvatarNav={onAvatarNav} onSignOut={onSignOut} />
       </div>
+      {notifOpen && (
+        <div className="hist-panel" role="dialog" aria-label="Notifications">
+          <div className="hist-head">
+            <span>Notifications</span>
+          </div>
+          {!approval && !question && unread === 0 && (
+            <div className="history-empty">All caught up ✓</div>
+          )}
+          {approval && (
+            <div className="hist-row">
+              <button className="hist-title" onClick={() => goNotif("approval")}>
+                <b className="kind-tag">decision</b>
+                <span className="hist-label">{approval.title}</span>
+              </button>
+            </div>
+          )}
+          {question && (
+            <div className="hist-row">
+              <button className="hist-title" onClick={() => goNotif("question")}>
+                <b className="kind-tag">ask</b>
+                <span className="hist-label">{question.title}</span>
+              </button>
+            </div>
+          )}
+          {unread > 0 && (
+            <div className="hist-row">
+              <button className="hist-title" onClick={() => goNotif("chat")}>
+                <b className="kind-tag">chat</b>
+                <span className="hist-label">{unread} unread message{unread === 1 ? "" : "s"}</span>
+              </button>
+            </div>
+          )}
+        </div>
+      )}
       {histOpen && (
         <div className="hist-panel" role="dialog" aria-label="Chat history">
           <div className="hist-head">

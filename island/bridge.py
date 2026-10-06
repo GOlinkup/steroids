@@ -641,7 +641,11 @@ class Handler(SimpleHTTPRequestHandler):
                 req = json.loads(self.rfile.read(n) or b"{}")
             except ValueError:
                 return self._send({"ok": False, "error": "bad json"}, 400)
-            name = os.path.basename(str(req.get("name") or "file"))[:80] or "file"
+            # sanitized landing name: no spaces/specials, so the @path the
+            # client appends survives opencode's @file expansion verbatim.
+            raw_name = os.path.basename(str(req.get("name") or "file"))[:80] or "file"
+            name = "".join(c if c.isalnum() or c in "._-" else "_"
+                           for c in raw_name).strip("._") or "file"
             data = str(req.get("data") or "")
             if data.startswith("data:") and "," in data:
                 data = data.split(",", 1)[1]

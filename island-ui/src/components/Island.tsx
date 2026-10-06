@@ -25,6 +25,7 @@ interface Props {
   attachments: Attachment[];
   onFiles: (files: File[]) => void;
   onRemoveAttachment: (id: number) => void;
+  onAdoptAttachments: (atts: Attachment[]) => void;
   onOpenLens: () => void;
   shots: Shot[];
   onMouseEnter: () => void;
@@ -32,7 +33,7 @@ interface Props {
   onMascotTap: (taps: number) => void;
   onDecide: (d: string) => void;
   onAnswer: (a: string[]) => void;
-  onSend: (t: string, provider?: string, opts?: { model: string; effort: string }) => void;
+  onSend: (t: string, provider?: string, opts?: { model: string; effort: string }, filesOverride?: Attachment[] | null) => void;
   sessions: ChatSession[];
   activeSessionId: number | null;
   onResumeSession: (id: number) => void;
@@ -55,6 +56,9 @@ interface Props {
   queuedDrops?: number;
   pairNode?: React.ReactNode;
   accountNode?: React.ReactNode;
+  accountEmail?: string | null;
+  accountAvatar?: string | null;
+  onSignOut?: () => void;
 }
 
 // Island shell — steroids spotter bar. Ranked routes, plate snap.
@@ -62,7 +66,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
   const {
     fsmState, view, mascotRef, routeHint,
     approval, question, messages, thinking, liveActivity, livePartial, turnEngine, attachments,
-    onFiles, onRemoveAttachment, onOpenLens, shots,
+    onFiles, onRemoveAttachment, onAdoptAttachments, onOpenLens, shots,
     onMouseEnter, onMouseLeave, onMascotTap,
     onDecide, onAnswer, onSend,
     sessions, activeSessionId, onResumeSession, onDeleteSession, onNewChat,
@@ -70,7 +74,23 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     exploreLive, exploreFeed, onSearchSkills,
     settings, onSettings, onTab, unread, zoomShot,
     onDropToPhone, onDropFilesToPhone, phoneLinked, queuedDrops, pairNode, accountNode,
+    accountEmail = null, accountAvatar = null, onSignOut = () => {},
   } = props;
+
+  // Avatar menu jumps: one settings page, so Profile scrolls to the
+  // identity card while Settings lands on the switches.
+  const avatarNav = (page: "profile" | "explore" | "settings" | "account") => {
+    if (page === "explore") {
+      onTab("explore");
+      return;
+    }
+    onTab("settings");
+    if (page === "profile") {
+      setTimeout(() => {
+        document.querySelector("#island-account")?.scrollIntoView({ block: "start" });
+      }, 60);
+    }
+  };
 
   return (
     <div
@@ -96,6 +116,12 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             agentSessions={agentSessions}
             onResumeAgent={onResumeAgentSession}
             onDeleteAgent={onDeleteAgentSession}
+            email={accountEmail}
+            avatarUrl={accountAvatar}
+            onAvatarNav={avatarNav}
+            approval={approval}
+            question={question}
+            onSignOut={onSignOut}
           />
           <div className="mascot-top">
             <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />
@@ -108,7 +134,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
               live={exploreLive}
               feed={exploreFeed}
               onSearch={onSearchSkills}
-              onPickSkill={(label) => onSend(`What can ${label} do?`)}
+              onPickSkill={(label) => onSend(`What can ${label} do?`, undefined, undefined, [])}
               agentSessions={agentSessions}
               onResumeAgent={onResumeAgentSession}
             />
@@ -127,6 +153,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
               attachments={attachments}
               onFiles={onFiles}
               onRemoveAttachment={onRemoveAttachment}
+              onAdoptAttachments={onAdoptAttachments}
               onOpenLens={onOpenLens}
               onDropToPhone={onDropToPhone}
               onDropFilesToPhone={onDropFilesToPhone}

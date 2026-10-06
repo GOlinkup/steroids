@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from "react";
-import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon } from "./icons";
+import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon, PhoneIcon } from "./icons";
 import { EffortPicker, ProviderPicker, useDismiss, ENGINES, displayModel } from "./pickers";
 export { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
 import { ActivityOrb } from "../orb";
@@ -55,16 +55,14 @@ export function ExploreView({
   const [hits, setHits] = useState<SkillHit[] | null>(null);
   const [searching, setSearching] = useState(false);
   const reqId = useRef(0);
+  // ponytail: searching flips true inside the debounce timeout (async), never
+  // synchronously in the effect — sync setState here double-renders per keystroke.
   useEffect(() => {
     const query = q.trim();
-    if (!query || !live) {
-      setHits(null);
-      setSearching(false);
-      return;
-    }
-    setSearching(true);
+    if (!query || !live) return;
     const id = ++reqId.current;
     const timer = setTimeout(() => {
+      setSearching(true);
       onSearch(query).then((h) => {
         if (reqId.current !== id) return;
         setHits(h);
@@ -88,7 +86,7 @@ export function ExploreView({
           <div className="card-detail">Explore is live when the bridge runs:<br />`python3 island/bridge.py --serve`</div>
         </div>
       )}
-      {q.trim() !== "" && (
+      {live && q.trim() !== "" && (
         <>
           <div className="explore-label">{searching ? "Searching…" : `${hits?.length ?? 0} skills`}</div>
           <div className="try-col">
@@ -233,14 +231,14 @@ function DropFrame({ rx = 20 }: { rx?: number }) {
   );
 }
 
-// Composer status: last-turn time + phone-pipe state. Provider/model
-// already show in the pills above, so this line carries what they can't:
-// relay live vs offline + how many drops are queued to fire on reconnect.
+// Composer status: last-turn time + phone-pipe state (relay live vs
+// offline queue). The offline count is the only hint a queued drop waits.
 export function StatusLine({ thinking, turnMs, linked, queued }: { thinking: boolean; turnMs: number | null; linked: boolean; queued: number }) {
   const link = linked ? "phone linked" : queued > 0 ? `phone offline · queued ${queued}` : "phone offline";
   const bits = [thinking ? "…" : turnMs !== null ? `${turnMs.toFixed(1)}s` : null, link].filter(
     (b): b is string => b !== null,
   );
+  if (!bits.length) return null;
   return (
     <span className="tokens" title="last turn time · phone pipe (relay live, outbox offline)">
       {bits.join(" · ")}
@@ -255,6 +253,7 @@ export function ChatPanel({
   attachments,
   onFiles,
   onRemoveAttachment,
+  onAdoptAttachments,
   onOpenLens,
   onDropToPhone,
   onDropFilesToPhone,
@@ -267,11 +266,16 @@ export function ChatPanel({
   turnEngine = "",
 }: {
   messages: ChatMessage[];
-  onSend: (text: string, provider?: string, opts?: { model: string; effort: string }) => void;
+  // filesOverride: explicit attachment set for this turn. undefined = use
+  // the composer's pending chips; [] = text-only (skill taps must never
+  // steal chips you staged for another question).
+  onSend: (text: string, provider?: string, opts?: { model: string; effort: string }, filesOverride?: Attachment[] | null) => void;
   thinking: boolean;
   attachments: Attachment[];
   onFiles: (files: File[]) => void;
   onRemoveAttachment: (id: number) => void;
+  // history chips carry no File handle — the app re-resolves them via url.
+  onAdoptAttachments: (atts: Attachment[]) => void;
   onOpenLens: () => void;
   onDropToPhone?: () => void;
   onDropFilesToPhone?: (files: File[]) => void;
@@ -293,17 +297,18 @@ export function ChatPanel({
   const [recSecs, setRecSecs] = useState(0);
   const [turnMs, setTurnMs] = useState<number | null>(null);
   const [workSecs, setWorkSecs] = useState(0);
-  const [filmFrame, setFilmFrame] = useState(0);
+  // ponytail: reset-on-prop-change via render-adjust, not an effect —
+  // sync setState in useEffect double-renders every turn start.
+  const [prevThinking, setPrevThinking] = useState(thinking);
+  if (thinking !== prevThinking) {
+    setPrevThinking(thinking);
+    if (thinking) setWorkSecs(0);
+  }
   useEffect(() => {
     if (!thinking) return;
-    setWorkSecs(0);
-    setFilmFrame(0);
     const t0 = Date.now();
     const timer = setInterval(() => setWorkSecs(Math.floor((Date.now() - t0) / 1000)), 1000);
-    // film runs in JS (100ms/step), not CSS — visible even where
-    // stylesheets kill animations, and it stops the instant thinking ends.
-    const film = setInterval(() => setFilmFrame((f) => (f + 1) % 29), 100);
-    return () => { clearInterval(timer); clearInterval(film); };
+    return () => clearInterval(timer);
   }, [thinking]);
   const [attachOpen, setAttachOpen] = useState(false);
   const [votes, setVotes] = useState<Record<number, 1 | -1>>({});
@@ -332,12 +337,14 @@ export function ChatPanel({
     if (boxRef.current) boxRef.current.style.height = "auto";
     onSend(t, provider, { model, effort });
   };
-  const canSend = draft.trim().length > 0 || attachments.length > 0;
+  const canSend = (draft.trim().length > 0 || attachments.length > 0) && !thinking;
 
-  // edit a sent message back into the composer; regen re-sends the last
-  // user turn as a fresh turn (no fake branching — both stay visible).
-  const editBack = (text: string) => {
+  // edit a sent message back into the composer, attachments ride along
+  // (fresh ids, same object URLs); regen re-sends the last user turn
+  // WITH its attachments as an explicit set, composer chips untouched.
+  const editBack = (text: string, atts?: Attachment[]) => {
     setDraft(text);
+    if (atts?.length) onAdoptAttachments(atts);
     const el = boxRef.current;
     if (el) {
       el.style.height = "auto";
@@ -350,7 +357,7 @@ export function ChatPanel({
     if (!last || thinking) return;
     sentAt.current = performance.now();
     setTurnMs(null);
-    onSend(last.content, provider, { model, effort });
+    onSend(last.content, provider, { model, effort }, last.attachments ?? []);
   };
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
 
@@ -468,8 +475,9 @@ export function ChatPanel({
                   key={a.id}
                   src={a.url}
                   alt={a.name}
+                  title={`${a.name} — click to open full size`}
                   className="bubble-img"
-                  onClick={onOpenLens}
+                  onClick={() => { if (a.url) window.open(a.url, "_blank", "noopener"); }}
                 />
               ))}
               {m.attachments?.filter((a) => a.kind === "audio" && a.url).map((a) => (
@@ -490,8 +498,8 @@ export function ChatPanel({
                   </button>
                   <button
                     className="msg-act"
-                    title="Edit in composer"
-                    onClick={() => editBack(m.content)}
+                    title="Edit in composer (attachments ride along)"
+                    onClick={() => editBack(m.content, m.attachments)}
                   >
                     <PencilIcon size={14} />
                   </button>
@@ -537,11 +545,7 @@ export function ChatPanel({
         {thinking && (
           <div className="chat-row">
             <div className="reply working">
-              <div
-                className="work-film"
-                aria-hidden
-                style={{ backgroundPositionX: `${-(filmFrame * (3687 / 28))}px` }}
-              />
+              <div className="work-pulse" aria-hidden />
               <div className="work-meta">
                 <span className="work-cap">
                   <i className={bridgeOn ? "live-dot" : "dead-dot"} />
@@ -576,9 +580,6 @@ export function ChatPanel({
               </span>
             ) : (
               <span key={a.id} className="chip">
-                {a.kind === "image" && a.url && (
-                  <img src={a.url} alt={a.name} style={{ width: 32, height: 32, borderRadius: 6, objectFit: "cover" }} />
-                )}
                 <i className="chip-dot" />
                 <span><b className="kind-tag">{kindIcon(a.kind)}</b> {a.name} · {formatSize(a.size)}</span>
                 <button className="chip-x" onClick={() => onRemoveAttachment(a.id)} aria-label="Remove"><XIcon /></button>
@@ -748,7 +749,7 @@ export function ChatPanel({
           </div>
           <button
             className={recording ? "tool-btn recording" : "tool-btn"}
-            title={recording ? `Stop recording (${recSecs}s)` : "Record voice note"}
+            title={recording ? `Stop recording (${recSecs}s)` : "Record voice note — attaches audio, hit send after"}
             onClick={toggleRecording}
           >
             {recording ? <span className="rec-dot" /> : <MicIcon size={20} />}
@@ -756,9 +757,11 @@ export function ChatPanel({
           <button className={canSend ? "send-btn ready" : "send-btn"} onClick={submit} aria-label="Send" disabled={!canSend}><ArrowUpIcon size={20} /></button>
         </div>
       </div>
-      <div className="composer-status">
-        <StatusLine thinking={thinking} turnMs={turnMs} linked={phoneLinked} queued={queuedDrops} />
-      </div>
+      {(thinking || turnMs !== null) && (
+        <div className="composer-status">
+          <StatusLine thinking={thinking} turnMs={turnMs} linked={phoneLinked} queued={queuedDrops} />
+        </div>
+      )}
     </Card>
   );
 }
@@ -796,8 +799,7 @@ export function md(text: string): React.ReactNode[] {
   });
 }
 
-// Settings view — sound + volume, provider, active pills, auto-close.
-// Everything configurable lives here so the navbar stays at 6 icons.
+// Settings state — sound + volume, provider, active pills, auto-close.
 export interface SettingsState {
   soundOn: boolean;
   volume: number;
@@ -836,6 +838,9 @@ export function PairPanel({
 }) {
   const [knocking, setKnocking] = useState(false);
   const [msg, setMsg] = useState("");
+  // Broken-QR fallback: if the png doesn't decode the <img> would show raw alt
+  // text ("Scan to get the app"). Swap it for the plain LAN URL instead.
+  const [qrBroken, setQrBroken] = useState(false);
   const origin = window.location.origin;
   // scan-to-get-the-app QR (plain LAN URL — any camera app opens it).
   const [dlQr, setDlQr] = useState<{ png: string; url: string } | null>(null);
@@ -876,42 +881,69 @@ export function PairPanel({
     }
     setKnocking(false);
   };
+  // Grouped menu card (pin-board settings pattern): one header row with a
+  // status badge, then one row per device/action with hairline dividers.
+  // Rows, not button stacks — the old stack read as five separate CTAs.
   if (linked) {
     return (
-      <div className="set-row col">
-        <span className="set-label">Phone link</span>
-        <div className="btn-row">
-          <button className="primary" disabled>✓ Phone linked</button>
-          <button onClick={onUnpair}>Unpair</button>
+      <div className="menu-card" aria-label="Phone link">
+        <div className="menu-row menu-head">
+          <PhoneIcon size={16} />
+          <b>Phone link</b>
+          <em className="badge on">Linked</em>
+        </div>
+        <div className="menu-row">
+          <CheckIcon size={14} />
+          <span>This phone follows the island</span>
+          <button className="menu-act" onClick={onUnpair}>Unpair</button>
         </div>
       </div>
     );
   }
   return (
-    <div className="set-row col">
-      <span className="set-label">Phone link</span>
+    <div className="menu-card" aria-label="Phone link">
+      <div className="menu-row menu-head">
+        <PhoneIcon size={16} />
+        <b>Phone link</b>
+        <em className="badge">Off</em>
+      </div>
       {isPcSide ? (
         <>
           {dlQr && (
-            <div className="qr-card">
-              <img src={`data:image/png;base64,${dlQr.png}`} alt="Scan to get the app" title={dlQr.url} />
+            <div className="menu-row col">
+              <div className="menu-line">
+                <DropIcon size={14} />
+                <span>Scan to get the app</span>
+              </div>
+              {!qrBroken ? (
+                <img
+                  className="menu-qr"
+                  src={`data:image/png;base64,${dlQr.png}`}
+                  alt="Scan to get the app"
+                  title={dlQr.url}
+                  onError={() => setQrBroken(true)}
+                />
+              ) : (
+                <span className="card-detail">open {dlQr.url} on the phone</span>
+              )}
             </div>
           )}
           {pending.map((p) => (
-            <div className="btn-row" key={p.token}>
-              <span>📲 {p.label} wants to link</span>
-              <button className="primary" onClick={() => onApprove(p.token)}>Allow</button>
+            <div className="menu-row" key={p.token}>
+              <PhoneIcon size={16} />
+              <span>{p.label} wants to link</span>
+              <button className="menu-act primary" onClick={() => onApprove(p.token)}>Allow</button>
             </div>
           ))}
         </>
       ) : (
-        <div className="btn-row">
-          <button className="primary" onClick={() => void knock()} disabled={knocking}>
-            {knocking ? "Waiting for PC…" : "Link this phone"}
-          </button>
-        </div>
+        <button className="menu-row action" onClick={() => void knock()} disabled={knocking}>
+          <PhoneIcon size={16} />
+          <span>{knocking ? "Waiting for PC…" : "Link this phone"}</span>
+          <span aria-hidden>›</span>
+        </button>
       )}
-      {!!msg && <div className="card-detail">{msg}</div>}
+      {!!msg && <div className="menu-note">{msg}</div>}
     </div>
   );
 }
@@ -934,72 +966,103 @@ export function SettingsView({
         ? settings.activePills.filter((p) => p !== id)
         : [...settings.activePills, id],
     });
+  // One page, no tabs: identity card (account panel) first, then the
+  // switches, phone link last. Everything visible, nothing tabbed away.
   return (
     <div className="card settings">
-      <div className="set-grid">
-        <div className="set-col">
-      <div className="set-row">
-        <button
-          className={settings.autoSave ? "switch on" : "switch"}
-          onClick={() => set({ autoSave: !settings.autoSave })}
-          aria-label="Auto-save incoming drops"
-        >
-          <i />
-        </button>
-        <span>Auto-save incoming drops</span>
-      </div>
-      <div className="set-row">
-        <button
-          className={settings.soundOn ? "switch on" : "switch"}
-          onClick={() => set({ soundOn: !settings.soundOn })}
-          aria-label="Sound"
-        >
-          <i />
-        </button>
-        <span>Notification sounds</span>
-        <input
-          type="range"
-          min={0}
-          max={100}
-          value={Math.round(settings.volume * 100)}
-          onChange={(e) => set({ volume: Number(e.target.value) / 100 })}
-          className="vol"
-        />
-      </div>
-      <div className="set-row">
-        <span className="set-label">Chat provider</span>
-        <div className="seg">
-          {["opencode", "claude", "codex", "ollama"].map((p) => (
-            <button
-              key={p}
-              className={settings.provider === p ? "seg-btn on" : "seg-btn"}
-              onClick={() => set({ provider: p })}
-            >
-              {p}
-            </button>
-          ))}
+      <div className="set-col">
+        <div id="island-account">{extra}</div>
+      <div className="menu-card" aria-label="Drops and sound">
+        <div className="menu-row menu-head">
+          <b>Sound &amp; drops</b>
         </div>
+        <div className="menu-row">
+          <span>Auto-save incoming drops</span>
+          <button
+            className={settings.autoSave ? "switch on" : "switch"}
+            onClick={() => set({ autoSave: !settings.autoSave })}
+            aria-label="Auto-save incoming drops"
+          >
+            <i />
+          </button>
+        </div>
+        <div className="menu-row">
+          <span>Notification sounds</span>
+          <button
+            className={settings.soundOn ? "switch on" : "switch"}
+            onClick={() => set({ soundOn: !settings.soundOn })}
+            aria-label="Notification sounds"
+          >
+            <i />
+          </button>
+        </div>
+        {settings.soundOn && (
+          <div className="menu-row">
+            <input
+              type="range"
+              min={0}
+              max={100}
+              value={Math.round(settings.volume * 100)}
+              onChange={(e) => set({ volume: Number(e.target.value) / 100 })}
+              className="vol"
+              aria-label="Volume"
+            />
+          </div>
+        )}
       </div>
-      <div className="set-row col">
-        <span className="set-label">Active pills</span>
-        <div className="pill-toggles">
-          {ALL_PILLS.map((p) => (
-            <button
-              key={p}
-              className={settings.activePills.includes(p) ? "hpill on" : "hpill"}
-              onClick={() => togglePill(p)}
-            >
-              {p}
-            </button>
-          ))}
+      <div className="menu-card" aria-label="Chat provider">
+        <div className="menu-row menu-head">
+          <b>Chat provider</b>
+          <em className="badge on">{settings.provider}</em>
         </div>
+        {ENGINES.map((e) => (
+          <button
+            key={e.id}
+            className="menu-row action"
+            onClick={() => set({ provider: e.id })}
+            aria-pressed={settings.provider === e.id}
+          >
+            <span>{e.label}</span>
+            <span className="menu-dim">{e.outcome}</span>
+            {settings.provider === e.id && <CheckIcon size={14} />}
+          </button>
+        ))}
       </div>
-      {pair}
-      {extra}
+      <div className="menu-card" aria-label="Auto-close">
+        <div className="menu-row menu-head">
+          <b>Auto-close</b>
+          <em className="badge on">{settings.autoClose}s</em>
         </div>
-        <div className="ts-hero">
-          <video src="intro.mp4" autoPlay muted loop playsInline preload="metadata" poster="intro-poster.jpg" />
+        {[5, 15, 30, 60].map((s) => (
+          <button
+            key={s}
+            className="menu-row action"
+            onClick={() => set({ autoClose: s })}
+            aria-pressed={settings.autoClose === s}
+          >
+            <span>{s}s</span>
+            {settings.autoClose === s && <CheckIcon size={14} />}
+          </button>
+        ))}
+      </div>
+      <div className="menu-card" aria-label="Active pills">
+        <div className="menu-row menu-head">
+          <b>Active pills</b>
+          <em className="badge on">{settings.activePills.length}</em>
         </div>
+        {ALL_PILLS.map((p) => (
+          <button
+            key={p}
+            className="menu-row action"
+            onClick={() => togglePill(p)}
+            aria-pressed={settings.activePills.includes(p)}
+          >
+            <span>{p}</span>
+            {settings.activePills.includes(p) && <CheckIcon size={14} />}
+          </button>
+        ))}
+      </div>
+        {pair}
       </div>
     </div>
   );

@@ -17,7 +17,7 @@ import os
 LINKS_FILE = os.path.join(os.path.dirname(os.path.abspath(__file__)),
                           "profile_links.json")
 
-EMPTY = {"user_id": "", "handle": "Guest", "avatar_url": None,
+EMPTY = {"user_id": "", "handle": "", "avatar_url": None,
          "bio": None, "links": [], "verified": False,
          "gigs_done": 0, "gigs_saved": 0}
 
@@ -37,7 +37,7 @@ def mirror():
     if not links.get("user_id"):
         return dict(EMPTY)
     return {"user_id": str(links.get("user_id") or ""),
-            "handle": str(links.get("handle") or "Island member"),
+            "handle": str(links.get("handle") or ""),
             "avatar_url": links.get("avatar_url"),
             "bio": links.get("bio"),
             "links": list(links.get("links") or []),

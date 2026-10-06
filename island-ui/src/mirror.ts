@@ -13,7 +13,7 @@ export interface IslandProfile {
 
 export const EMPTY_PROFILE: IslandProfile = {
   user_id: "",
-  handle: "Guest",
+  handle: "",
   avatar_url: null,
   bio: null,
   links: [],
@@ -35,7 +35,7 @@ export function assembleMirror(
     typeof v === "string" ? v : "";
   return {
     user_id: str(row.user_id),
-    handle: str(row.handle) || "Island member",
+    handle: str(row.handle),
     avatar_url: (row.avatar_url as string | null) ?? null,
     bio: (row.bio as string | null) ?? null,
     links: Array.isArray(row.links)

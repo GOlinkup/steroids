@@ -167,6 +167,25 @@ export function GearIcon({ size = 20, bold = false }: P) {
     />
   );
 }
+// Real Iconsax paths (iconsax-react 0.0.8, MIT) — Notification Linear/Bold.
+export function BellIcon({ size = 20, bold = false }: P) {
+  return (
+    <Svg size={size} bold={bold}
+      linear={
+        <>
+      <path d="M12.02 2.91c-3.31 0-6 2.69-6 6v2.89c0 .61-.26 1.54-.57 2.06L4.3 15.77c-.71 1.18-.22 2.49 1.08 2.93 4.31 1.44 8.96 1.44 13.27 0 1.21-.4 1.74-1.83 1.08-2.93l-1.15-1.91c-.3-.52-.56-1.45-.56-2.06V8.91c0-3.3-2.7-6-6-6Z" stroke="currentColor" strokeWidth="1.5" strokeMiterlimit="10" strokeLinecap="round" />
+      <path d="M13.87 3.2a6.754 6.754 0 0 0-3.7 0c.29-.74 1.01-1.26 1.85-1.26.84 0 1.56.52 1.85 1.26Z" stroke="currentColor" strokeWidth="1.5" strokeMiterlimit="10" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M15.02 19.06c0 1.65-1.35 3-3 3-.82 0-1.58-.34-2.12-.88a3.01 3.01 0 0 1-.88-2.12" stroke="currentColor" strokeWidth="1.5" strokeMiterlimit="10" />
+        </>
+      }
+      filled={
+        <>
+      <path d="m19.34 14.49-1-1.66c-.21-.37-.4-1.07-.4-1.48V8.82a5.91 5.91 0 0 0-3.37-5.33A2.926 2.926 0 0 0 11.99 2c-1.09 0-2.07.59-2.59 1.52-1.95.97-3.3 2.98-3.3 5.3v2.53c0 .41-.19 1.11-.4 1.47l-1.01 1.67c-.4.67-.49 1.41-.24 2.09.24.67.81 1.19 1.55 1.44 1.94.66 3.98.98 6.02.98 2.04 0 4.08-.32 6.02-.97.7-.23 1.24-.76 1.5-1.45s.19-1.45-.2-2.09ZM14.83 20.01A3.014 3.014 0 0 1 12 22c-.79 0-1.57-.32-2.12-.89-.32-.3-.56-.7-.7-1.11.13.02.26.03.4.05.23.03.47.06.71.08.57.05 1.15.08 1.73.08.57 0 1.14-.03 1.7-.08.21-.02.42-.03.62-.06l.49-.06Z" fill="currentColor" />
+        </>
+      }
+    />
+  );
+}
 export function XIcon({ size = 12 }: P) {  return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
       stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden
@@ -335,6 +354,53 @@ export function PhoneIcon({ size = 10 }: P) {
       stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
       aria-hidden style={{ display: "block", flex: "none" }}>
       <path d="M5 4h4l2 5-2.5 1.5a12 12 0 0 0 5 5L15 13l5 2v4a2 2 0 0 1-2 2A16 16 0 0 1 3 6a2 2 0 0 1 2-2Z" />
+    </svg>
+  );
+}
+
+// Person — avatar fallback when signed out (no photo fetched, ever).
+export function PersonIcon({ size = 16 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <circle cx="12" cy="8" r="3.5" />
+      <path d="M5 20a7 7 0 0 1 14 0" />
+    </svg>
+  );
+}
+
+// Logout — red sign-out row, same plain stroke as PlusIcon.
+export function LogoutIcon({ size = 16 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M14 4h-8a1 1 0 0 0-1 1v14a1 1 0 0 0 1 1h8M10 12h11m0 0-3-3m3 3-3 3" />
+    </svg>
+  );
+}
+// Card — subscription row, same plain stroke as PlusIcon.
+export function CardIcon({ size = 16 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <rect x="3" y="6" width="18" height="13" rx="2.5" />
+      <path d="M3 10.5h18M7 15h4" />
+    </svg>
+  );
+}
+
+// Help — help-center row, same plain stroke as PlusIcon.
+export function HelpIcon({ size = 16 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <circle cx="12" cy="12" r="9" />
+      <path d="M9.5 9.5a2.5 2.5 0 1 1 3.4 2.34c-.8.32-.9.8-.9 1.66" />
+      <path d="M12 16.5h.01" strokeWidth={2.2} />
     </svg>
   );
 }

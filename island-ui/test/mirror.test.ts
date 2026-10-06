@@ -27,6 +27,6 @@ describe("assembleMirror", () => {
   });
 
   it("missing handle falls back, never invents", () => {
-    assert.equal(assembleMirror({ user_id: "u9" }).handle, "Island member");
+    assert.equal(assembleMirror({ user_id: "u9" }).handle, "");
   });
 });

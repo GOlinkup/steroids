@@ -68,6 +68,45 @@ export async function accountEmail(): Promise<string | null> {
   }
 }
 
+// Profiles-table identity — the Flutter rule (account_drawer): the table
+// wins over session metadata. Nulls where nothing set (RLS included) —
+// callers fall back to email/initial. One query for photo + display name.
+export async function profileIdentity(): Promise<{ avatar: string | null; name: string | null }> {
+  const none = { avatar: null, name: null };
+  try {
+    const s = supa();
+    if (!s) return none;
+    const { data: { session } } = await s.auth.getSession();
+    const uid = session?.user?.id;
+    if (!uid) return none;
+    const { data, error } = await s
+      .from("profiles")
+      .select("avatar_url, full_name")
+      .eq("id", uid)
+      .maybeSingle();
+    if (error) return none;
+    const row = (data as { avatar_url?: unknown; full_name?: unknown } | null) ?? {};
+    const avatar = typeof row.avatar_url === "string" && row.avatar_url.trim() ? row.avatar_url.trim() : null;
+    const name = typeof row.full_name === "string" && row.full_name.trim() ? row.full_name.trim() : null;
+    return { avatar, name };
+  } catch {
+    return none;
+  }
+}
+
+// Session-metadata photo (Google avatar_url/picture, rides the session).
+// Lowest priority — the profiles table wins. Null for email-OTP logins.
+export async function sessionAvatar(): Promise<string | null> {
+  try {
+    const { data } = (await supa()?.auth.getSession()) ?? { data: { session: null } };
+    const meta = data.session?.user?.user_metadata as Record<string, unknown> | undefined;
+    const url = meta?.avatar_url ?? meta?.picture;
+    return typeof url === "string" && url ? url : null;
+  } catch {
+    return null;
+  }
+}
+
 export interface CloudRow {
   chat_id: string;
   title: string;
@@ -120,23 +159,5 @@ export async function deleteCloudChat(chatId: string): Promise<void> {
   if (error) throw new Error(error.message);
 }
 
-// Remember a deleted chat id locally so a re-pull never resurrects it
-// (rows older than the newest pull can still arrive). Survives restarts.
-const TOMB_KEY = "island.chats.deleted.v1";
-export function tombstones(): string[] {
-  try {
-    const raw = localStorage.getItem(TOMB_KEY);
-    const arr: unknown = raw ? JSON.parse(raw) : [];
-    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === "string").slice(0, 200) : [];
-  } catch {
-    return [];
-  }
-}
-
-export function addTombstone(chatId: string): void {
-  if (!chatId) return;
-  const next = Array.from(new Set([chatId, ...tombstones()])).slice(0, 200);
-  try {
-    localStorage.setItem(TOMB_KEY, JSON.stringify(next));
-  } catch { /* private mode: best effort */ }
-}
+// Tombstones (deleted-chat memory) live in ./store — localStorage only,
+// no supabase, so the main bundle can use them without the cloud chunk.

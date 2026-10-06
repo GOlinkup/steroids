@@ -276,10 +276,15 @@ export function EffortPicker({
             ref={trackRef}
             className="effort-track"
             role="slider"
+            tabIndex={0}
             aria-valuemin={0}
             aria-valuemax={EFFORT_TIERS.length - 1}
             aria-valuenow={idx}
             aria-label="Effort"
+            onKeyDown={(e) => {
+              if (e.key === "ArrowRight" || e.key === "ArrowUp") { e.preventDefault(); pick(idx + 1); }
+              else if (e.key === "ArrowLeft" || e.key === "ArrowDown") { e.preventDefault(); pick(idx - 1); }
+            }}
             onPointerDown={(e) => {
               (e.target as Element).setPointerCapture?.(e.pointerId);
               fromPointer(e.clientX);

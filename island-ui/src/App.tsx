@@ -4,16 +4,17 @@ import type { MascotHandle } from "./components/Mascot";
 import { IslandFSM, type IslandState } from "./fsm";
 import {
   HARNESS_PILLS, ROUTE_SAMPLES, classifyAttachment, sessionTitle,
+  tombstones, addTombstone,
   type AgentSession, type Approval, type Attachment, type ChatMessage, type ChatSession, type ExploreFeed, type IslandView, type Pill, type Question, type SkillHit,
 } from "./store";
 import type { Shot } from "./components/LensView";
 import { PairPanel, isPcSide, type LinkRequest, type SettingsState } from "./components/Cards";
 import { AccountPanel } from "./components/Account";
-import {
-  accountEmail, sendCode, verifyCode, signOut, pullChats, pushChats,
-  deleteCloudChat, tombstones, addTombstone,
-  type CloudRow,
-} from "./sync";
+import type { CloudRow } from "./sync";
+// ponytail: supabase rides a lazy chunk — the ONLY heavy dep left in the
+// main bundle. Every cloud call below goes through loadSync(), so boot
+// stays lean and the chunk loads on first login/sync tap, never at startup.
+const loadSync = () => import("./sync");
 import { Sound, setMuted, setVolume } from "./sound";
 import { RelayClient } from "./relay";
 import { OutboxStore } from "./outbox";
@@ -98,13 +99,25 @@ export default function App() {
     parts: Uint8Array<ArrayBuffer>[]; got: number; ts: number;
   }
   const incomingRef = useRef(new Map<string, Incoming>());
-  const [settings, setSettingsState] = useState<SettingsState>({
-    soundOn: true,
-    volume: 0.5,
-    provider: "opencode",
-    activePills: ["steroids", "opencode", "claude"],
-    autoClose: 15,
-    autoSave: true,
+  // Settings persist: toggles/provider/pills survive reload. Unknown keys are
+  // ignored so a stale cache can never break a newer SettingsState shape.
+  const SETTINGS_KEY = "island_settings";
+  const [settings, setSettingsState] = useState<SettingsState>(() => {
+    const fresh: SettingsState = {
+      soundOn: true,
+      volume: 0.5,
+      provider: "opencode",
+      activePills: ["steroids", "opencode", "claude"],
+      autoClose: 15,
+      autoSave: true,
+    };
+    try {
+      const raw = localStorage.getItem(SETTINGS_KEY);
+      if (raw) return { ...fresh, ...(JSON.parse(raw) as Partial<SettingsState>) };
+    } catch {
+      /* corrupt cache — fresh defaults */
+    }
+    return fresh;
   });
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
@@ -117,11 +130,17 @@ export default function App() {
   // cloud account (same Supabase login as GOlinkup) — history sync only,
   // everything still works logged out.
   const [account, setAccount] = useState<string | null>(null);
+  const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
   const [syncMsg, setSyncMsg] = useState("");
   const [syncBusy, setSyncBusy] = useState(false);
 
   const applySettings = (s: SettingsState) => {
     setSettingsState(s);
+    try {
+      localStorage.setItem(SETTINGS_KEY, JSON.stringify(s));
+    } catch {
+      /* private mode / quota — settings just won't survive reload */
+    }
     setMuted(!s.soundOn);
     setVolume(s.volume);
     fsm.setAutoClose(s.autoClose);
@@ -220,6 +239,14 @@ export default function App() {
         if (!dead && Array.isArray(j.sessions)) setAgentSessions(j.sessions);
       })
       .catch(() => {});
+    // profile photo for the avatar button (GOlinkup rule: photo when live,
+    // initial the moment it dies — the button itself owns the fallback).
+    fetch(`${BRIDGE}/profile`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!dead && typeof j?.profile?.avatar_url === "string") setAvatarUrl(j.profile.avatar_url);
+      })
+      .catch(() => {});
     const pullSessions = () => {
       fetch(`${BRIDGE}/sessions`)
         .then((r) => r.json())
@@ -296,7 +323,8 @@ export default function App() {
     if (!account) return;
     if (syncTimer.current) clearTimeout(syncTimer.current);
     syncTimer.current = setTimeout(() => {
-      void pushChats(sessions)
+      void loadSync()
+        .then((s) => s.pushChats(sessions))
         .then((n) => setSyncMsg(`synced ${n} chats ✓`))
         .catch((e) => setSyncMsg(`sync failed: ${e instanceof Error ? e.message : e}`));
     }, 2500);
@@ -307,13 +335,27 @@ export default function App() {
   }, [sessions, account]);
 
   // Restore a previous login silently (supabase persists its own session).
+  // Avatar order = Flutter (account_drawer): profiles table, then session
+  // metadata, then the initial disc. Mirror photo (bridge effect) wins over
+  // both when a social account is linked.
   useEffect(() => {
-    void accountEmail().then((e) => {
-      if (e) {
-        setAccount(e);
-        say(`signed in as ${e}`);
-      }
-    });
+    void loadSync()
+      .then((s) => s.accountEmail())
+      .then((e) => {
+        if (e) {
+          setAccount(e);
+          say(`signed in as ${e}`);
+        }
+        return loadSync();
+      })
+      .then((s) => s.profileIdentity().then((id) => ({ s, id })))
+      .then(({ s, id }) => {
+        if (id.avatar) setAvatarUrl((prev) => prev ?? id.avatar);
+        if (id.avatar) return;
+        return s.sessionAvatar().then((m) => {
+          if (m) setAvatarUrl((prev) => prev ?? m);
+        });
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -356,10 +398,23 @@ export default function App() {
     setSyncMsg(`pulled ${rows.length} chats ✓`);
   };
 
+  const handleGoogle = () => {
+    setSyncBusy(true);
+    setSyncMsg("");
+    // OAuth leaves to Google and returns here — the restore effect picks up
+    // the session. Needs this origin in the Supabase dashboard URL config.
+    void loadSync()
+      .then((s) => s.signInGoogle())
+      .catch((e) => {
+        setSyncMsg(e instanceof Error ? e.message : String(e));
+        setSyncBusy(false);
+      });
+  };
   const handleSendCode = (email: string) => {
     setSyncBusy(true);
     setSyncMsg("");
-    void sendCode(email)
+    void loadSync()
+      .then((s) => s.sendCode(email))
       .then(() => setSyncMsg(`code sent to ${email} — check inbox`))
       .catch((e) => setSyncMsg(e instanceof Error ? e.message : String(e)))
       .finally(() => setSyncBusy(false));
@@ -367,29 +422,34 @@ export default function App() {
   const handleVerify = (email: string, code: string) => {
     setSyncBusy(true);
     setSyncMsg("");
-    void verifyCode(email, code)
+    void loadSync()
+      .then((s) => s.verifyCode(email, code))
       .then((e) => {
         setAccount(e);
         say(`signed in as ${e}`);
-        return pullChats();
+        return loadSync().then((s) => s.pullChats());
       })
       .then(mergeCloud)
       .catch((e) => setSyncMsg(e instanceof Error ? e.message : String(e)))
       .finally(() => setSyncBusy(false));
   };
   const handleSignOut = () => {
-    void signOut().finally(() => {
-      setAccount(null);
-      setSyncMsg("");
-      say("signed out");
-    });
+    void loadSync()
+      .then((s) => s.signOut())
+      .finally(() => {
+        setAccount(null);
+        setAvatarUrl(null);
+        setSyncMsg("");
+        say("signed out");
+      });
   };
   const handleSyncNow = () => {
     if (!account) return;
     setSyncBusy(true);
-    void pullChats()
+    void loadSync()
+      .then((s) => s.pullChats())
       .then(mergeCloud)
-      .then(() => pushChats(sessions))
+      .then(() => loadSync().then((s) => s.pushChats(sessions)))
       .catch((e) => setSyncMsg(e instanceof Error ? e.message : String(e)))
       .finally(() => setSyncBusy(false));
   };
@@ -723,9 +783,12 @@ export default function App() {
     // Tombstone the cloud row too, or the next pull resurrects it: sync is
     // an additive upsert, so a local-only delete never sticks.
     if (dead?.cloudId) {
-      addTombstone(dead.cloudId);
-      void deleteCloudChat(dead.cloudId).catch((e) =>
-        say(`cloud delete failed: ${e instanceof Error ? e.message : e}`));
+      const cloudId = dead.cloudId;
+      addTombstone(cloudId);
+      void loadSync()
+        .then((s) => s.deleteCloudChat(cloudId))
+        .catch((e) =>
+          say(`cloud delete failed: ${e instanceof Error ? e.message : e}`));
     }
     if (activeSessionId === id) {
       setActiveSessionId(null);
@@ -764,10 +827,11 @@ export default function App() {
   // one shared conversation across both screens: every turn is announced
   // over the relay (display-only there — the bot turn runs once, here).
   // The hub skips the sender, so our own lines never echo back.
-  const relayChat = (role: "user" | "assistant", text: string) => {
+  const relayChat = (role: "user" | "assistant", text: string, files?: Attachment[]) => {
     const relay = relayRef.current;
     if (!relay || !text) return;
-    relay.send("chat", { role, text, session: ocSessionRef.current });
+    const body = files?.length ? `${text}\n[${files.length} attachment${files.length === 1 ? "" : "s"}: ${files.map((f) => f.name).join(", ")}]` : text;
+    relay.send("chat", { role, text: body, session: ocSessionRef.current });
   };
 
   const announceBot = (content: string) => {
@@ -775,7 +839,7 @@ export default function App() {
     relayChat("assistant", content);
   };
 
-  const sendChat = (text: string, provider = "opencode", opts?: { model: string; effort: string }) => {
+  const sendChat = (text: string, provider = "opencode", opts?: { model: string; effort: string }, filesOverride?: Attachment[] | null) => {
     Sound.send();
     stopGreet();
     setUnread(0);
@@ -784,8 +848,19 @@ export default function App() {
       fsm.forceJacked();
     }
     if (opts) say(`engine: ${provider}/${opts.model} · ${opts.effort} effort`);
-    const files = attachments;
-    setAttachments([]);
+    // explicit set (skill tap [], regen history) or the composer's chips.
+    // Override turns never touch pending chips — tapping around while
+    // files are staged must not fire them off with an unrelated question.
+    const files = filesOverride ?? attachments;
+    if (!filesOverride) setAttachments([]);
+    // snapshot live handles for the upload, then forget them (no leak).
+    // History-adopted attachments carry no handle — they resolve via url.
+    const handles = new Map<number, File>();
+    for (const a of files) {
+      const h = fileHandles.current.get(a.id);
+      if (h) handles.set(a.id, h);
+      fileHandles.current.delete(a.id);
+    }
     // auto chooses: stay on the current chat's engine, else first live one.
     let eng = provider;
     if (provider === "auto") {
@@ -798,10 +873,10 @@ export default function App() {
     const caption = text.trim() || (files.length ? "Look at the attached files and tell me what you see." : "");
     if (!caption) return;
     setMessages((m) => [...m, { id: msgId++, role: "user", content: caption, attachments: files }]);
-    relayChat("user", caption);
+    relayChat("user", caption, files);
     mascotRef.current?.celebrate();
     setThinking(true);
-    void sendWithFiles(caption, files, eng, opts);
+    void sendWithFiles(caption, files, eng, opts, handles);
   };
 
   // uploads attachments so the agent can actually open them: @paths ride
@@ -810,15 +885,26 @@ export default function App() {
     caption: string,
     files: Attachment[],
     provider: string,
-    opts?: { model: string; effort: string },
+    opts: { model: string; effort: string } | undefined,
+    handles: Map<number, File>,
   ) => {
     let msg = caption;
+    const failed: string[] = [];
     if (files.length) {
       const paths: string[] = [];
       for (const a of files) {
-        const handle = fileHandles.current.get(a.id);
+        // adopted history chips have no File handle — rebuild from the
+        // still-live object URL (same session only; reloads lose it).
+        let handle = handles.get(a.id);
+        if (!handle && a.url) {
+          try {
+            const blob = await fetch(a.url).then((r) => r.blob());
+            if (blob.size) handle = new File([blob], a.name, { type: blob.type || "application/octet-stream" });
+          } catch { /* falls through to bare name */ }
+        }
         if (!handle) {
           paths.push(a.name);
+          failed.push(a.name);
           continue;
         }
         try {
@@ -835,6 +921,24 @@ export default function App() {
         }
       }
       if (paths.length) msg += `\n\n[attached files: ${paths.join(", ")}]`;
+      // vision honesty: neither provider receives pixels (plain-text CLI
+      // turns), so forbid the model from pretending it saw the image.
+      if (files.some((a) => a.kind === "image")) {
+        msg += `\n\n(note: attached images arrive as filenames only — if you cannot see pixels, say so instead of describing them)`;
+      }
+      // bridge caps messages at 4000 chars: shrink the caption, never cut
+      // an @path in half (a clipped path reads as a missing file).
+      if (caption && msg.length > 3900 && paths.length) {
+        const over = msg.length - 3900;
+        const cutCaption = caption.slice(0, Math.max(0, caption.length - over)) + "…[truncated]";
+        msg = msg.replace(caption, cutCaption);
+      }
+    }
+    if (failed.length) {
+      // plain append, NOT pushBot — the turn is still in flight and
+      // pushBot would kill the thinking spinner mid-poll.
+      const warn = `${failed.join(", ")} couldn't upload — sent names only, the agent can't open them. Try again or paste the content as text.`;
+      setMessages((m) => [...m, { id: msgId++, role: "assistant", content: warn }]);
     }
     postChat(msg, provider, opts);
   };
@@ -1150,18 +1254,28 @@ export default function App() {
     }
   };
 
-  // files dropped on the phone zone go straight to the phone (and stay
-  // attached, so you can still ask the agent about them after).
+  // history chips back into the composer (edit flow): fresh ids so React
+  // keys never collide, same object URLs so previews + uploads still work.
+  const adoptAttachments = (atts: Attachment[]) => {
+    if (!atts.length) return;
+    const fresh = atts.map((a) => ({ ...a, id: attachId.current++ }));
+    setAttachments((cur) => [...cur, ...fresh].slice(-5));
+    say(`restored ${fresh.length} attachment${fresh.length === 1 ? "" : "s"} to composer`);
+  };
+
+  // files dropped on the phone zone go straight to the phone and LEAVE the
+  // composer — they were sent, keeping them staged double-fires them into
+  // the next agent turn. Re-attach via + if you also want to ask about them.
   const dropFilesToPhone = (files: File[]) => {
     const fresh = buildAttachments(files, 5 - attachments.length);
     if (!fresh.length) return;
-    setAttachments((cur) => [...cur, ...fresh]);
     say(`dropped: ${fresh.map((f) => f.name).join(", ")} → phone`);
     if (fsm.state !== "jacked" || view !== "chat") {
       setView("chat");
       fsm.forceJacked();
     }
     void dropToPhone(fresh);
+    setAttachments((cur) => cur.filter((x) => !fresh.some((f) => f.id === x.id)));
   };
 
   const removeAttachment = (id: number) => {
@@ -1241,6 +1355,7 @@ export default function App() {
         attachments={attachments}
         onFiles={addFiles}
         onRemoveAttachment={removeAttachment}
+        onAdoptAttachments={adoptAttachments}
         onOpenLens={openLens}
         shots={shots}
         zoomShot={zoomShot}
@@ -1289,11 +1404,16 @@ export default function App() {
             onUnpair={handleUnpair}
           />
         }
+        accountEmail={account}
+        accountAvatar={avatarUrl}
+        onSignOut={handleSignOut}
         accountNode={
           <AccountPanel
             email={account}
+            avatarUrl={avatarUrl}
             msg={syncMsg}
             busy={syncBusy}
+            onGoogle={handleGoogle}
             onSendCode={handleSendCode}
             onVerify={handleVerify}
             onSignOut={handleSignOut}

@@ -88,6 +88,8 @@ export interface Attachment {
 }
 
 export function classifyAttachment(name: string, mime = ""): Attachment["kind"] {
+  // mime first: clipboard/camera drops can arrive extensionless.
+  if (mime.startsWith("image")) return "image";
   if (mime.startsWith("audio")) return "audio";
   const ext = name.split(".").pop()?.toLowerCase() ?? "";
   if (["png", "jpg", "jpeg", "gif", "webp", "svg"].includes(ext)) return "image";
@@ -116,3 +118,24 @@ export const HARNESS_PILLS: Pill[] = [
   { id: "codex", label: "codex", color: "#3d3e45", badge: "idle" },
   { id: "ollama", label: "ollama", color: "#3d3e45", badge: "idle" },
 ];
+
+// Deleted-chat tombstones (localStorage only, no cloud): a local delete must
+// survive the next pull, or additive-upsert sync resurrects the row.
+const TOMB_KEY = "island.chats.deleted.v1";
+export function tombstones(): string[] {
+  try {
+    const raw = localStorage.getItem(TOMB_KEY);
+    const arr: unknown = raw ? JSON.parse(raw) : [];
+    return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === "string").slice(0, 200) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function addTombstone(chatId: string): void {
+  if (!chatId) return;
+  const next = Array.from(new Set([chatId, ...tombstones()])).slice(0, 200);
+  try {
+    localStorage.setItem(TOMB_KEY, JSON.stringify(next));
+  } catch { /* private mode: best effort */ }
+}
