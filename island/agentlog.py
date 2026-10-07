@@ -76,7 +76,8 @@ def normalize_claude(p, agent='claude'):
     ev_map = {
         'SessionStart': 'SessionStart', 'UserPromptSubmit': 'UserPromptSubmit',
         'PreToolUse': 'PreToolUse', 'PostToolUse': 'PostToolUse',
-        'Notification': 'Notification', 'Stop': 'Stop',
+        'PermissionRequest': 'PreToolUse', 'Notification': 'Notification',
+        'Stop': 'Stop',
         'StopFailure': 'Stop', 'SessionEnd': 'SessionEnd',
         'SubagentStart': 'SubagentStart', 'SubagentStop': 'SubagentStop',
     }
@@ -98,6 +99,16 @@ def normalize_claude(p, agent='claude'):
         'ok': bool(p.get('ok', ev != 'StopFailure')),
         'agent': agent,
     }
+    # terminal context rides along when the relay captured it (focus jump-back)
+    for k in ('cwd', 'tmux', 'tmux_server', 'term_program', 'tty',
+              'term_pid', 'ssh', 'title_hint'):
+        if p.get(k):
+            e[k] = str(p[k])[:128]
+    if p.get('hook_event_name') == 'PermissionRequest':
+        e['attention'] = True
+    if agent == 'codex' and ev == 'PreToolUse':
+        # Codex owns its approval UI; the island surfaces but never blocks.
+        e['notify_only'] = True
     return e
 
 
@@ -114,7 +125,7 @@ def normalize_opencode(p, agent='opencode'):
     ev = m.get(kind)
     if not ev:
         return None
-    return {
+    e = {
         'ts': p.get('ts') or time.time(),
         'event': ev,
         'tool': str(p.get('tool') or ''),
@@ -126,14 +137,26 @@ def normalize_opencode(p, agent='opencode'):
         'ok': bool(p.get('ok', True)),
         'agent': agent,
     }
+    for k in ('cwd', 'tmux', 'term_program', 'tty'):
+        if p.get(k):
+            e[k] = str(p[k])[:128]
+    return e
 
 
 def normalize(p, agent='claude'):
+    """Any registered client -> ledger dict. Claude-protocol agents
+    (gemini/qwen/kimi/codex/cursor/...) share normalize_claude; the
+    agent tag is preserved so the island can brand per client."""
     if not isinstance(p, dict):
         return None
-    if p.get('kind') or agent == 'opencode':
-        return normalize_opencode(p, 'opencode')
-    return normalize_claude(p, agent if agent != 'opencode' else 'claude')
+    try:
+        import clients as _clients
+        kind = _clients.get(agent)['kind']
+    except Exception:
+        kind = 'claude' if not p.get('kind') else 'opencode'
+    if kind == 'opencode' or p.get('kind'):
+        return normalize_opencode(p, agent if agent != 'claude' else 'opencode')
+    return normalize_claude(p, agent or 'claude')
 
 # --- append / read ---------------------------------------------------------
 
@@ -228,6 +251,54 @@ def latest(evs):
     return state, activity
 
 
+def work_today(evs=None, now=None):
+    """Today's work snapshot for the Daily grid: what/where/%/left.
+
+    asks = UserPromptSubmits, done = Stops (clamped), left = asks - done,
+    pct = done/asks. current = newest prompt text. Never throws."""
+    try:
+        now = now or time.time()
+        day = time.strftime('%Y-%m-%d', time.localtime(now))
+        evs = read_events(limit=2000) if evs is None else evs
+        state, activity = latest(evs)
+        asks, dones, files, added, removed = 0, 0, set(), 0, 0
+        current = ''
+        for e in evs:
+            try:
+                ts = e.get('ts') or 0
+            except AttributeError:
+                continue
+            if not ts or time.strftime('%Y-%m-%d',
+                                       time.localtime(ts)) != day:
+                continue
+            ev = e.get('event') or ''
+            if ev == 'UserPromptSubmit':
+                asks += 1
+                if e.get('text'):
+                    # first line only: pasted blobs stay a readable headline
+                    first = str(e['text']).strip().splitlines()
+                    current = (first[0] if first else '')[:140]
+            elif ev == 'Stop':
+                dones += 1
+            elif ev in ('PreToolUse', 'PostToolUse'):
+                if e.get('file'):
+                    files.add(os.path.basename(e['file']))
+                added += e.get('added') or 0
+                removed += e.get('removed') or 0
+        done = min(dones, asks)
+        left = asks - done
+        return {'state': state, 'activity': activity,
+                'current': current, 'asks': asks,
+                'done': done, 'left': left,
+                'pct': round(done * 100 / asks) if asks else 0,
+                'files': sorted(files)[:8], 'added': added,
+                'removed': removed}
+    except Exception:
+        return {'state': 'idle', 'activity': '', 'current': '',
+                'asks': 0, 'done': 0, 'left': 0, 'pct': 0,
+                'files': [], 'added': 0, 'removed': 0}
+
+
 def transcript(evs):
     """All events -> ordered UI items with role: user|agent|system."""
     items = []
@@ -304,6 +375,76 @@ def hide_session(sid):
     except OSError:
         pass
     return sorted(hidden)
+
+def _opencode_db():
+    """Read-only handle to opencode's sqlite. None when locked/missing."""
+    db = os.path.join(os.path.expanduser('~'), '.local', 'share',
+                      'opencode', 'opencode.db')
+    try:
+        return sqlite3.connect('file:%s?mode=ro' % db.replace('%', '%25'),
+                               uri=True, timeout=2)
+    except Exception:
+        return None
+
+
+def opencode_usage(now=None):
+    """Token/cost snapshot for the Daily grid, off opencode's own db.
+
+    today = sessions updated local-today; current = latest updated.
+    Cost is provider-reported (0 on free tiers). Never throws."""
+    empty = {'provider': 'opencode', 'model': '', 'today': {
+        'in': 0, 'out': 0, 'cached': 0, 'cost': 0.0, 'sessions': 0},
+        'current': {'title': '', 'model': '', 'in': 0, 'out': 0,
+                    'cost': 0.0}}
+    try:
+        now = now or time.time()
+        day = time.strftime('%Y-%m-%d', time.localtime(now))
+        c = _opencode_db()
+        if c is None:
+            return empty
+        try:
+            rows = c.execute(
+                'SELECT id, title, model, cost, tokens_input,'
+                ' tokens_output, tokens_cache_read, time_updated'
+                ' FROM session ORDER BY time_updated DESC LIMIT 60'
+            ).fetchall()
+        finally:
+            try:
+                c.close()
+            except Exception:
+                pass
+        today = dict(empty['today'])
+        current = dict(empty['current'])
+        model, latest = '', None
+        for sid, title, mjs, cost, ti, to, cr, upd in rows:
+            ts = (upd or 0) / 1000.0
+            if ts and time.strftime('%Y-%m-%d',
+                                    time.localtime(ts)) == day:
+                today['in'] += ti or 0
+                today['out'] += to or 0
+                today['cached'] += cr or 0
+                today['cost'] += cost or 0.0
+                today['sessions'] += 1
+            if latest is None and ts:
+                try:
+                    m = json.loads(mjs or '{}')
+                    model = m.get('id') or ''
+                except ValueError:
+                    model = ''
+                current = {'title': str(title or '')[:80], 'model': model,
+                           'in': ti or 0, 'out': to or 0,
+                           'cost': cost or 0.0}
+                latest = sid
+            if not model and mjs:
+                try:
+                    model = (json.loads(mjs) or {}).get('id') or ''
+                except ValueError:
+                    pass
+        return {'provider': 'opencode', 'model': model, 'today': today,
+                'current': current}
+    except Exception:
+        return empty
+
 
 def opencode_db_sessions(limit=12):
     """Terminal sessions straight from opencode's own sqlite (read-only).
@@ -469,18 +610,31 @@ class ChatLog:
 
 # --- provider commands ------------------------------------------------------
 
-def claude_available():
+# install dirs the official scripts use — the bridge often inherits a thin
+# PATH from the desktop launcher, so a working CLI reads as missing.
+# Checked live per call: a fresh install shows up with no restart.
+_HOME_BINS = (
+    os.path.join(os.path.expanduser('~'), '.opencode', 'bin'),
+    os.path.join(os.path.expanduser('~'), '.local', 'bin'),
+)
+
+
+def _which(name):
     for d in os.environ.get('PATH', '').split(os.pathsep):
-        if d and os.access(os.path.join(d, 'claude'), os.X_OK):
+        if d and os.access(os.path.join(d, name), os.X_OK):
+            return True
+    for d in _HOME_BINS:
+        if os.access(os.path.join(d, name), os.X_OK):
             return True
     return False
+
+
+def claude_available():
+    return _which('claude')
 
 
 def opencode_available():
-    for d in os.environ.get('PATH', '').split(os.pathsep):
-        if d and os.access(os.path.join(d, 'opencode'), os.X_OK):
-            return True
-    return False
+    return _which('opencode')
 
 
 def provider_available(provider):
@@ -611,3 +765,90 @@ def summarize_stream_updates(updates, user_text):
             partial = final
             activity = 'finished ✓' if u.get('ok', True) else 'failed ✗'
     return activity, (partial if not final else final), session, final
+
+
+# --- ping-island lifecycle + titles + usage (ported rules) ---------------
+
+IDLE_HIDE_AFTER = 30 * 60  # primary list hides quiet sessions after 30 min
+
+
+def needs_attention(e):
+    """Sessions needing manual action stay visible + pop the island."""
+    if not isinstance(e, dict):
+        return False
+    if e.get('attention'):
+        return True
+    if e.get('event') == 'Notification':
+        return True
+    t = (e.get('text') or '').lower()
+    return any(k in t for k in ('approval', 'permission', 'needs input',
+                                '?', 'please confirm'))
+
+
+def visible_sessions(sess_list, now=None):
+    """Ended stays until archived; quiet >30min hides unless attention."""
+    now = now or time.time()
+    out = []
+    for s in sess_list:
+        if not isinstance(s, dict):
+            continue
+        age = now - (s.get('ts') or 0)
+        if s.get('attention') or s.get('needs_attention'):
+            out.append(s)
+        elif age < IDLE_HIDE_AFTER:
+            out.append(s)
+    return out
+
+
+def session_title(evs, sid):
+    """First user prompt, else newest tool/file, else '?'. Survives reboots."""
+    for e in evs:
+        if e.get('session') == sid and e.get('event') == 'UserPromptSubmit' \
+                and e.get('text'):
+            t = e['text'].strip().splitlines()[0][:60]
+            return t
+    for e in reversed(evs):
+        if e.get('session') == sid and (e.get('tool') or e.get('text')):
+            return str(e.get('tool') or e.get('text'))[:60]
+    return '?'
+
+
+def transcript_usage(path):
+    """Token totals from a Claude transcript .jsonl.
+
+    One assistant message spans several lines (one per content block)
+    repeating message.usage — count each message.id once per consecutive
+    run (O(1), no ever-growing seen-set). Half-written trailing line
+    is skipped. Never throws."""
+    totals = {'input': 0, 'output': 0, 'cacheRead': 0, 'cacheCreation': 0}
+    last_id, last_run = None, False
+    try:
+        with open(path, encoding='utf-8') as f:
+            lines = f.read().splitlines()[-4000:]
+    except OSError:
+        return totals
+    for ln in lines:
+        ln = ln.strip()
+        if not ln:
+            continue
+        try:
+            e = json.loads(ln)
+        except ValueError:
+            continue  # half-written tail: skip
+        msg = e.get('message') or {}
+        u = msg.get('usage') or e.get('usage')
+        if not isinstance(u, dict):
+            continue
+        mid = msg.get('id') or e.get('message_id') or ''
+        if mid and mid == last_id and last_run:
+            continue  # same message, next content block
+        last_id, last_run = mid, bool(mid)
+        try:
+            totals['input'] += int(u.get('input_tokens') or 0)
+            totals['output'] += int(u.get('output_tokens') or 0)
+            totals['cacheRead'] += int(u.get('cache_read_input_tokens') or 0)
+            totals['cacheCreation'] += int(
+                u.get('cache_creation_input_tokens') or 0)
+        except (TypeError, ValueError):
+            continue
+    return totals

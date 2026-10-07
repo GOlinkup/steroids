@@ -117,6 +117,76 @@ class LedgerTest(unittest.TestCase):
         end = agentlog.normalize({"hook_event_name": "SessionEnd", "session_id": "s"})
         self.assertEqual(agentlog.latest([end]), ("idle", ""))
 
+    def test_opencode_usage_shape_and_never_throws(self):
+        import sqlite3
+        import time
+        d = tempfile.mkdtemp()
+        db = os.path.join(d, "opencode.db")
+        c = sqlite3.connect(db)
+        c.execute("CREATE TABLE session (id TEXT, title TEXT, model TEXT,"
+                  " cost REAL, tokens_input INT, tokens_output INT,"
+                  " tokens_cache_read INT, time_updated INT)")
+        now_ms = int(time.time() * 1000)
+        c.execute("INSERT INTO session VALUES (?,?,?,?,?,?,?,?)",
+                  ("s1", "fix grid",
+                   '{"id":"m1","providerID":"opencode"}', 0.0,
+                   1000, 200, 5000, now_ms))
+        c.execute("INSERT INTO session VALUES (?,?,?,?,?,?,?,?)",
+                  ("s0", "old", '{"id":"m0","providerID":"opencode"}', 0.0,
+                   7, 7, 7, now_ms - 3 * 86400 * 1000))
+        c.commit()
+        c.close()
+        real = agentlog._opencode_db
+        agentlog._opencode_db = lambda: sqlite3.connect(db)
+        try:
+            u = agentlog.opencode_usage()
+        finally:
+            agentlog._opencode_db = real
+        self.assertEqual(u["provider"], "opencode")
+        self.assertEqual(u["model"], "m1")
+        self.assertEqual(u["today"]["sessions"], 1)
+        self.assertEqual((u["today"]["in"], u["today"]["out"],
+                          u["today"]["cached"]), (1000, 200, 5000))
+        self.assertEqual(u["current"]["title"], "fix grid")
+        # missing db -> honest empty, never throws
+        agentlog._opencode_db = lambda: None
+        try:
+            e = agentlog.opencode_usage()
+        finally:
+            agentlog._opencode_db = real
+        self.assertEqual(e["today"]["sessions"], 0)
+
+    def test_work_today_counts_and_pct(self):
+        import time
+        now = time.time()
+        evs = [
+            {"event": "UserPromptSubmit", "text": "fix grid", "ts": now - 50,
+             "tool": "", "file": "", "added": 0, "removed": 0, "ok": True},
+            {"event": "PostToolUse", "tool": "Edit", "file": "/x/a.py",
+             "added": 5, "removed": 2, "ts": now - 40, "ok": True},
+            {"event": "Stop", "ts": now - 30, "ok": True},
+            {"event": "UserPromptSubmit", "text": "offline cache",
+             "ts": now - 10, "tool": "", "file": "", "added": 0,
+             "removed": 0, "ok": True},
+        ]
+        w = agentlog.work_today(evs, now=now)
+        self.assertEqual((w["asks"], w["done"], w["left"], w["pct"]),
+                         (2, 1, 1, 50))
+        self.assertEqual(w["current"], "offline cache")
+        self.assertEqual((w["files"], w["added"], w["removed"]),
+                         (["a.py"], 5, 2))
+        self.assertEqual(w["state"], "thinking")
+        # yesterday's noise never leaks in
+        old = [dict(e, ts=now - 90000) for e in evs]
+        self.assertEqual(agentlog.work_today(old, now=now)["asks"], 0)
+        # pasted blobs collapse to a first-line headline
+        blob = [{"event": "UserPromptSubmit",
+                 "text": "Now working\nline2\nline3", "ts": now,
+                 "tool": "", "file": "", "added": 0, "removed": 0,
+                 "ok": True}]
+        self.assertEqual(agentlog.work_today(blob, now=now)["current"],
+                         "Now working")
+
     def test_transcript_roles(self):
         s = agentlog.normalize({"hook_event_name": "UserPromptSubmit",
                                 "prompt": "do it", "session_id": "s"})

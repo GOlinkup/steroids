@@ -18,12 +18,50 @@ import time
 import urllib.parse
 import urllib.request
 import xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 
 PORT = 8906
 GDELT_QUERY = "south africa"
-RSS_FEED = "https://feeds.bbci.co.uk/news/rss.xml"
+# Google News SA edition (reliable server-side, names SA outlets).
+# Publisher feeds (News24/EWN/M&G/IOL) all bot-wall datacenter fetches.
+RSS_FEED = ("https://news.google.com/rss/search"
+            "?q=south%20africa&hl=en-ZA&gl=ZA&ceid=ZA%3Aen")
 # Malamulele, Limpopo (approx) — Open-Meteo needs coords, label is honest.
 WX_LAT, WX_LON, WX_LABEL = -22.99, 30.68, "Malamulele"
+
+
+def _outlet(url):
+    """Registrable name for a pin chip: businesslive.co.za -> BUSINESSLIVE."""
+    try:
+        host = urllib.parse.urlsplit(url).hostname or ""
+        host = host[4:] if host.startswith("www.") else host
+        parts = host.split(".")
+        core = parts[-2] if len(parts) >= 2 and parts[-1] in (
+            "za", "uk", "com", "org", "net", "io") else parts[-1]
+        if len(parts) >= 3 and parts[-1] in ("za", "uk") \
+                and parts[-2] in ("co", "ac", "org", "gov"):
+            core = parts[-3]
+        return core.upper() if core else "NEWS"
+    except Exception:
+        return "NEWS"
+
+
+def _clean_title(raw):
+    """Strip video prefixes, split Google News 'Headline - Outlet'."""
+    t = (raw or "").strip()
+    for pre in ("Watch: ", "Listen: ", "WATCH: ", "LISTEN: "):
+        if t.startswith(pre):
+            t = t[len(pre):].strip()
+            break
+    outlet = None
+    if " - " in t:
+        head, tail = t.rsplit(" - ", 1)
+        head, tail = head.strip(), tail.strip()
+        # outlet-like: short, and either spaceless (eNCA) or Title Case
+        if head and tail and len(tail) <= 30 and (
+                " " not in tail or tail[0].isupper()):
+            t, outlet = head, tail.upper()
+    return t, outlet
 
 
 def _get(url, timeout=10):
@@ -46,7 +84,9 @@ def fetch_gdelt(limit=5, get=None, query=GDELT_QUERY):
             t = (a.get("title") or "").strip()
             u = (a.get("url") or "").strip()
             if t and u.startswith("http"):
-                out.append({"title": t, "url": u, "source": "GDELT"})
+                t, _ = _clean_title(t)
+                out.append({"title": t, "url": u,
+                            "source": _outlet(u)})
         return out
     except Exception:
         return []
@@ -62,7 +102,9 @@ def fetch_rss(limit=5, get=None, feed=RSS_FEED):
             t = (item.findtext("title") or "").strip()
             u = (item.findtext("link") or "").strip()
             if t and u.startswith("http"):
-                out.append({"title": t, "url": u, "source": "RSS"})
+                t, outlet = _clean_title(t)
+                out.append({"title": t, "url": u,
+                            "source": outlet or _outlet(u)})
             if len(out) >= limit:
                 break
         return out
@@ -94,14 +136,19 @@ def load_briefing(cache_path, now=None, gdelt=None, rss=None, weather=None):
     Injectables return row lists / weather dict; defaults hit the network.
     """
     now = now or time.time()
-    w = (weather or fetch_weather)()
-    heads = []
-    for fn in (gdelt or (lambda: fetch_gdelt()),
-               rss or (lambda: fetch_rss())):
-        try:
-            heads.extend(fn() or [])
-        except Exception:
-            pass
+    # Concurrent (stdlib threads): three 10s pipes overlap instead of
+    # stacking to 30s. Injectables stay plain callables for tests.
+    with ThreadPoolExecutor(max_workers=3) as ex:
+        fw = ex.submit(weather or fetch_weather)
+        fg = ex.submit(gdelt or (lambda: fetch_gdelt()))
+        fr = ex.submit(rss or (lambda: fetch_rss()))
+        w = fw.result()
+        heads = []
+        for fut in (fg, fr):
+            try:
+                heads.extend(fut.result() or [])
+            except Exception:
+                pass
     heads = heads[:12]
     if w is None and not heads:
         cached = read_cache(cache_path)

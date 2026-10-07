@@ -16,11 +16,13 @@ import json
 import base64
 import mimetypes
 import os
+import re
 import socket
 import subprocess
 import sys
 import threading
 import time
+import urllib.request
 from collections import Counter
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from urllib.parse import urlparse, parse_qs
@@ -30,6 +32,14 @@ import agentlog  # noqa: E402  (same CLI path as the desktop island app)
 import relay  # noqa: E402  (self WS relay: /relay/ws + qr/verify/send)
 import gigs  # noqa: E402  (gig adapters: native store + Remotive seed)
 import profile  # noqa: E402  (island profile: mirror-only)
+import decisions  # noqa: E402  (island approve/deny/answer)
+import focus as _focus  # noqa: E402  (jump back to agent terminal)
+import energy  # noqa: E402  (poll tiers + keep-awake)
+import soundpack  # noqa: E402  (openpeon packs)
+import display as _display  # noqa: E402  (external display-state.json)
+import quota as _quota  # noqa: E402  (Claude OAuth usage)
+import demo as _demo  # noqa: E402  (scripted fixtures)
+import fleet as _fleet  # noqa: E402  (attention ranking + overlap)
 
 HOST, PORT = "127.0.0.1", 8096
 BODY_LIMIT = 64 * 1024
@@ -41,6 +51,33 @@ SKILLS_DIR = os.path.join(REPO_ROOT, "skills")
 SHOTS_DIR = os.path.join(REPO_ROOT, "shots")
 
 _lens_lib = None
+_daily_lib = None
+
+
+def daily_lib():
+    """daily.py pure helpers (load_briefing, today_events). Never throws."""
+    global _daily_lib
+    if _daily_lib is None:
+        import importlib.util
+        p = os.path.join(REPO_ROOT, "src", "steroids", "daily.py")
+        spec = importlib.util.spec_from_file_location("steroids_daily", p)
+        m = importlib.util.module_from_spec(spec)
+        spec.loader.exec_module(m)
+        _daily_lib = m
+    return _daily_lib
+
+
+def daily_cache_path():
+    p = os.path.expanduser("~/.cache/steroids/daily_brief.json")
+    try:
+        os.makedirs(os.path.dirname(p), exist_ok=True)
+    except OSError:
+        pass
+    return p
+
+
+def daily_log_path():
+    return os.path.expanduser("~/.cache/steroids/daily_log.jsonl")
 
 
 def lens_lib():
@@ -54,6 +91,252 @@ def lens_lib():
         spec.loader.exec_module(m)
         _lens_lib = m
     return _lens_lib
+
+
+def _playerctl(*args):
+    """playerctl call, None when the binary is missing. 3s cap, no hangs."""
+    try:
+        r = subprocess.run(["playerctl"] + list(args), capture_output=True,
+                           text=True, timeout=3)
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    return r.stdout.strip()
+
+
+_HAS_PLAYERCTL = None
+
+
+_MPRIS_OBJ = "/org/mpris/MediaPlayer2"
+_MPRIS_IFACE = "org.mpris.MediaPlayer2.Player"
+
+
+def _bus_env():
+    """Session bus env; falls back to the runtime-dir socket."""
+    env = dict(os.environ)
+    if not env.get("DBUS_SESSION_BUS_ADDRESS"):
+        try:
+            uid = os.getuid()
+        except AttributeError:
+            uid = 1000
+        env["DBUS_SESSION_BUS_ADDRESS"] = "unix:path=/run/user/%d/bus" % uid
+    return env
+
+
+def _busctl(*args):
+    try:
+        r = subprocess.run(["busctl", "--user"] + list(args),
+                           capture_output=True, text=True, timeout=3,
+                           env=_bus_env())
+    except (OSError, subprocess.TimeoutExpired):
+        return None
+    if r.returncode != 0:
+        return None
+    return r.stdout.strip()
+
+
+def _mpris_players():
+    """MPRIS names on the session bus (Brave tabs, Spotify, …)."""
+    out = _busctl("list", "--no-legend")
+    if not out:
+        return []
+    return [p for p in (ln.split()[0] for ln in out.splitlines() if ln.split())
+            if p.startswith("org.mpris.MediaPlayer2.")]
+
+
+def _mpris_unescape(v):
+    return v.replace("\\", "\x00").replace('\"', '"').replace("\x00", "\\")
+
+
+def _mpris_str(meta, key):
+    m = re.search(r'"%s" [so] "((?:[^"\\]|\\.)*)"' % re.escape(key), meta or "")
+    return _mpris_unescape(m.group(1)) if m else None
+
+
+def _mpris_strv(meta, key):
+    m = re.search(r'"%s" as (\d+)((?: "(?:[^"\\]|\\.)*")*)' % re.escape(key), meta or "")
+    if not m:
+        return []
+    n = int(m.group(1))
+    return [_mpris_unescape(x) for x in re.findall(r'"((?:[^"\\]|\\.)*)"', m.group(2))][:n]
+
+
+def _mpris_int(meta, key):
+    m = re.search(r'"%s" [xo] "?(\d+)"?' % re.escape(key), meta or "")
+    try:
+        return int(m.group(1)) if m else None
+    except (TypeError, ValueError):
+        return None
+
+
+def _mpris_scalar(out, typ):
+    m = re.match(r'^%s "(.*)"$' % typ, out or "", re.DOTALL)
+    if m:
+        return _mpris_unescape(m.group(1))
+    m = re.match(r"^x (\d+)$", out or "")
+    return int(m.group(1)) if m else None
+
+
+def _native_now_playing():
+    """Now-playing straight off D-Bus. None when the bus is unreachable."""
+    players = _mpris_players()
+    if not players:
+        return None
+    ordered = sorted(players, key=lambda p: 0 if _mpris_scalar(
+        _busctl("get-property", p, _MPRIS_OBJ, _MPRIS_IFACE, "PlaybackStatus"),
+        "s") == "Playing" else 1)
+    name = ordered[0]
+    meta = _busctl("get-property", name, _MPRIS_OBJ, _MPRIS_IFACE, "Metadata") or ""
+    parts = name.split(".")
+    short = parts[-2] if parts[-1].startswith("instance") and len(parts) > 1 else parts[-1]
+    status = _mpris_scalar(_busctl(
+        "get-property", name, _MPRIS_OBJ, _MPRIS_IFACE, "PlaybackStatus"), "s")
+    pos = _mpris_scalar(_busctl(
+        "get-property", name, _MPRIS_OBJ, _MPRIS_IFACE, "Position"), "x")
+    artists = _mpris_strv(meta, "xesam:artist")
+    length = _mpris_int(meta, "mpris:length")
+    return {"playing": status == "Playing", "player": short,
+            "title": _mpris_str(meta, "xesam:title"),
+            "artist": ", ".join(artists) if artists else None,
+            "album": _mpris_str(meta, "xesam:album") or None,
+            "art": _mpris_str(meta, "mpris:artUrl"),
+            "status": status,
+            "playing": status == "Playing",
+            "pos": pos // 1_000_000 if isinstance(pos, int) else None,
+            "len": length // 1_000_000 if isinstance(length, int) else None,
+            "has_playerctl": True}
+
+
+def _native_player_cmd(action, player, position):
+    players = _mpris_players()
+    if not players:
+        return {"ok": False, "error": "no players on the session bus"}
+    svc = next((q for q in players
+                if q == player or q.split(".")[-1] == player or
+                (len(q.split(".")) > 1 and q.split(".")[-2] == player)),
+               None) if player else None
+    if svc is None:
+        svc = sorted(
+        players, key=lambda p: 0 if _mpris_scalar(
+            _busctl("get-property", p, _MPRIS_OBJ, _MPRIS_IFACE, "PlaybackStatus"),
+            "s") == "Playing" else 1)[0]
+    if action in ("play-pause", "next", "previous"):
+        method = {"play-pause": "PlayPause", "next": "Next",
+                  "previous": "Previous"}[action]
+        ok = _busctl("call", svc, _MPRIS_OBJ, _MPRIS_IFACE, method) is not None
+        return {"ok": ok} if ok else {"ok": False, "error": "player refused"}
+    if action == "seek" and position is not None:
+        try:
+            us = int(float(position) * 1_000_000)
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "position must be seconds"}
+        meta = _busctl("get-property", svc, _MPRIS_OBJ, _MPRIS_IFACE, "Metadata") or ""
+        trackid = _mpris_str(meta, "mpris:trackid")
+        if not trackid:
+            return {"ok": False, "error": "no track id (player busy?)"}
+        ok = _busctl("call", svc, _MPRIS_OBJ, _MPRIS_IFACE, "SetPosition",
+                     "ox", trackid, str(us)) is not None
+        return {"ok": ok} if ok else {"ok": False, "error": "player refused"}
+    return {"ok": False, "error": "play-pause | next | previous | seek"}
+
+
+def _np_art_bytes():
+    """Current player art file (Chromium drops file:// thumbs in /tmp)."""
+    players = _mpris_players()
+    if not players:
+        return None, None
+    meta = _busctl("get-property", players[0], _MPRIS_OBJ, _MPRIS_IFACE,
+                   "Metadata") or ""
+    art = _mpris_str(meta, "mpris:artUrl") or ""
+    if not art.startswith("file:///tmp/"):
+        return None, None
+    path = art[len("file://"):]
+    try:
+        with open(path, "rb") as f:
+            head = f.read(12)
+            f.seek(0)
+            body = f.read(512 * 1024)
+    except OSError:
+        return None, None
+    if head.startswith(b"\x89PNG"):
+        mime = "image/png"
+    elif head.startswith(b"\xff\xd8"):
+        mime = "image/jpeg"
+    elif head.startswith(b"RIFF") and head[8:12] == b"WEBP":
+        mime = "image/webp"
+    elif head.startswith(b"GIF8"):
+        mime = "image/gif"
+    else:
+        return None, None
+    return body, mime
+
+
+def now_playing():
+    """First playing player, else first listed. Empty dict shape always."""
+    global _HAS_PLAYERCTL
+    if _HAS_PLAYERCTL is None:
+        _HAS_PLAYERCTL = _playerctl("--version") is not None
+    if not _HAS_PLAYERCTL:
+        # No playerctl (this box): straight off the session bus instead.
+        native = _native_now_playing()
+        if native is None:
+            return {"playing": False, "player": None, "title": None,
+                    "artist": None, "album": None, "art": None,
+                    "status": None, "pos": None, "len": None,
+                    "has_playerctl": False}
+        return native
+    empty = {"playing": False, "player": None, "title": None, "artist": None,
+             "album": None, "art": None, "status": None, "pos": None, "len": None,
+             "has_playerctl": _HAS_PLAYERCTL}
+    players = (_playerctl("-l") or "").split()
+    if not players:
+        return empty
+    ordered = sorted(players, key=lambda p: 0 if (
+        _playerctl("status", "-p", p) or "").strip() == "Playing" else 1)
+    name = ordered[0]
+
+    def meta(key):
+        return _playerctl("metadata", "--format", "{{%s}}" % key, "-p", name)
+
+    def num(key):
+        try:
+            v = _playerctl("metadata", "--format", "{{%s}}" % key, "-p", name)
+            return int(float(v)) if v else None
+        except (TypeError, ValueError):
+            return None
+
+    status = (_playerctl("status", "-p", name) or "").strip() or None
+    out = dict(empty)
+    out.update(player=name, title=meta("title") or None,
+               artist=meta("artist") or None, album=meta("album") or None,
+               art=meta("mpris:artUrl") or None, status=status,
+               playing=status == "Playing",
+               pos=num("position") and num("position") // 1_000_000,
+               len=num("mpris:length") and num("mpris:length") // 1_000_000)
+    return out
+
+
+def player_cmd(action, player=None, position=None):
+    """play-pause | next | previous | seek. Returns ok dict, never raises."""
+    if action == "seek" and position is not None:
+        try:
+            args = ["position", "%s" % float(position)]
+        except (TypeError, ValueError):
+            return {"ok": False, "error": "position must be seconds"}
+    elif action in ("play-pause", "next", "previous"):
+        args = [action]
+    else:
+        return {"ok": False, "error": "play-pause | next | previous | seek"}
+    if _playerctl("--version") is None:
+        return _native_player_cmd(action,
+                                  str(player)[:80] if player else None,
+                                  position)
+    if player:
+        args += ["-p", str(player)[:80]]
+    if _playerctl(*args) is None:
+        return {"ok": False, "error": "playerctl missing or no players"}
+    return {"ok": True}
 
 
 def daemon_clean(server, attr):
@@ -81,15 +364,14 @@ def daemon_stop(server, attr):
 
 
 def daemon_start(server, kind, extra=None):
-    """Start the hand|gaze daemon; stops the other (one camera between them)."""
-    daemon_stop(server, "gaze_proc" if kind == "hand" else "hand_proc")
+    """Start the hand cursor daemon."""
+    daemon_stop(server, "hand_proc")
     attr = kind + "_proc"
     if daemon_clean(server, attr) is not None:
         return {"ok": True, "running": True}
     script = os.path.join(os.path.dirname(os.path.abspath(__file__)),
-                          "handd.py" if kind == "hand" else "gazed.py")
+                          "handd.py")
     args = [sys.executable, script, "--no-preview"] + list(extra or [])
-    # self-view rides the lens page (/gaze-frame) — never an OS popup.
     try:
         os.makedirs(os.path.expanduser("~/.config/steroids"), exist_ok=True)
         logo = open(os.path.expanduser("~/.config/steroids/%s.log" % kind), "a")
@@ -321,6 +603,32 @@ def _pump_turn(tid, argv, stdin_data, provider):
             t.update(done=True, ok=True, text=text)
 
 
+OPENCODE_INSTALL_URL = "https://opencode.ai/install"
+OPENCODE_INSTALL_CMD = "curl -fsSL https://opencode.ai/install | bash"
+_install_state = {"running": False}
+
+
+def install_opencode_bg():
+    """Fetch the official installer and run it (daemon thread, no shell).
+    The UI polls /health for completion — no status channel needed."""
+    try:
+        req = urllib.request.Request(OPENCODE_INSTALL_URL,
+                                     headers={"User-Agent": "steroids-island"})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            script = r.read()
+        if len(script) < 500 or b"opencode" not in script[:2000]:
+            raise ValueError("unexpected install payload")
+        p = subprocess.run(["bash", "-s"], input=script,
+                           capture_output=True, timeout=300)
+        if p.returncode != 0:
+            tail = (p.stderr or p.stdout or b"install failed")[-300:]
+            raise ValueError(tail.decode("utf-8", "replace"))
+    except Exception as e:  # noqa: BLE001 — surfaced as install hint
+        _install_state["error"] = str(e)[:200]
+    finally:
+        _install_state["running"] = False
+
+
 def start_turn(msg, session_id=None, provider="opencode"):
     """Spawn an agent turn in the background. Returns {ok, turn}."""
     if provider == "auto":
@@ -414,6 +722,14 @@ class Handler(SimpleHTTPRequestHandler):
                 # plus claude code's own transcripts when they exist.
                 extra += [s for s in agentlog.claude_projects_sessions()
                           if s["session"] not in seen]
+                seen.update(s["session"] for s in extra)
+                # plus hook-free readers (cursor/grok/copilot stores).
+                try:
+                    import discovery as _discovery
+                    extra += [s for s in _discovery.all_extra()
+                              if s["session"] not in seen]
+                except Exception:
+                    pass
                 merged = sorted(hooked + extra,
                                 key=lambda s: s["ts"] or 0,
                                 reverse=True)
@@ -476,10 +792,142 @@ class Handler(SimpleHTTPRequestHandler):
             self._send(gigs.load(max(1, min(limit, 50))))
         elif parts.path == "/profile":
             self._send({"ok": True, "profile": profile.mirror()})
-        elif parts.path in ("/hand", "/gaze"):
-            # cursor-daemon status — moves the real OS cursor (localhost reads).
-            kind = parts.path[1:]
-            self._send({"running": daemon_clean(self.server, kind + "_proc") is not None})
+        elif parts.path == "/pending":
+            # island approvals/questions awaiting a tap (act-from-island).
+            sid = (parse_qs(parts.query).get("session") or [""])[0]
+            self._send({"pending": decisions.pending(sid or None)})
+        elif parts.path == "/usage":
+            # token totals for a Claude transcript (?path=...jsonl).
+            p = (parse_qs(parts.query).get("path") or [""])[0]
+            self._send({"usage": agentlog.transcript_usage(p) if p else {}})
+        elif parts.path == "/soundpacks":
+            self._send({"packs": soundpack.packs()})
+        elif parts.path == "/energy":
+            now = time.time()
+            evs = agentlog.read_events(limit=30)
+            work = any((e.get("ts") or 0) > now - 120 and e.get("event")
+                       in ("PreToolUse", "UserPromptSubmit") for e in evs)
+            self._send({"tier": energy.tier(work),
+                        "interval": energy.poll_interval(work)})
+        elif parts.path == "/display":
+            # frozen navigate slots + published display-state.json.
+            try:
+                hidden = agentlog.hidden_sessions()
+                evs = agentlog.read_events(limit=300)
+                sess = [s for s in agentlog.sessions(evs)
+                        if s["session"] not in hidden][:9]
+                states = {}
+                for e in evs:
+                    sid = e.get("session")
+                    if sid and e.get("event") in (
+                            "PreToolUse", "UserPromptSubmit", "Stop"):
+                        states[sid] = (
+                            "working" if e["event"] == "PreToolUse" else
+                            ("thinking" if e["event"] == "UserPromptSubmit"
+                             else "finished"), "")
+                for s in sess:
+                    if agentlog.needs_attention(
+                            next((x for x in evs
+                                  if x.get("session") == s["session"]), {})):
+                        s["attention"] = True
+                st = _display.build_state(sess, states)
+                path = _display.publish(st)
+                self._send({"display": st, "path": path})
+            except Exception as e:
+                self._send({"display": {"sessions": []}, "error": str(e)})
+        elif parts.path == "/quota":
+            self._send({"quota": _quota.cached()})
+        elif parts.path == "/demo":
+            self._send({"demo": _demo.demo_sessions()})
+        elif parts.path == "/fleet":
+            # attention-ranked sessions + worktree overlap warnings.
+            try:
+                hidden = agentlog.hidden_sessions()
+                evs = agentlog.read_events(limit=300)
+                sess = [s for s in agentlog.sessions(evs)
+                        if s["session"] not in hidden][:12]
+                over = _fleet.overlap(
+                    [dict(s, cwd=(next(
+                        (x.get("cwd", "") for x in evs
+                         if x.get("session") == s["session"]
+                         and x.get("cwd")), ""))) for s in sess])
+                self._send({"sessions": _fleet.rank(sess, over),
+                            "overlap": over})
+            except Exception as e:
+                self._send({"sessions": [], "error": str(e)})
+        elif parts.path == "/hand":
+            # hand cursor-daemon status — moves the real OS cursor (localhost reads).
+            self._send({"running": daemon_clean(self.server, "hand_proc") is not None})
+        elif parts.path == "/battery":            # laptop power for the chat live-strip. sysfs on Linux, none on
+            # desktop/VM — callers treat has_battery False as "no row".
+            info = {"has_battery": False, "pct": None, "charging": False}
+            try:
+                base = "/sys/class/power_supply"
+                for name in sorted(os.listdir(base)):
+                    p = os.path.join(base, name)
+                    try:
+                        with open(os.path.join(p, "type")) as f:
+                            if f.read().strip() != "Battery":
+                                continue
+                        with open(os.path.join(p, "capacity")) as f:
+                            pct = int(f.read().strip())
+                        with open(os.path.join(p, "status")) as f:
+                            status = f.read().strip()
+                        info = {"has_battery": True, "pct": max(0, min(100, pct)),
+                                "charging": status in ("Charging", "Full")}
+                        break
+                    except (OSError, ValueError):
+                        continue
+            except OSError:
+                pass
+            self._send(info)
+        elif parts.path == "/np-art":
+            # Chromium-family art thumbs (file:///tmp/…). Served so the
+            # island can <img> them; nothing outside /tmp ever reads.
+            body, mime = _np_art_bytes()
+            if body is None:
+                return self._send({"ok": False, "error": "no art"}, 404)
+            self.send_response(200)
+            self.send_header("Content-Type", mime)
+            self.send_header("Content-Length", str(len(body)))
+            self.send_header("Cache-Control", "no-store")
+            self.end_headers()
+            self.wfile.write(body)
+            return
+        elif parts.path == "/nowplaying":
+            # system now-playing via playerctl (MPRIS). No binary or no
+            # players → playing False; the island shows no strip at all.
+            self._send(now_playing())
+        elif parts.path == "/api/daily/briefing":
+            # morning briefing, same-origin: no second daemon to keep alive.
+            try:
+                self._send(daily_lib().load_briefing(daily_cache_path()))
+            except Exception as e:
+                self._send({"weatherLine": "", "headlines": [],
+                            "fetchedAt": 0, "offline": True,
+                            "error": str(e)})
+        elif parts.path == "/api/daily/today":
+            try:
+                self._send({"events": daily_lib().today_events(
+                    daily_log_path())})
+            except Exception:
+                self._send({"events": []})
+        elif parts.path == "/api/daily/work":
+            # live work snapshot: what/where/%/left, off the event ledger.
+            try:
+                self._send(agentlog.work_today())
+            except Exception:
+                self._send(agentlog.work_today([]))
+        elif parts.path == "/api/daily/usage":
+            # token/cost snapshot off opencode's own db (read-only).
+            try:
+                self._send(agentlog.opencode_usage())
+            except Exception:
+                self._send({"provider": "opencode", "model": "",
+                            "today": {"in": 0, "out": 0, "cached": 0,
+                                      "cost": 0.0, "sessions": 0},
+                            "current": {"title": "", "model": "", "in": 0,
+                                        "out": 0, "cost": 0.0}})
         elif parts.path == "/turn":
             # live agent turn snapshot (polled while it streams).
             tid = (parse_qs(parts.query).get("id") or [""])[0]
@@ -490,20 +938,6 @@ class Handler(SimpleHTTPRequestHandler):
             if snap is None:
                 return self._send({"ok": False, "error": "no such turn"}, 404)
             self._send(snap)
-        elif parts.path == "/gaze-frame":
-            # live self-view for the lens page (daemon drops it, no popup).
-            try:
-                with open(os.path.expanduser("~/.config/steroids/gaze_frame.jpg"), "rb") as f:
-                    body = f.read()
-                self.send_response(200)
-                self.send_header("Content-Type", "image/jpeg")
-                self.send_header("Content-Length", str(len(body)))
-                self.send_header("Cache-Control", "no-store")
-                self.end_headers()
-                self.wfile.write(body)
-            except OSError:
-                return self._send({"ok": False, "error": "no frame yet"}, 404)
-            return
         elif parts.path == "/shots":
             # live lens feed: newest-first shot cards from the watch dir.
             try:
@@ -562,12 +996,12 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parts = urlparse(self.path)
-        if parts.path in ("/hand", "/gaze"):
-            # cursor daemons: only the PC owner may start/stop them.
+        if parts.path == "/hand":
+            # hand cursor daemon: only the PC owner may start/stop it.
             if not self._local():
                 return self._send({"ok": False,
-                                    "error": "cursor daemons run on the PC itself"}, 403)
-            kind = parts.path[1:]
+                                    "error": "cursor daemon runs on the PC itself"}, 403)
+            kind = "hand"
             req = self._read_json() or {}
             action = req.get("action") or "status"
             if action == "stop":
@@ -579,6 +1013,26 @@ class Handler(SimpleHTTPRequestHandler):
                 # 9-dot absolute fit (~1 min, stare each dot). Precision path.
                 return self._send(daemon_start(self.server, kind, ["--recalibrate"]))
             return self._send({"running": daemon_clean(self.server, kind + "_proc") is not None})
+        if parts.path == "/playercmd":
+            # music transport: only the PC owner drives local players.
+            if not self._local():
+                return self._send({"ok": False,
+                                    "error": "players run on the PC itself"}, 403)
+            req = self._read_json() or {}
+            return self._send(player_cmd(req.get("action"),
+                                         req.get("player"),
+                                         req.get("position")))
+        if parts.path == "/api/daily/log":
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            try:
+                daily_lib().log_event(daily_log_path(),
+                                      str(req.get("type") or ""),
+                                      str(req.get("label") or ""))
+            except Exception:
+                pass
+            return self._send({"ok": True})
         if parts.path == "/gigs/add":
             req = self._read_json()
             if req is None:
@@ -594,6 +1048,30 @@ class Handler(SimpleHTTPRequestHandler):
         if parts.path == "/profile/unlink":
             return self._send({"ok": True,
                                "profile": profile.unlink()})
+        if parts.path == "/decide":
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            if req.get("auto_approve") is not None:
+                decisions.set_auto_approve(req.get("session") or "",
+                                           bool(req.get("auto_approve")))
+                return self._send({"ok": True})
+            ok = decisions.decide(req.get("key") or "",
+                                  req.get("verdict") or "",
+                                  req.get("answer") or "")
+            return self._send({"ok": ok})
+        if parts.path == "/focus":
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            sid = str(req.get("session") or "")
+            ev = None
+            for e in agentlog.read_events(limit=300):
+                if e.get("session") == sid:
+                    ev = e
+            if ev is None:
+                return self._send({"ok": False, "error": "unknown session"}, 404)
+            return self._send(_focus.focus(ev))
         if parts.path == "/relay/verify":
             req = self._read_json()
             if req is None:
@@ -666,6 +1144,22 @@ class Handler(SimpleHTTPRequestHandler):
             except OSError as e:
                 return self._send({"ok": False, "error": str(e)}, 500)
             return self._send({"ok": True, "path": p})
+        if parts.path == "/install":
+            # one-click agent setup: allowlist of one (opencode — keyless
+            # per contract). Runs the official installer in a daemon
+            # thread; the UI polls /health until the CLI appears.
+            req = self._read_json()
+            if not req or req.get("provider") != "opencode":
+                return self._send({"ok": False, "error": "only opencode"}, 400)
+            if agentlog.opencode_available():
+                return self._send({"ok": True, "already": True})
+            if _install_state["running"]:
+                return self._send({"ok": True, "started": True})
+            _install_state.pop("error", None)
+            _install_state["running"] = True
+            threading.Thread(target=install_opencode_bg, daemon=True).start()
+            return self._send({"ok": True, "started": True,
+                               "manual": OPENCODE_INSTALL_CMD})
         if parts.path != "/chat":
             return self._send({"ok": False, "error": "use POST /chat"}, 404)
         try:
@@ -742,7 +1236,6 @@ def main(argv):
     srv.serve_dir = serve_dir
     srv.lens_watch = lens_watch
     srv.hand_proc = None
-    srv.gaze_proc = None
     if serve_dir:
         print("nicki: http://%s:%s  (UI + opencode bridge)" % (host, port))
         if host in ("0.0.0.0", "::"):

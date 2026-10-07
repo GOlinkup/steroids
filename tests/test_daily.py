@@ -4,9 +4,9 @@ import os
 import tempfile
 import unittest
 
-from steroids.daily import (age_label, fetch_gdelt, fetch_rss,
-                            fetch_weather, load_briefing, log_event,
-                            resolve_track, today_events)
+from steroids.daily import (_clean_title, _outlet, age_label, fetch_gdelt,
+                             fetch_rss, fetch_weather, load_briefing,
+                             log_event, resolve_track, today_events)
 
 GDELT = {"articles": [
     {"title": "SA power update", "url": "https://x.test/a",
@@ -32,11 +32,31 @@ class DailyTest(unittest.TestCase):
     def test_gdelt_maps_bad_rows_drop(self):
         rows = fetch_gdelt(get=lambda u: json.dumps(GDELT))
         self.assertEqual([(r["title"], r["source"]) for r in rows],
-                         [("SA power update", "GDELT")])
+                         [("SA power update", "TEST")])
 
     def test_rss_maps_blank_title_drops(self):
         rows = fetch_rss(get=lambda u: RSS)
-        self.assertEqual([r["title"] for r in rows], ["BBC One"])
+        self.assertEqual([(r["title"], r["source"]) for r in rows],
+                         [("BBC One", "TEST")])
+
+    def test_rss_splits_gn_outlet_and_strips_watch(self):
+        feed = ("<rss><channel>"
+                "<item><title>Marriage age limits coming - BusinessTech</title>"
+                "<link>https://x.test/1</link></item>"
+                "<item><title>Watch: Durban tensions rise - eNCA</title>"
+                "<link>https://x.test/2</link></item>"
+                "</channel></rss>")
+        rows = fetch_rss(get=lambda u: feed)
+        self.assertEqual([(r["title"], r["source"]) for r in rows],
+                         [("Marriage age limits coming", "BUSINESSTECH"),
+                          ("Durban tensions rise", "ENCA")])
+
+    def test_outlet_chips(self):
+        self.assertEqual(
+            (_outlet("https://www.businesslive.co.za/a"),
+             _outlet("https://www.bbc.co.uk/news"),
+             _outlet("not a url")),
+            ("BUSINESSLIVE", "BBC", "NEWS"))
 
     def test_weather_line_shape(self):
         w = fetch_weather(get=lambda u: json.dumps(

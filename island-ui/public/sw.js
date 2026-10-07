@@ -1,16 +1,17 @@
-// Steroids island service worker: app shell offline, API always live.
-// Only same-origin dist assets are cached; every /relay /chat /sessions
-// /skills /trending /gigs /profile call (and sockets) pass straight through,
-// so drops and pairing never serve stale.
-// bump this on every shell change or phones keep the old bundle.
-const CACHE = "steroids-island-v2";
-const SHELL = ["/", "/index.html", "/manifest.webmanifest", "/icon-192.png", "/icon-512.png"];
-const LIVE = ["/relay/", "/chat", "/sessions", "/skills", "/trending", "/gigs", "/profile", "/verify"];
+// Steroids island service worker: fresh shell, offline-tolerant, API always live.
+// Shell (navigations, /, /index.html) is NETWORK-FIRST: a stale shell can never
+// stick again, and installs can't be poisoned by the previous worker's cache.
+// Hashed /assets/* are immutable filenames, safe to serve cache-first.
+// Bump CACHE on every shell-affecting change; old caches self-delete on activate.
+const CACHE = "steroids-island-v6";
+// Every live JSON poll rides the network, never the cache: a cached
+// /health froze installs at Installing… (and stale /turn + /sessions +
+// /shots froze live views the same way). Images under /shots-file/ keep
+// the browser HTTP cache — this list only bypasses the worker cache.
+const LIVE = ["/relay/", "/chat", "/health", "/turn", "/sessions", "/skills", "/trending", "/gigs", "/profile", "/verify", "/pending", "/usage", "/quota", "/energy", "/display", "/fleet", "/battery", "/shots", "/soundpacks", "/hand", "/upload", "/install", "/decide", "/focus", "/agent-sessions", "/nowplaying", "/np-art", "/playercmd"];
 
-self.addEventListener("install", (e) => {
-  e.waitUntil(
-    caches.open(CACHE).then((c) => c.addAll(SHELL)).then(() => self.skipWaiting()).catch(() => {}),
-  );
+self.addEventListener("install", () => {
+  self.skipWaiting();
 });
 
 self.addEventListener("activate", (e) => {
@@ -25,13 +26,27 @@ self.addEventListener("fetch", (e) => {
   const u = new URL(e.request.url);
   if (e.request.method !== "GET" || u.origin !== self.location.origin) return;
   if (LIVE.some((p) => u.pathname === p || u.pathname.startsWith(p))) return;
+  if (e.request.mode === "navigate" || u.pathname === "/" || u.pathname === "/index.html") {
+    e.respondWith(
+      fetch(e.request).then((res) => {
+        if (res && res.ok) {
+          const copy = res.clone();
+          caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+        }
+        return res;
+      }).catch(() => caches.match(e.request).then((hit) => hit || caches.match("/"))),
+    );
+    return;
+  }
   e.respondWith(
     caches.match(e.request).then(
       (hit) =>
         hit ||
         fetch(e.request).then((res) => {
-          const copy = res.clone();
-          caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+          if (res && res.ok) {
+            const copy = res.clone();
+            caches.open(CACHE).then((c) => c.put(e.request, copy)).catch(() => {});
+          }
           return res;
         }),
     ),
