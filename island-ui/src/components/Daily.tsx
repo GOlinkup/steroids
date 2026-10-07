@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { Card, EqBars } from "./Cards";
+import { Card } from "./Cards";
 import { MusicIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon } from "./icons";
 import { fetchNowPlaying, fmtClock, mergeTrack, pushHistory, resolveArt, seekFrac, sendPlayerCmd, trackKey, type HistTrack, type NowPlaying } from "../music";
 
@@ -20,6 +20,7 @@ interface Work {
   files: string[];
   added: number;
   removed: number;
+  steps: { label: string; status: string }[];
 }
 interface UsageToday { in: number; out: number; cached: number; cost: number; sessions: number }
 interface Usage {
@@ -61,23 +62,29 @@ function LocalPlayer({
   const art = resolveArt(track.art, window.location.origin);
   return (
     <>
-      <div className="yt-thumb">
+      {/* YT-Music compact: 48px thumb + meta + inline transport. */}
+      <div className="ytm-row">
         {art ? (
-          <img src={art} alt="" loading="lazy" />
+          <img src={art} alt="" className="ytm-thumb" loading="lazy" />
         ) : (
-          <span className="yt-thumb-empty" aria-hidden>
-            <MusicIcon size={28} />
+          <span className="ytm-thumb empty" aria-hidden>
+            <MusicIcon size={20} />
           </span>
         )}
-        {track.len !== null && <span className="yt-badge">{fmtClock(track.len)}</span>}
-      </div>
-      <div className="yt-title">{track.title}</div>
-      <div className="yt-sub">
-        {!!track.artist && <b>{track.artist}</b>}
-        {!!track.player && <span>via {track.player}</span>}
-        {!track.playing && <em> · Paused — tap play to resume</em>}
-        <span className="yt-eq">
-          <EqBars playing={track.playing} />
+        <span className="ytm-meta">
+          <b>{track.title}</b>
+          {!!track.artist && <em>{track.artist}</em>}
+        </span>
+        <span className="ytm-transport">
+          <button aria-label="Previous track" onClick={() => onCmd("previous")}>
+            <PrevIcon size={16} />
+          </button>
+          <button className="primary" aria-label={track.playing ? "Pause" : "Play"} onClick={() => onCmd("play-pause")}>
+            {track.playing ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
+          </button>
+          <button aria-label="Next track" onClick={() => onCmd("next")}>
+            <NextIcon size={16} />
+          </button>
         </span>
       </div>
       <div
@@ -98,18 +105,8 @@ function LocalPlayer({
       </div>
       <div className="music-times">
         <span>{fmtClock(pos)}</span>
+        {!!track.player && <span>via {track.player}</span>}
         <span>{fmtClock(track.len)}</span>
-      </div>
-      <div className="btn-row music-transport">
-        <button aria-label="Previous track" onClick={() => onCmd("previous")}>
-          <PrevIcon size={18} />
-        </button>
-        <button className="primary" aria-label={track.playing ? "Pause" : "Play"} onClick={() => onCmd("play-pause")}>
-          {track.playing ? <PauseIcon size={18} /> : <PlayIcon size={18} />}
-        </button>
-        <button aria-label="Next track" onClick={() => onCmd("next")}>
-          <NextIcon size={18} />
-        </button>
       </div>
       {upNext.length > 0 && (
         <div className="yt-upnext">
@@ -274,6 +271,24 @@ export function DailyView() {
               {!!work.activity && <span>{work.activity}</span>}
             </div>
             {!!work.current && <div className="work-ask">“{work.current}”</div>}
+            {work.steps.length > 0 && (
+              <div className="work-steps">
+                {work.steps.map((s, i) => (
+                  <div key={i} className={`work-step ${s.status}`}>
+                    {s.status === "active" ? (
+                      <i className="live-dot" />
+                    ) : s.status === "error" ? (
+                      <b className="tick">✕</b>
+                    ) : s.status === "pending" ? (
+                      <i className="dead-dot" />
+                    ) : (
+                      <b className="tick">✓</b>
+                    )}
+                    <span>{s.label}</span>
+                  </div>
+                ))}
+              </div>
+            )}
             <div className="music-seek" aria-label={`${work.pct}% done`}>
               <i className="music-fill" style={{ width: `${work.pct}%` }} />
             </div>

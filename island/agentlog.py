@@ -292,11 +292,73 @@ def work_today(evs=None, now=None):
                 'done': done, 'left': left,
                 'pct': round(done * 100 / asks) if asks else 0,
                 'files': sorted(files)[:8], 'added': added,
-                'removed': removed}
+                'removed': removed,
+                'steps': session_steps(evs, day)}
     except Exception:
         return {'state': 'idle', 'activity': '', 'current': '',
                 'asks': 0, 'done': 0, 'left': 0, 'pct': 0,
-                'files': [], 'added': 0, 'removed': 0}
+                'files': [], 'added': 0, 'removed': 0, 'steps': []}
+
+
+def session_steps(evs, day, limit=6):
+    """Step-by-step checklist for the newest session today, oldest first.
+
+    PreToolUse opens a pending step, PostToolUse closes it (done/error),
+    Stop appends Done. The trailing pending step (if any) reads active.
+    Never throws."""
+    try:
+        sess = ''
+        for e in reversed(evs or []):
+            try:
+                if e.get('session'):
+                    sess = e['session']
+                    break
+            except AttributeError:
+                continue
+        if not sess:
+            return []
+        steps = []
+        for e in evs:
+            try:
+                ts = e.get('ts') or 0
+            except AttributeError:
+                continue
+            if e.get('session') != sess or not ts:
+                continue
+            try:
+                same_day = time.strftime('%Y-%m-%d',
+                                         time.localtime(ts)) == day
+            except (TypeError, ValueError):
+                continue
+            if not same_day:
+                continue
+            ev = e.get('event') or ''
+            if ev == 'UserPromptSubmit' and e.get('text'):
+                first = str(e['text']).strip().splitlines()
+                steps.append({'label': (first[0] if first else '')[:60],
+                              'status': 'done'})
+            elif ev == 'PreToolUse':
+                tool = e.get('tool') or 'tool'
+                f = os.path.basename(e.get('file') or '')
+                steps.append({'label': ('%s %s' % (tool, f)).strip()[:60],
+                              'status': 'pending'})
+            elif ev == 'PostToolUse':
+                ok = e.get('ok', True)
+                for s in reversed(steps):
+                    if s['status'] == 'pending':
+                        s['status'] = 'done' if ok else 'error'
+                        break
+            elif ev == 'Stop':
+                steps.append({'label': 'Done',
+                              'status': 'done' if e.get('ok', True)
+                              else 'error'})
+        for s in reversed(steps):
+            if s['status'] == 'pending':
+                s['status'] = 'active'
+                break
+        return steps[-limit:]
+    except Exception:
+        return []
 
 
 def transcript(evs):

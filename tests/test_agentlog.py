@@ -187,6 +187,29 @@ class LedgerTest(unittest.TestCase):
         self.assertEqual(agentlog.work_today(blob, now=now)["current"],
                          "Now working")
 
+    def test_session_steps_checklist(self):
+        import time
+        now = time.time()
+        evs = [
+            {"event": "UserPromptSubmit", "text": "fix grid", "ts": now - 50,
+             "session": "s", "tool": "", "file": "", "added": 0,
+             "removed": 0, "ok": True},
+            {"event": "PreToolUse", "tool": "read", "file": "/x/a.py",
+             "ts": now - 40, "session": "s", "added": 0, "removed": 0,
+             "ok": True},
+            {"event": "PostToolUse", "tool": "read", "file": "/x/a.py",
+             "ts": now - 39, "session": "s", "added": 0, "removed": 0,
+             "ok": True},
+            {"event": "PreToolUse", "tool": "edit", "file": "/x/a.py",
+             "ts": now - 10, "session": "s", "added": 0, "removed": 0,
+             "ok": True},
+        ]
+        steps = agentlog.work_today(evs, now=now)["steps"]
+        self.assertEqual([(s["label"], s["status"]) for s in steps],
+                         [("fix grid", "done"), ("read a.py", "done"),
+                          ("edit a.py", "active")])
+        self.assertEqual(agentlog.work_today([], now=now)["steps"], [])
+
     def test_transcript_roles(self):
         s = agentlog.normalize({"hook_event_name": "UserPromptSubmit",
                                 "prompt": "do it", "session_id": "s"})

@@ -60,6 +60,23 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .work-line b{text-transform:capitalize}
 .work-line span{opacity:.6;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .work-ask{font-size:.82rem;opacity:.85;border-left:2px solid var(--brand);padding-left:.55rem}
+/* work steps checklist (korus-style): done ✓, active pulse, error ✕ */
+.work-steps{display:flex;flex-direction:column;gap:.22rem;margin:.1rem 0}
+.work-step{display:flex;align-items:center;gap:.5rem;font-size:.78rem}
+.work-step span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.work-step.done{color:var(--text-dim)}
+.work-step.done .tick{color:var(--success);font-weight:700}
+.work-step.error .tick{color:var(--danger);font-weight:700}
+.work-step .tick{width:12px;flex:none;text-align:center}
+/* YT-Music compact player: 48px thumb + meta + inline transport */
+.ytm-row{display:flex;align-items:center;gap:.6rem;margin:.2rem 0 .1rem}
+.ytm-thumb{width:48px;height:48px;border-radius:12px;object-fit:cover;flex:none;background:#000}
+.ytm-thumb.empty{display:flex;align-items:center;justify-content:center;color:var(--text-dim);border:1px solid var(--border)}
+.ytm-meta{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.ytm-meta b{font-size:.85rem;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ytm-meta em{font-style:normal;font-size:.72rem;color:var(--text-dim);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ytm-transport{display:flex;align-items:center;gap:.15rem;flex:none}
+.ytm-transport button{padding:.35rem .45rem}
 button{background:var(--surface-2);color:var(--text);border:1px solid var(--border);border-radius:8px;padding:.45rem .8rem;font-size:.82rem;cursor:pointer}
 button.primary{background:var(--brand);border-color:var(--brand);box-shadow:none}
 button.danger{background:transparent;border:1px solid var(--danger);color:var(--danger)}
@@ -443,8 +460,13 @@ button.hpill:hover{border-color:var(--brand)}
 /* live strip (Atoll live activities): mic / drops / battery, only while live */
 .live-strip{display:flex;flex-direction:column;gap:.25rem;padding:.35rem .1rem}
 .live-row{display:inline-flex;align-items:center;gap:.4rem;font-size:var(--size-floor);color:var(--text-dim)}
-/* queue suggestion (not an alert): dim hint + dismiss, no pulsing dot */
-.queue-tip{display:inline-flex;align-items:center;gap:.4rem;font-size:var(--size-floor);color:var(--text-mute)}
+/* mascot note (coucou-style tell-you card): buddy face + 2 lines + dismiss */
+.mascot-note{display:flex;align-items:center;gap:.6rem;background:var(--surface-2);border:1px solid var(--border);border-radius:14px;padding:.5rem .6rem}
+.mascot-note-face{flex:none;display:flex}
+.mascot-note-face svg{width:40px;height:40px;display:block}
+.mascot-note-text{flex:1;min-width:0;display:flex;flex-direction:column;line-height:1.3}
+.mascot-note-text b{font-size:.8rem}
+.mascot-note-text em{font-style:normal;font-size:.72rem;color:var(--text-dim)}
 /* grouped menu card (pin-board settings pattern): header + hairline rows */
 .menu-card{display:flex;flex-direction:column;background:var(--surface-2);border:1px solid var(--border);border-radius:20px;overflow:hidden}
 /* soft groups: gentler edges + quieter dividers than the old tiles */
