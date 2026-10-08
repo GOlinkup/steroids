@@ -8,6 +8,7 @@ export type IslandView =
   | "chat"
   | "daily"
   | "lens"
+  | "shelf"
   | "settings"
   | "finished";
 
@@ -116,6 +117,9 @@ export const HARNESS_PILLS: Pill[] = [
   { id: "opencode", label: "opencode", color: "#3d3e45", badge: "idle" },
   { id: "claude", label: "claude", color: "#3d3e45", badge: "idle" },
   { id: "codex", label: "codex", color: "#3d3e45", badge: "idle" },
+  { id: "gemini", label: "gemini", color: "#3d3e45", badge: "idle" },
+  { id: "qwen", label: "qwen", color: "#3d3e45", badge: "idle" },
+  { id: "kimi", label: "kimi", color: "#3d3e45", badge: "idle" },
   { id: "ollama", label: "ollama", color: "#3d3e45", badge: "idle" },
 ];
 

@@ -1,9 +1,10 @@
 import { useState } from "react";
 import type { AgentSession, Approval, ChatSession, IslandView, Question } from "../store";
+import type { SettingsPage } from "./Cards";
 import {
-  CardIcon, ChatIcon, ExploreIcon, GearIcon, HelpIcon, HistoryIcon, HomeIcon, LensIcon, LogoutIcon, PersonIcon, PlusIcon, TrashIcon, BellIcon,
+  BellIcon, ChatIcon, ExploreIcon, GearIcon, HistoryIcon, HomeIcon, LensIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ShelfIcon, TrashIcon,
 } from "./icons";
-import { useDismiss } from "./pickers";
+import { useDismiss, MenuRow } from "./pickers";
 
 import type { ComponentType } from "react";
 
@@ -17,6 +18,7 @@ const TABS: Array<{ view: IslandView; title: string; Icon: ComponentType<IconPro
   { view: "daily", title: "Daily", Icon: HomeIcon },
   { view: "explore", title: "Explore", Icon: ExploreIcon },
   { view: "lens", title: "Lens", Icon: LensIcon },
+  { view: "shelf", title: "Shelf", Icon: ShelfIcon },
 ];
 
 // "3m" / "2h" / "5d" — iOS recents style right-aligned meta.
@@ -71,27 +73,30 @@ function HeaderIconButton({
   );
 }
 
-// Avatar menu — the ref's left card: rows only, no header block. Profile
-// scrolls to the identity card, Settings lands on the switches (same page,
-// different ends — see avatarNav). Subscription + Help render disabled
-// honest-soon: the look without a lie.
+// Avatar menu — the profile dropdown owns settings navigation: Profile
+// lands on the account page, Settings on preferences, Phone link on the
+// phone page (same settings view, dropdown picks the page — no in-card
+// tabs). Subscription + Help render disabled honest-soon.
 function AvatarMenu({
   email = null,
   avatarUrl = null,
   view,
+  settingsPage = "general",
   onAvatarNav = () => {},
   onSignOut = () => {},
 }: {
   email?: string | null;
   avatarUrl?: string | null;
   view: IslandView;
-  onAvatarNav?: (page: "profile" | "explore" | "settings" | "account") => void;
+  settingsPage?: SettingsPage;
+  onAvatarNav?: (page: "profile" | "explore" | "settings" | "account" | "phone") => void;
   onSignOut?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [imgDead, setImgDead] = useState(false);
   const dismiss = useDismiss<HTMLDivElement>(open, () => setOpen(false));
-  const go = (page: "profile" | "explore" | "settings" | "account") => { setOpen(false); onAvatarNav(page); };
+  const go = (page: "profile" | "explore" | "settings" | "account" | "phone") => { setOpen(false); onAvatarNav(page); };
+  const onSettings = view === "settings";
   const initial = (email ?? "").trim().charAt(0).toUpperCase() || "?";
   const face = email && avatarUrl && !imgDead ? (
     <img className="avatar-photo" src={avatarUrl} alt="" onError={() => setImgDead(true)} />
@@ -112,30 +117,27 @@ function AvatarMenu({
       </button>
       {open && (
         <div className="sheet avatar-menu" role="menu" aria-label="Account">
-          <button role="menuitem" className={view === "settings" ? "am-row on" : "am-row"} onClick={() => go("profile")}>
+          <MenuRow role="menuitem" active={onSettings && settingsPage === "general"} onClick={() => go("profile")}>
             <PersonIcon size={16} /> Profile
-          </button>
-          <button role="menuitem" className={view === "explore" ? "am-row on" : "am-row"} onClick={() => go("explore")}>
+          </MenuRow>
+          <MenuRow role="menuitem" active={view === "explore"} onClick={() => go("explore")}>
             <ExploreIcon size={16} /> Community
-          </button>
-          <button role="menuitem" className="am-row" disabled title="Subscriptions aren't here yet">
-            <CardIcon size={16} /> Subscription <span className="pro-badge" aria-hidden>⚡PRO</span>
-          </button>
-          <button role="menuitem" className={view === "settings" ? "am-row on" : "am-row"} onClick={() => go("settings")}>
+          </MenuRow>
+          <MenuRow role="menuitem" active={onSettings && settingsPage === "general"} onClick={() => go("settings")}>
             <GearIcon size={16} /> Settings
-          </button>
+          </MenuRow>
+          <MenuRow role="menuitem" active={onSettings && settingsPage === "phone"} onClick={() => go("phone")}>
+            <PhoneIcon size={16} /> Phone link
+          </MenuRow>
           <div className="am-sep" aria-hidden />
-          <button role="menuitem" className="am-row" disabled title="Help center isn't here yet">
-            <HelpIcon size={16} /> Help center
-          </button>
           {email ? (
-            <button role="menuitem" className="am-row danger" onClick={() => { setOpen(false); onSignOut(); }}>
+            <MenuRow role="menuitem" danger onClick={() => { setOpen(false); onSignOut(); }}>
               <LogoutIcon size={16} /> Sign out
-            </button>
+            </MenuRow>
           ) : (
-            <button role="menuitem" className="am-row" onClick={() => go("account")}>
+            <MenuRow role="menuitem" onClick={() => go("account")}>
               <PersonIcon size={16} /> Sign in
-            </button>
+            </MenuRow>
           )}
         </div>
       )}
@@ -164,6 +166,8 @@ export function Header({
   onSignOut = () => {},
   approval = null,
   question = null,
+  hiddenViews = [],
+  settingsPage = "general",
 }: {
   view: IslandView;
   unread: number;
@@ -179,12 +183,15 @@ export function Header({
   onDeleteAgent?: (sid: string) => void;
   email?: string | null;
   avatarUrl?: string | null;
-  onAvatarNav?: (page: "profile" | "explore" | "settings" | "account") => void;
+  onAvatarNav?: (page: "profile" | "explore" | "settings" | "account" | "phone") => void;
   onSignOut?: () => void;
   approval?: Approval | null;
   question?: Question | null;
+  hiddenViews?: IslandView[];
+  settingsPage?: SettingsPage;
 }) {
-  const tabs = TABS.map((t) => ({
+  // Atoll rule: disabled features render no tab. Toggles live in settings.
+  const tabs = TABS.filter((t) => !hiddenViews.includes(t.view)).map((t) => ({
     v: t.view,
     title: t.title,
     Icon: t.Icon,
@@ -228,7 +235,7 @@ export function Header({
         >
           <BellIcon bold={notifOpen} size={22} />
         </HeaderIconButton>
-        <AvatarMenu email={email} avatarUrl={avatarUrl} view={view} onAvatarNav={onAvatarNav} onSignOut={onSignOut} />
+        <AvatarMenu email={email} avatarUrl={avatarUrl} view={view} settingsPage={settingsPage} onAvatarNav={onAvatarNav} onSignOut={onSignOut} />
       </div>
       {notifOpen && (
         <div className="hist-panel" role="dialog" aria-label="Notifications">

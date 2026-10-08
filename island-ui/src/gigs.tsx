@@ -13,7 +13,7 @@ export function GigList(props: {
     return (
       <div className="card">
         <div className="card-title">Gigs you can land today</div>
-        <div className="card-detail">No gigs right now — check back soon.</div>
+        <div className="card-detail">No gigs right now — native jobs table is empty and the Remotive seed didn&apos;t land. Check the bridge /gigs, or seed the jobs table.</div>
       </div>
     );
   }

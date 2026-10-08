@@ -15,6 +15,10 @@ export class IslandFSM {
   state: IslandState = "hidden";
   onTransition: ((from: IslandState, to: IslandState) => void) | null = null;
   pinned = false;
+  /** ping-island parity: drag-out buddy keeps a floating capsule. */
+  detached = false;
+  private hoverDwell: ReturnType<typeof setTimeout> | null = null;
+  /** Hover must dwell 240ms before flex (kills incidental passes). */
 
   private jackedToFlexDelay: number;
   private flexToHiddenDelay: number;
@@ -35,7 +39,15 @@ export class IslandFSM {
 
   mouseEntered() {
     switch (this.state) {
-      case "hidden": this.cancelTimers(); this.go("flex"); break;
+      case "hidden":
+        // dwell-gated: only expand after 240ms hover (ping-island 0.24s)
+        if (this.hoverDwell == null) {
+          this.hoverDwell = setTimeout(() => {
+            this.hoverDwell = null;
+            if (this.state === "hidden") { this.cancelTimers(); this.go("flex"); }
+          }, 240);
+        }
+        break;
       case "flex": this.clearFlex(); break;
       case "jacked": this.clearJacked(); break;
       case "pump": this.greet(this.greetHoverCollapseDelay); break;
@@ -43,6 +55,7 @@ export class IslandFSM {
   }
 
   mouseLeft() {
+    if (this.hoverDwell != null) { clearTimeout(this.hoverDwell); this.hoverDwell = null; }
     switch (this.state) {
       case "flex": this.hide(this.flexToHiddenDelay); break;
       case "jacked": this.collapse(this.jackedToFlexDelay); break;
@@ -108,7 +121,10 @@ export class IslandFSM {
   private clearJacked() { if (this.jackedCollapse != null) clearTimeout(this.jackedCollapse); this.jackedCollapse = null; }
   private clearGreet() { if (this.greetCollapse != null) clearTimeout(this.greetCollapse); this.greetCollapse = null; }
 
-  cancelTimers() { this.clearFlex(); this.clearJacked(); this.clearGreet(); }
+  cancelTimers() { this.clearFlex(); this.clearJacked(); this.clearGreet(); if (this.hoverDwell != null) { clearTimeout(this.hoverDwell); this.hoverDwell = null; } }
+
+  detach() { this.cancelTimers(); this.detached = true; this.go("flex"); }
+  redock() { this.detached = false; this.go("hidden"); }
 
   private go(next: IslandState) {
     if (next === this.state) return;

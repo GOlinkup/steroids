@@ -8,9 +8,10 @@ import {
   type AgentSession, type Approval, type Attachment, type ChatMessage, type ChatSession, type ExploreFeed, type IslandView, type Pill, type Question, type SkillHit,
 } from "./store";
 import type { Shot } from "./components/LensView";
-import { PairPanel, isPcSide, type LinkRequest, type SettingsState } from "./components/Cards";
+import { PairPanel, ShelfView, isPcSide, type LinkRequest, type SettingsState, type ShelfItem } from "./components/Cards";
 import { AccountPanel } from "./components/Account";
-import type { CloudRow } from "./sync";
+import type { SettingsPage } from "./components/Cards";
+import type { CloudRow, DisplayName } from "./sync";
 // ponytail: supabase rides a lazy chunk — the ONLY heavy dep left in the
 // main bundle. Every cloud call below goes through loadSync(), so boot
 // stays lean and the chunk loads on first login/sync tap, never at startup.
@@ -59,6 +60,7 @@ const APP_MODE =
 export default function App() {
   const [fsmState, setFsmState] = useState<IslandState>("hidden");
   const [view, setView] = useState<IslandView>("chat");
+  const [settingsPage, setSettingsPage] = useState<SettingsPage>("general");
   const [hint, setHint] = useState(ROUTE_SAMPLES[0]);
   const [, setPills] = useState<Pill[]>(HARNESS_PILLS);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
@@ -69,6 +71,41 @@ export default function App() {
   const [liveTurn, setLiveTurn] = useState<{ activity: string; partial: string } | null>(null);
   const [turnEngine, setTurnEngine] = useState("");
   const [caps, setCaps] = useState({ opencode: true, claude: true });
+  // One-click agent install: POST /install, then poll /health until the
+  // CLI appears (detection is per-call, no bridge restart). 3min cap,
+  // then the card falls back to the manual command.
+  const [installState, setInstallState] = useState<"idle" | "working" | "error">("idle");
+  const handleInstall = () => {
+    setInstallState("working");
+    void fetch(`${BRIDGE}/install`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ provider: "opencode" }),
+    }).catch(() => setInstallState("error"));
+    const t0 = Date.now();
+    const timer = setInterval(() => {
+      fetch(`${BRIDGE}/health`)
+        .then((r) => r.json())
+        .then((j) => {
+          const c = { opencode: !!j.opencode, claude: !!j.claude };
+          setCaps(c);
+          if (c.opencode || c.claude) {
+            clearInterval(timer);
+            setInstallState("idle");
+            say("agent installed ✓");
+          } else if (Date.now() - t0 > 180000) {
+            clearInterval(timer);
+            setInstallState("error");
+          }
+        })
+        .catch(() => {
+          if (Date.now() - t0 > 180000) {
+            clearInterval(timer);
+            setInstallState("error");
+          }
+        });
+    }, 2000);
+  };
   const [ocSession, setOcSession] = useState<string | null>(null);
   const [agentSessions, setAgentSessions] = useState<AgentSession[]>([]);
   const [exploreFeed, setExploreFeed] = useState<ExploreFeed | null>(null);
@@ -79,7 +116,6 @@ export default function App() {
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [unread, setUnread] = useState(0);
   const [phoneLinked, setPhoneLinked] = useState(false);
-  const [queuedDrops, setQueuedDrops] = useState(0);
   const relayRef = useRef<RelayClient | null>(null);
   const outboxRef = useRef<OutboxStore | null>(null);
   if (!outboxRef.current) outboxRef.current = new OutboxStore();
@@ -110,6 +146,9 @@ export default function App() {
       activePills: ["steroids", "opencode", "claude"],
       autoClose: 15,
       autoSave: true,
+      hoverOpen: true,
+      hoverDelay: 0.3,
+      hiddenViews: [],
     };
     try {
       const raw = localStorage.getItem(SETTINGS_KEY);
@@ -121,7 +160,31 @@ export default function App() {
   });
   const settingsRef = useRef(settings);
   settingsRef.current = settings;
+  // Atoll hover rule: hover opens only when hoverOpen is on, after the
+  // hoverDelay dwell; click-only mode opens on tap instead (same reveal).
   const ocSessionRef = useRef<string | null>(null);
+  const hoverTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const hoverEntered = () => {
+    if (hoverTimer.current) clearTimeout(hoverTimer.current);
+    if (!settingsRef.current.hoverOpen) return;
+    hoverTimer.current = setTimeout(
+      () => fsm.mouseEntered(),
+      Math.max(0, settingsRef.current.hoverDelay) * 1000,
+    );
+  };
+  const hoverLeft = () => {
+    if (hoverTimer.current) {
+      clearTimeout(hoverTimer.current);
+      hoverTimer.current = null;
+    }
+    fsm.mouseLeft();
+  };
+  const islandClicked = () => {
+    if (fsm.state === "hidden" && !settingsRef.current.hoverOpen) {
+      fsm.reveal();
+      say("island opened on tap (hover-open off)");
+    }
+  };
   ocSessionRef.current = ocSession;
   // auto's choice sticks here: continuing a chat reuses its engine.
   const ocProvider = useRef<string | null>(null);
@@ -131,6 +194,7 @@ export default function App() {
   // everything still works logged out.
   const [account, setAccount] = useState<string | null>(null);
   const [avatarUrl, setAvatarUrl] = useState<string | null>(null);
+  const [displayName, setDisplayName] = useState<DisplayName | null>(null);
   const [syncMsg, setSyncMsg] = useState("");
   const [syncBusy, setSyncBusy] = useState(false);
 
@@ -157,6 +221,8 @@ export default function App() {
     Sound.pop();
     if (v === "chat") setUnread(0);
     setView(v);
+    // Atoll shelf rule: auto-close suppressed while the shelf is open.
+    fsm.setPinned(v === "shelf");
     fsm.forceJacked();
   };
   const [log, setLog] = useState<string[]>(["island preview ready — state: hidden"]);
@@ -165,6 +231,7 @@ export default function App() {
   const mascotRef = useRef<MascotHandle>(null);
   const islandRef = useRef<HTMLDivElement>(null);
   const sampleIdx = useRef(0);
+  const hintTimer = useRef(0);
   if (!fsmRef.current) {
     const fsm = new IslandFSM();
     fsm.onTransition = (from, to) => {
@@ -184,7 +251,7 @@ export default function App() {
     const q = new URLSearchParams(window.location.search);
     const v = q.get("view");
     const s = q.get("state");
-    if (v === "explore" || v === "approval" || v === "question" || v === "chat" || v === "daily" || v === "lens" || v === "settings" || v === "finished") setView(v);
+    if (v === "explore" || v === "approval" || v === "question" || v === "chat" || v === "daily" || v === "lens" || v === "shelf" || v === "settings" || v === "finished") setView(v);
     if (s === "jacked") fsm.forceJacked();
     else if (s === "flex") fsm.forceFlex();
     else if (s === "hidden") fsm.forceHidden();
@@ -227,10 +294,12 @@ export default function App() {
       .then((j) => {
         if (dead) return;
         setCaps({ opencode: !!j.opencode, claude: !!j.claude });
-        if (j.opencode || j.claude) {
-          setBridgeOn(true);
-          say("nicki bridge live — real opencode chat");
-        }
+        // Bridge alive = bridge on, even with zero CLIs — that's exactly
+        // when the chat setup card (one-click install) must appear.
+        setBridgeOn(true);
+        say(j.opencode || j.claude
+          ? "nicki bridge live — real opencode chat"
+          : "nicki bridge live — no agent installed");
       })
       .catch(() => {});
     fetch(`${BRIDGE}/sessions`)
@@ -325,8 +394,8 @@ export default function App() {
     syncTimer.current = setTimeout(() => {
       void loadSync()
         .then((s) => s.pushChats(sessions))
-        .then((n) => setSyncMsg(`synced ${n} chats ✓`))
-        .catch((e) => setSyncMsg(`sync failed: ${e instanceof Error ? e.message : e}`));
+        .then((n) => setSyncMsg(n > 0 ? `Last synced ${n} chat${n === 1 ? "" : "s"}` : "Nothing to sync yet"))
+        .catch((e) => setSyncMsg(e instanceof Error ? e.message : e));
     }, 2500);
     return () => {
       if (syncTimer.current) clearTimeout(syncTimer.current);
@@ -341,31 +410,42 @@ export default function App() {
   useEffect(() => {
     void loadSync()
       .then((s) => s.accountEmail())
-      .then((e) => {
+      .then((e) => loadSync().then((s) => ({ s, e })))
+      .then(({ s, e }) => {
         if (e) {
           setAccount(e);
           say(`signed in as ${e}`);
+          s.ensureSyncKey();
+          setHasKey(true);
         }
-        return loadSync();
+        return s.profileIdentity().then((id) => ({ s, id }));
       })
-      .then((s) => s.profileIdentity().then((id) => ({ s, id })))
       .then(({ s, id }) => {
         if (id.avatar) setAvatarUrl((prev) => prev ?? id.avatar);
-        if (id.avatar) return;
+        if (id.avatar) return null;
         return s.sessionAvatar().then((m) => {
           if (m) setAvatarUrl((prev) => prev ?? m);
+          return null;
         });
+      })
+      .then(() => loadSync().then((s) => s.displayName()))
+      .then((d) => {
+        if (d) {
+          setDisplayName(d);
+          say(`welcome back, ${d.first}`);
+        }
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  const mergeCloud = (rows: CloudRow[]) => {
+  const mergeCloud = (rows: CloudRow[], skipped = 0) => {
     // Deleted chats stay deleted: tombstoned ids never merge back, even
     // when the row still exists server-side (older device re-pushed it).
     const dead = new Set(tombstones());
     const live = rows.filter((r) => !dead.has(r.chat_id));
+    const locked = skipped > 0 ? ` · ${skipped} need the sync code` : "";
     if (!live.length) {
-      setSyncMsg("nothing new in the cloud");
+      setSyncMsg(skipped > 0 ? `Nothing readable yet — ${skipped} need the sync code` : "Nothing to sync yet");
       return;
     }
     setSessions((cur) => {
@@ -395,7 +475,7 @@ export default function App() {
       }
       return out.slice(0, 20);
     });
-    setSyncMsg(`pulled ${rows.length} chats ✓`);
+    setSyncMsg(`Last synced ${live.length} chat${live.length === 1 ? "" : "s"}${locked}`);
   };
 
   const handleGoogle = () => {
@@ -427,9 +507,32 @@ export default function App() {
       .then((e) => {
         setAccount(e);
         say(`signed in as ${e}`);
-        return loadSync().then((s) => s.pullChats());
+        return loadSync().then((s) => {
+          s.ensureSyncKey();
+          setHasKey(true);
+          return s.displayName().then((d) => ({ s, d }));
+        });
       })
-      .then(mergeCloud)
+      .then(({ s, d }) => {
+        if (d) {
+          setDisplayName(d);
+          say(`welcome back, ${d.first}`);
+        }
+        return s.pullChats();
+      })
+      .then(({ rows, skipped }) => mergeCloud(rows, skipped))
+      .catch((e) => setSyncMsg(e instanceof Error ? e.message : String(e)))
+      .finally(() => setSyncBusy(false));
+  };
+  const handleSaveName = (first: string, last: string) => {
+    setSyncBusy(true);
+    setSyncMsg("");
+    void loadSync()
+      .then((s) => s.saveDisplayName(first, last))
+      .then((d) => {
+        setDisplayName(d);
+        setSyncMsg(`welcome, ${d.first} ✓`);
+      })
       .catch((e) => setSyncMsg(e instanceof Error ? e.message : String(e)))
       .finally(() => setSyncBusy(false));
   };
@@ -439,17 +542,30 @@ export default function App() {
       .finally(() => {
         setAccount(null);
         setAvatarUrl(null);
+        setDisplayName(null);
         setSyncMsg("");
         say("signed out");
       });
   };
-  const handleSyncNow = () => {
-    if (!account) return;
+  // Sync key: minted on login, pasted on the second device. The card
+  // owns the UI (show/enter); here owns the state. Key stays on-device
+  // through sign-out — it's the device's secret, not the session's.
+  const [hasKey, setHasKey] = useState(false);
+  const [shownCode, setShownCode] = useState<string | null>(null);
+  const handleRevealCode = () => {
+    void loadSync().then((s) => setShownCode(s.ensureSyncKey()));
+  };
+  const handleSaveCode = (code: string) => {
     setSyncBusy(true);
+    setSyncMsg("");
     void loadSync()
-      .then((s) => s.pullChats())
-      .then(mergeCloud)
-      .then(() => loadSync().then((s) => s.pushChats(sessions)))
+      .then((s) => {
+        s.setSyncKey(code);
+        setHasKey(true);
+        setShownCode(null);
+        return s.pullChats();
+      })
+      .then(({ rows, skipped }) => mergeCloud(rows, skipped))
       .catch((e) => setSyncMsg(e instanceof Error ? e.message : String(e)))
       .finally(() => setSyncBusy(false));
   };
@@ -459,7 +575,6 @@ export default function App() {
   useEffect(() => {
     const relay = relayRef.current!;
     const outbox = outboxRef.current!;
-    setQueuedDrops(outbox.pending().length);
     const offStatus = relay.onStatus((s) => {
       setPhoneLinked(s === "connected");
       if (s === "connected") {
@@ -474,7 +589,7 @@ export default function App() {
             body: JSON.stringify({ key: localStorage.getItem("relay_key") ?? "", frame }),
           }).catch(() => null);
           return !!res?.ok || relay.send(String(frame.type ?? "file"), frame);
-        }).then(() => setQueuedDrops(outbox.pending().length));
+        });
       }
     });
     const offMsg = relay.onMessage((f) => {
@@ -635,7 +750,8 @@ export default function App() {
     const h = ROUTE_SAMPLES[sampleIdx.current];
     setHint(h);
     setPills((p) => p.map((x) => (x.id === "router" ? { ...x, badge: "routed" } : x)));
-    mascotRef.current?.celebrate();
+    // ponytail: let the tap face read for a beat before the wave lands.
+    window.setTimeout(() => mascotRef.current?.celebrate(), 900);
     say(`route: ${h}`);
   };
 
@@ -868,6 +984,16 @@ export default function App() {
         (caps.opencode ? "opencode" : "claude");
       say(`auto → ${eng}`);
     }
+    // mid-task provider switch: session ids are provider-scoped (opencode
+    // --session vs claude --resume), so switching forks a fresh session and
+    // keeps the old one in history instead of erroring on a foreign id.
+    let sid = ocSession;
+    if (provider !== "auto" && ocProvider.current && provider !== ocProvider.current && ocSessionRef.current) {
+      sid = null;
+      setOcSession(null);
+      ocSessionRef.current = null;
+      say(`switched ${ocProvider.current} → ${provider} · fresh session (providers can't share one)`);
+    }
     // files alone are a complete turn: caption them so the bridge (which
     // refuses empty messages) and the agent both get something to chew on.
     const caption = text.trim() || (files.length ? "Look at the attached files and tell me what you see." : "");
@@ -876,7 +1002,7 @@ export default function App() {
     relayChat("user", caption, files);
     mascotRef.current?.celebrate();
     setThinking(true);
-    void sendWithFiles(caption, files, eng, opts, handles);
+    void sendWithFiles(caption, files, eng, opts, handles, sid);
   };
 
   // uploads attachments so the agent can actually open them: @paths ride
@@ -887,6 +1013,7 @@ export default function App() {
     provider: string,
     opts: { model: string; effort: string } | undefined,
     handles: Map<number, File>,
+    sid: string | null = ocSession,
   ) => {
     let msg = caption;
     const failed: string[] = [];
@@ -940,13 +1067,14 @@ export default function App() {
       const warn = `${failed.join(", ")} couldn't upload — sent names only, the agent can't open them. Try again or paste the content as text.`;
       setMessages((m) => [...m, { id: msgId++, role: "assistant", content: warn }]);
     }
-    postChat(msg, provider, opts);
+    postChat(msg, provider, opts, sid);
   };
 
   const postChat = (
     text: string,
     provider = "opencode",
     opts?: { model: string; effort: string },
+    sid: string | null = ocSession,
   ) => {
     const ctl = new AbortController();
     const label = `${provider}${opts?.model && opts.model !== "router-pick" ? `/${opts.model}` : ""}`;
@@ -964,7 +1092,7 @@ export default function App() {
     fetch(`${BRIDGE}/chat`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ message: text, session_id: ocSession, provider, model: opts?.model, effort: opts?.effort }),
+      body: JSON.stringify({ message: text, session_id: sid, provider, model: opts?.model, effort: opts?.effort }),
       signal: ctl.signal,
     })
       .then((r) => r.json())
@@ -1213,12 +1341,21 @@ export default function App() {
         continue;
       }
     }
-    setQueuedDrops(outbox.pending().length);
     const s = (n: number) => (n === 1 ? "" : "s");
     if (sent && !queued) pushBot(`Sent ${sent} file${s(sent)} to phone ✓ — same session continues there.`);
     else if (queued && !sent) pushBot(`${queued} file${s(queued)} queued — pair the phone in Settings and they fire on link.`);
     else if (queued) pushBot(`Sent ${sent}, queued ${queued} — pairing fires the rest.`);
     if (cards) pushBot(`Note: ${cards} file${s(cards)} travelled as name card${s(cards)} (offline or unreadable) — bytes need a live link.`);
+    // The buddy says it once as a pill-hint suggestion, then it fades —
+    // no card, no nag. Outbox still auto-fires on link either way.
+    if (queued > 0 && !phoneLinked) {
+      mascotRef.current?.celebrate();
+      setHint(queued === 1
+        ? "1 file waiting — pair your phone, it sends on link"
+        : `${queued} files waiting — pair your phone, they send on link`);
+      window.clearTimeout(hintTimer.current);
+      hintTimer.current = window.setTimeout(() => setHint(ROUTE_SAMPLES[sampleIdx.current]), 6000);
+    }
     say(`drop → phone: ${sent} live, ${queued} queued`);
   };
 
@@ -1281,6 +1418,27 @@ export default function App() {
   const removeAttachment = (id: number) => {
     fileHandles.current.delete(id);
     setAttachments((a) => a.filter((x) => x.id !== id));
+  };
+
+  // Shelf (Atoll tray tab): staged files waiting to attach or beam.
+  // Session-only — object URLs die on reload, so staged files do too.
+  const [shelf, setShelf] = useState<ShelfItem[]>([]);
+  const stageFiles = (files: File[]) => {
+    const room = Math.max(0, 10 - shelf.length);
+    const fresh = files.slice(0, room).map((file) => ({ file, url: URL.createObjectURL(file) }));
+    if (!fresh.length) {
+      say("shelf full (10) — attach or remove first");
+      return;
+    }
+    setShelf((cur) => [...cur, ...fresh].slice(-10));
+    say(`staged: ${fresh.map((f) => f.file.name).join(", ")}`);
+  };
+  const removeShelf = (url: string) => {
+    setShelf((cur) => {
+      const dead = cur.find((x) => x.url === url);
+      if (dead) URL.revokeObjectURL(dead.url);
+      return cur.filter((x) => x.url !== url);
+    });
   };
 
   const handlePaired = (endpoint: string, key: string) => {
@@ -1359,8 +1517,9 @@ export default function App() {
         onOpenLens={openLens}
         shots={shots}
         zoomShot={zoomShot}
-        onMouseEnter={() => fsm.mouseEntered()}
-        onMouseLeave={() => fsm.mouseLeft()}
+        onMouseEnter={hoverEntered}
+        onMouseLeave={hoverLeft}
+        onIslandClick={islandClicked}
         onMascotTap={handleTap}
         onDecide={(d) => {
           if (d === "Deny") Sound.deny(); else Sound.approve();
@@ -1384,17 +1543,21 @@ export default function App() {
         exploreLive={bridgeOn}
         exploreFeed={exploreFeed}
         onSearchSkills={searchSkills}
+        providers={bridgeOn ? caps : null}
+        installState={installState}
+        onInstall={handleInstall}
         agentSessions={agentSessions}
         onResumeAgentSession={resumeAgentSession}
         onDeleteAgentSession={deleteAgentSession}
         settings={settings}
         onSettings={applySettings}
+        settingsPage={settingsPage}
+        onSettingsPage={setSettingsPage}
         onTab={handleTab}
         unread={unread}
         onDropToPhone={() => void dropToPhone()}
         onDropFilesToPhone={dropFilesToPhone}
         phoneLinked={phoneLinked}
-        queuedDrops={queuedDrops}
         pairNode={
           <PairPanel
             linked={phoneLinked}
@@ -1404,6 +1567,17 @@ export default function App() {
             onUnpair={handleUnpair}
           />
         }
+        shelfNode={
+          <ShelfView
+            items={shelf}
+            onStage={stageFiles}
+            onAttach={(f) => addFiles([f])}
+            onSendToPhone={(f) => dropFilesToPhone([f])}
+            onRemove={removeShelf}
+          />
+        }
+        staged={shelf}
+        onAttachStaged={(f) => addFiles([f])}
         accountEmail={account}
         accountAvatar={avatarUrl}
         onSignOut={handleSignOut}
@@ -1411,13 +1585,20 @@ export default function App() {
           <AccountPanel
             email={account}
             avatarUrl={avatarUrl}
+            displayName={displayName?.full ?? null}
+            firstName={displayName?.first ?? null}
+            lastName={displayName?.last ?? null}
             msg={syncMsg}
             busy={syncBusy}
             onGoogle={handleGoogle}
             onSendCode={handleSendCode}
+            onSaveName={handleSaveName}
             onVerify={handleVerify}
-            onSignOut={handleSignOut}
-            onSyncNow={handleSyncNow}
+            hasKey={hasKey}
+            shownCode={shownCode}
+            onRevealCode={handleRevealCode}
+            onHideCode={() => setShownCode(null)}
+            onSaveCode={handleSaveCode}
           />
         }
       />

@@ -21,6 +21,27 @@ function Svg({ size = 20, bold = false, linear, filled }: P & { linear: React.Re
   );
 }
 
+export function DotsIcon({ size = 16, bold = false }: P) {
+  return (
+    <Svg size={size} bold={bold}
+      linear={
+        <>
+          <circle cx="12" cy="5" r="1.4" stroke="currentColor" strokeWidth="1.5" />
+          <circle cx="12" cy="12" r="1.4" stroke="currentColor" strokeWidth="1.5" />
+          <circle cx="12" cy="19" r="1.4" stroke="currentColor" strokeWidth="1.5" />
+        </>
+      }
+      filled={
+        <>
+          <circle cx="12" cy="5" r="2" fill="currentColor" />
+          <circle cx="12" cy="12" r="2" fill="currentColor" />
+          <circle cx="12" cy="19" r="2" fill="currentColor" />
+        </>
+      }
+    />
+  );
+}
+
 export function HomeIcon({ size = 20, bold = false }: P) {
   return (
     <Svg size={size} bold={bold}
@@ -358,6 +379,90 @@ export function PhoneIcon({ size = 10 }: P) {
   );
 }
 
+// Real Iconsax paths (iconsax-react 0.0.8, MIT) — DirectInbox Linear/Bold.
+// Inbox tray: the shelf tab (Atoll uses tray.fill for the same slot).
+export function ShelfIcon({ size = 20, bold = false }: P) {
+  return (
+    <Svg size={size} bold={bold}
+      linear={
+        <>
+      <path d="M12 2v7l2-2M12 9l-2-2M1.98 13h4.41c.38 0 .72.21.89.55l1.17 2.34A2 2 0 0 0 10.24 17h3.53a2 2 0 0 0 1.79-1.11l1.17-2.34a1 1 0 0 1 .89-.55h4.36" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M7 4.13c-3.54.52-5 2.6-5 6.87v4c0 5 2 7 7 7h6c5 0 7-2 7-7v-4c0-4.27-1.46-6.35-5-6.87" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      }
+      filled={
+        <>
+      <path d="M21.3 12.23h-3.48c-.98 0-1.85.54-2.29 1.42l-.84 1.66c-.2.4-.6.65-1.04.65h-3.28c-.31 0-.75-.07-1.04-.65l-.84-1.65a2.567 2.567 0 0 0-2.29-1.42H2.7c-.39 0-.7.31-.7.7v3.26C2 19.83 4.18 22 7.82 22h8.38c3.43 0 5.54-1.88 5.8-5.22v-3.85c0-.38-.31-.7-.7-.7ZM12.75 2c0-.41-.34-.75-.75-.75s-.75.34-.75.75v2h1.5V2Z" fill="currentColor" />
+      <path d="M22 9.81v1.04a2.06 2.06 0 0 0-.7-.12h-3.48c-1.55 0-2.94.86-3.63 2.24l-.75 1.48h-2.86l-.75-1.47a4.026 4.026 0 0 0-3.63-2.25H2.7c-.24 0-.48.04-.7.12V9.81C2 6.17 4.17 4 7.81 4h3.44v3.19l-.72-.72a.754.754 0 0 0-1.06 0c-.29.29-.29.77 0 1.06l2 2c.01.01.02.01.02.02a.753.753 0 0 0 .51.2c.1 0 .19-.02.28-.06.09-.03.18-.09.25-.16l2-2c.29-.29.29-.77 0-1.06a.754.754 0 0 0-1.06 0l-.72.72V4h3.44C19.83 4 22 6.17 22 9.81Z" fill="currentColor" />
+        </>
+      }
+    />
+  );
+}
+
+// Real Iconsax paths (iconsax-react 0.0.8, MIT) — Music Linear/Bold.
+export function MusicIcon({ size = 20, bold = false }: P) {
+  return (
+    <Svg size={size} bold={bold}
+      linear={
+        <>
+      <path d="M6.28 22a3.12 3.12 0 1 0 0-6.24 3.12 3.12 0 0 0 0 6.24Z" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M20.84 16.8V4.6c0-2.6-1.63-2.96-3.28-2.51l-6.24 1.7C10.18 4.1 9.4 5 9.4 6.3v12.57" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+      <path d="M17.72 19.92a3.12 3.12 0 1 0 0-6.24 3.12 3.12 0 0 0 0 6.24ZM9.4 9.52 20.84 6.4" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
+        </>
+      }
+      filled={
+        <>
+      <path d="M20.89 5.179v11.3c0 1.98-1.61 3.59-3.59 3.59a3.6 3.6 0 0 1-3.59-3.59c0-1.97 1.62-3.58 3.59-3.58.84 0 1.59.29 2.2.77v-5.95l-9.21 2.62v8.07a3.6 3.6 0 0 1-3.59 3.59c-1.98 0-3.59-1.61-3.59-3.59 0-1.97 1.61-3.58 3.59-3.58.83 0 1.58.29 2.19.76v-8.84c0-1.47.89-2.61 2.3-2.99l5.78-1.58c1.17-.32 2.16-.21 2.86.33.71.53 1.06 1.43 1.06 2.67Z" fill="currentColor" />
+        </>
+      }
+    />
+  );
+}
+
+// Ours: transport glyphs, same 1.5 stroke as the tab language.
+export function PlayIcon({ size = 16 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M8 5.5v13l11-6.5Z" />
+    </svg>
+  );
+}
+
+export function PauseIcon({ size = 16 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M9 5.5v13M15 5.5v13" />
+    </svg>
+  );
+}
+
+export function NextIcon({ size = 16 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M6 5.5v13l8-6.5Z" />
+      <path d="M17 5.5v13" />
+    </svg>
+  );
+}
+
+export function PrevIcon({ size = 16 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M18 5.5v13l-8-6.5Z" />
+      <path d="M7 5.5v13" />
+    </svg>
+  );
+}
+
 // Person — avatar fallback when signed out (no photo fetched, ever).
 export function PersonIcon({ size = 16 }: P) {
   return (
@@ -401,6 +506,30 @@ export function HelpIcon({ size = 16 }: P) {
       <circle cx="12" cy="12" r="9" />
       <path d="M9.5 9.5a2.5 2.5 0 1 1 3.4 2.34c-.8.32-.9.8-.9 1.66" />
       <path d="M12 16.5h.01" strokeWidth={2.2} />
+    </svg>
+  );
+}
+
+// Step icons — same plain stroke as PlusIcon/navbar family (1.8, round).
+// MemberDetail + Daily steps share these; active step uses CSS .spin arc.
+export function ReadIcon({ size = 14 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <path d="M6 3.5h8L19 8.5V20a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1v-16a1 1 0 0 1 1-1Z" />
+      <path d="M14 3.5V8.5H19M9 12h6M9 15.5h6" />
+    </svg>
+  );
+}
+
+export function BashIcon({ size = 14 }: P) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
+      aria-hidden style={{ display: "block", flex: "none" }}>
+      <rect x="3" y="4.5" width="18" height="15" rx="2.5" />
+      <path d="m7 9 3 3-3 3M12.5 15H17" />
     </svg>
   );
 }

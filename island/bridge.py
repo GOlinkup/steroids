@@ -501,6 +501,7 @@ def trending(limit_rows=500):
 
 TURNS = {}  # tid -> live turn snapshot (the UI polls while it streams)
 TURNS_LOCK = threading.Lock()
+_MODELS = {"at": 0.0, "data": []}  # `opencode models` cache (5 min)
 TURN_TTL = 600  # forget finished turns after 10 min
 
 
@@ -629,7 +630,7 @@ def install_opencode_bg():
         _install_state["running"] = False
 
 
-def start_turn(msg, session_id=None, provider="opencode"):
+def start_turn(msg, session_id=None, provider="opencode", model=None):
     """Spawn an agent turn in the background. Returns {ok, turn}."""
     if provider == "auto":
         provider = "opencode"  # router-pick default: local opencode, no keys
@@ -639,7 +640,7 @@ def start_turn(msg, session_id=None, provider="opencode"):
         return {"ok": False, "error": "%s CLI not installed" % provider,
                 "code": 503}
     try:
-        argv, stdin_data = agentlog.describe_command(provider, msg, session_id)
+        argv, stdin_data = agentlog.describe_command(provider, msg, session_id, model=model)
     except ValueError as e:
         return {"ok": False, "error": str(e)}
     tid = os.urandom(8).hex()
@@ -675,6 +676,9 @@ class Handler(SimpleHTTPRequestHandler):
         self.send_header("Content-Type", "application/json")
         self.send_header("Content-Length", str(len(body)))
         self.send_header("Access-Control-Allow-Origin", "*")
+        # live data only: Chromium heuristically caches GETs without this,
+        # so the 3s /nowplaying poll kept replaying the previous song.
+        self.send_header("Cache-Control", "no-store")
         self.end_headers()
         self.wfile.write(body)
 
@@ -738,6 +742,25 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send({"sessions": merged})
             except Exception as e:
                 self._send({"sessions": [], "error": str(e)})
+        elif parts.path == "/session":
+            # one session's live progress for the team tiles (steps + files).
+            sid = (parse_qs(parts.query).get("session") or [""])[0].strip()
+            try:
+                evs = agentlog.read_events(limit=300)
+                self._send({"progress": agentlog.session_progress(evs, sid)})
+            except Exception as e:
+                self._send({"progress": None, "error": str(e)})
+        elif parts.path == "/models":
+            # live `opencode models` ids so the picker never goes stale
+            # when they ship a new model. Cached 5 min, [] on failure.
+            try:
+                now = time.time()
+                if now - _MODELS["at"] > 300:
+                    _MODELS["data"] = agentlog.list_models()
+                    _MODELS["at"] = now
+                self._send({"models": _MODELS["data"]})
+            except Exception as e:
+                self._send({"models": [], "error": str(e)})
         elif parts.path == "/skills":
             q = (parse_qs(parts.query).get("q") or [""])[0].strip()[:200]
             if not q:
@@ -898,6 +921,15 @@ class Handler(SimpleHTTPRequestHandler):
             # system now-playing via playerctl (MPRIS). No binary or no
             # players → playing False; the island shows no strip at all.
             self._send(now_playing())
+        elif parts.path == "/audio-energy":
+            # live loudness for the dancing mascot: {energy 0..1, hop
+            # edge-once, ts, live}. Auto-starts the parec sampler.
+            try:
+                import audio_energy as _ae
+                self._send(_ae.read())
+            except Exception:
+                self._send({"energy": 0.0, "hop": False,
+                            "ts": 0.0, "live": False})
         elif parts.path == "/api/daily/briefing":
             # morning briefing, same-origin: no second daemon to keep alive.
             try:
@@ -1176,7 +1208,8 @@ class Handler(SimpleHTTPRequestHandler):
         if not msg:
             return self._send({"ok": False, "error": "empty message"}, 400)
         out = start_turn(msg, req.get("session_id"),
-                         req.get("provider") or "opencode")
+                         req.get("provider") or "opencode",
+                         req.get("model"))
         self._send(out, out.pop("code", 200) if not out.get("ok") else 200)
 
     def do_DELETE(self):
@@ -1236,6 +1269,15 @@ def main(argv):
     srv.serve_dir = serve_dir
     srv.lens_watch = lens_watch
     srv.hand_proc = None
+    # warm the models cache off-thread so the first picker open already
+    # lists live `opencode models` instead of the static fallback.
+    def _warm_models():
+        try:
+            _MODELS["data"] = agentlog.list_models()
+            _MODELS["at"] = time.time()
+        except Exception:
+            pass
+    threading.Thread(target=_warm_models, daemon=True).start()
     if serve_dir:
         print("nicki: http://%s:%s  (UI + opencode bridge)" % (host, port))
         if host in ("0.0.0.0", "::"):

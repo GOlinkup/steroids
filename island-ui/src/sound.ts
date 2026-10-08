@@ -1,9 +1,14 @@
 // Tiny WebAudio blips — zero assets, offline. Coucou has 28 WAVs;
 // we synthesize 3 (send/pop/approve) + mute + volume.
+// Sound-pack mode (ping-island openpeon.json compat): when a pack dir is
+// set and carries a file for the event, play it; else synth fallback.
 
 let ctx: AudioContext | null = null;
 let muted = false;
 let volume = 0.5;
+let pack: Record<string, string[]> = {};
+
+export function setPack(files: Record<string, string[]>) { pack = files; }
 
 function ac(): AudioContext | null {
   try {
@@ -38,8 +43,22 @@ function blip(freq: number, dur = 0.08, delay = 0) {
 }
 
 export const Sound = {
-  send: () => blip(660, 0.07),
-  pop: () => blip(520, 0.06),
-  approve: () => { blip(523, 0.08); blip(784, 0.1, 0.09); },
-  deny: () => blip(220, 0.12),
+  send: () => playFile("start") ?? blip(660, 0.07),
+  pop: () => playFile("attention") ?? blip(520, 0.06),
+  approve: () => { if (!playFile("complete")) { blip(523, 0.08); blip(784, 0.1, 0.09); } },
+  deny: () => playFile("error") ?? blip(220, 0.12),
 };
+
+function playFile(ev: string): boolean {
+  if (muted) return true;
+  const files = pack[ev];
+  if (!files || !files.length) return false;
+  try {
+    const a = new Audio(files[0]);
+    a.volume = volume;
+    void a.play();
+    return true;
+  } catch {
+    return false;
+  }
+}

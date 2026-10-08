@@ -25,7 +25,7 @@ const RELAY = path.join(
 function report(kind: string, extra: Record<string, unknown> = {}): void {
   try {
     spawnSync("python3", [RELAY, "opencode"], {
-      input: JSON.stringify({ kind, ...extra }),
+      input: JSON.stringify({ kind, cwd: root, ...extra }),
       encoding: "utf-8",
       timeout: 2000,
     })
@@ -46,15 +46,43 @@ function sessionOf(...candidates: any[]): string {
 }
 
 function fileOf(args: any): string {
+  if (typeof args === "string") {
+    try {
+      args = JSON.parse(args)
+    } catch {
+      return ""
+    }
+  }
   if (!args || typeof args !== "object") return ""
-  for (const k of ["file_path", "filePath", "path", "notebook_path"]) {
+  for (const k of ["file_path", "filePath", "path", "filename", "notebook_path"]) {
     const v = args[k]
-    if (typeof v === "string") return v
+    if (typeof v === "string" && v) return v
   }
   return ""
 }
 
-export const SteroidsEventsPlugin = async () => {
+function dirOf(...candidates: any[]): string {
+  // project root for the project-centric home hero: explicit directory
+  // first (plugin ctx), then per-payload fields, then server cwd.
+  // Server cwd is last — opencode often starts at $HOME, never the project.
+  for (const c of candidates) {
+    if (typeof c === "string" && c) return c
+    if (c && typeof c === "object") {
+      for (const k of ["directory", "cwd", "workdir", "projectRoot", "root"]) {
+        const v = (c as any)[k]
+        if (typeof v === "string" && v) return v
+      }
+    }
+  }
+  try {
+    return process.cwd()
+  } catch {
+    return ""
+  }
+}
+
+export const SteroidsEventsPlugin = async (ctx: any = {}) => {
+  const root = dirOf(ctx?.directory, ctx)
   return {
     "chat.message": async (_input: any, output: any) => {
       try {
@@ -64,7 +92,7 @@ export const SteroidsEventsPlugin = async () => {
           .join(" ")
           .slice(0, 2000)
         if (text.trim().length >= 2) {
-          report("prompt", { text, session: sessionOf(output?.info, output) })
+          report("prompt", { text, session: sessionOf(output?.info, output), cwd: dirOf(_input, output, root) })
         }
       } catch {}
     },
@@ -76,7 +104,12 @@ export const SteroidsEventsPlugin = async () => {
           input?.name ??
           "tool"
         const file = fileOf(input?.call?.arguments ?? input?.arguments ?? input?.input)
-        report("tool-before", { tool: String(tool), file, session: sessionOf(input) })
+        report("tool-before", { tool: String(tool), file, cwd: dirOf(input, root), session: sessionOf(input) })
+        // act-from-island: surface approval-worthy calls as attention rows.
+        // We only report; the native permission UI still decides.
+        if (/permission|approve|confirm|ask/i.test(String(tool))) {
+          report("prompt", { text: `approval: ${String(tool)}`, session: sessionOf(input) })
+        }
       } catch {}
     },
     "tool.execute.after": async (input: any) => {
@@ -86,6 +119,8 @@ export const SteroidsEventsPlugin = async () => {
         const err = input?.output?.error ?? input?.output?.exitCode
         report("tool-after", {
           tool: String(tool),
+          file: fileOf(input?.call?.arguments ?? input?.arguments ?? input?.input),
+          cwd: dirOf(input, root),
           ok: err == null || err === 0,
           session: sessionOf(input),
         })

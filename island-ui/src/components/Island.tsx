@@ -1,6 +1,6 @@
 import { forwardRef, lazy, Suspense } from "react";
 import Mascot, { type MascotHandle } from "./Mascot";
-import { ApprovalCard, QuestionCard, ChatPanel, ExploreView, SettingsView, type SettingsState } from "./Cards";
+import { ApprovalCard, QuestionCard, ChatPanel, ExploreView, SettingsView, type SettingsState, type SettingsPage } from "./Cards";
 import { Header } from "./Header";
 // ponytail: lens + daily ride separate chunks — default chat view stays lean,
 // vite warns over 500KB and these views load on tab tap, never at boot.
@@ -30,6 +30,7 @@ interface Props {
   shots: Shot[];
   onMouseEnter: () => void;
   onMouseLeave: () => void;
+  onIslandClick?: () => void;
   onMascotTap: (taps: number) => void;
   onDecide: (d: string) => void;
   onAnswer: (a: string[]) => void;
@@ -43,9 +44,14 @@ interface Props {
   onResumeAgentSession: (sid: string, first: string) => void;
   onDeleteAgentSession: (sid: string) => void;
   exploreLive: boolean;
+  providers?: { opencode: boolean; claude: boolean } | null;
+  installState?: "idle" | "working" | "error";
+  onInstall?: () => void;
   exploreFeed: ExploreFeed | null;
   onSearchSkills: (q: string) => Promise<SkillHit[]>;
   settings: SettingsState;
+  settingsPage?: SettingsPage;
+  onSettingsPage?: (p: SettingsPage) => void;
   zoomShot: string | null;
   onSettings: (s: SettingsState) => void;
   onTab: (v: IslandView) => void;
@@ -53,9 +59,11 @@ interface Props {
   onDropToPhone?: () => void;
   onDropFilesToPhone?: (files: File[]) => void;
   phoneLinked?: boolean;
-  queuedDrops?: number;
   pairNode?: React.ReactNode;
   accountNode?: React.ReactNode;
+  shelfNode?: React.ReactNode;
+  staged?: Array<{ file: File; url: string }>;
+  onAttachStaged?: (file: File) => void;
   accountEmail?: string | null;
   accountAvatar?: string | null;
   onSignOut?: () => void;
@@ -72,20 +80,24 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     sessions, activeSessionId, onResumeSession, onDeleteSession, onNewChat,
     agentSessions, onResumeAgentSession, onDeleteAgentSession,
     exploreLive, exploreFeed, onSearchSkills,
+    providers = null, installState = "idle", onInstall = () => {},
     settings, onSettings, onTab, unread, zoomShot,
-    onDropToPhone, onDropFilesToPhone, phoneLinked, queuedDrops, pairNode, accountNode,
-    accountEmail = null, accountAvatar = null, onSignOut = () => {},
+    settingsPage = "general", onSettingsPage = () => {},
+    onDropToPhone, onDropFilesToPhone, phoneLinked, pairNode, accountNode, shelfNode,
+    staged = [], onAttachStaged,
+    accountEmail = null, accountAvatar = null, onSignOut = () => {}, onIslandClick,
   } = props;
 
-  // Avatar menu jumps: one settings page, so Profile scrolls to the
-  // identity card while Settings lands on the switches.
-  const avatarNav = (page: "profile" | "explore" | "settings" | "account") => {
+  // Avatar menu jumps: everything but Phone lands on the one General
+  // page (account section on top); Profile scrolls straight to it.
+  const avatarNav = (page: "profile" | "explore" | "settings" | "account" | "phone") => {
     if (page === "explore") {
       onTab("explore");
       return;
     }
+    onSettingsPage(page === "phone" ? "phone" : "general");
     onTab("settings");
-    if (page === "profile") {
+    if (page === "profile" || page === "account") {
       setTimeout(() => {
         document.querySelector("#island-account")?.scrollIntoView({ block: "start" });
       }, 60);
@@ -100,6 +112,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
       data-view={view}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
+      onClick={onIslandClick}
     >
       {fsmState !== "jacked" && <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />}
       {fsmState === "hidden" ? null : fsmState === "jacked" ? (
@@ -108,6 +121,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             view={view}
             unread={unread}
             onTab={onTab}
+            hiddenViews={settings.hiddenViews}
             sessions={sessions}
             activeSessionId={activeSessionId}
             onResumeSession={onResumeSession}
@@ -119,15 +133,18 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             email={accountEmail}
             avatarUrl={accountAvatar}
             onAvatarNav={avatarNav}
+            settingsPage={settingsPage}
             approval={approval}
             question={question}
             onSignOut={onSignOut}
           />
-          <div className="mascot-top">
-            <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />
-          </div>
+          {view !== "daily" && (
+            <div className="mascot-top">
+              <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />
+            </div>
+          )}
           {view === "settings" && (
-            <SettingsView settings={settings} onChange={onSettings} pair={pairNode} extra={accountNode} />
+            <SettingsView settings={settings} onChange={onSettings} pair={pairNode} extra={accountNode} page={settingsPage} onPage={onSettingsPage} />
           )}
           {view === "explore" && (
             <ExploreView
@@ -158,24 +175,27 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
               onDropToPhone={onDropToPhone}
               onDropFilesToPhone={onDropFilesToPhone}
               phoneLinked={phoneLinked}
-              queuedDrops={queuedDrops}
               liveShots={shots}
               bridgeOn={exploreLive}
               liveActivity={liveActivity}
               livePartial={livePartial}
               turnEngine={turnEngine}
+              providers={providers}
+              installState={installState}
+              onInstall={onInstall}
             />
           )}
           {view === "lens" && (
             <Suspense fallback={<div className="card"><div className="card-detail">Opening lens…</div></div>}>
-              <LensView shots={shots} initialZoom={zoomShot} />
+              <LensView shots={shots} initialZoom={zoomShot} staged={staged} onAttachStaged={onAttachStaged} agentSessions={agentSessions} onResumeAgent={onResumeAgentSession} />
             </Suspense>
           )}
           {view === "daily" && (
             <Suspense fallback={<div className="card"><div className="card-detail">Opening daily…</div></div>}>
-              <DailyView />
+              <DailyView agentSessions={agentSessions} onResumeAgent={onResumeAgentSession} />
             </Suspense>
           )}
+          {view === "shelf" && shelfNode}
           {view === "finished" && (
             <div className="card finished">
               <div className="card-title">Route complete ✓</div>

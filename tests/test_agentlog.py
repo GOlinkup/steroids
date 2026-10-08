@@ -187,6 +187,44 @@ class LedgerTest(unittest.TestCase):
         self.assertEqual(agentlog.work_today(blob, now=now)["current"],
                          "Now working")
 
+    def test_file_lens_tail_and_honest_empty(self):
+        import time
+        d = tempfile.mkdtemp()
+        p = os.path.join(d, "invoice.ts")
+        with open(p, "w") as f:
+            f.write("\n".join(f"line{i}" for i in range(1, 21)))
+        lens = agentlog.file_lens(p)
+        self.assertEqual(lens["file"], "invoice.ts")
+        self.assertEqual(lens["lines"], [f"line{i}" for i in range(7, 21)])
+        self.assertEqual(agentlog.file_lens("/nope/missing.py"),
+                          {"file": "", "lines": []})
+        now = time.time()
+        evs = [{"event": "PostToolUse", "tool": "Edit", "file": p,
+                "ts": now, "session": "s", "added": 1, "removed": 0,
+                "ok": True}]
+        self.assertEqual(agentlog.session_progress(evs, "s")["lens"]["file"],
+                          "invoice.ts")
+
+    def test_cwd_lens_newest_dirty_file(self):
+        import subprocess
+        d = tempfile.mkdtemp()
+        subprocess.run(["git", "init", "-q", d], check=True)
+        subprocess.run(["git", "-C", d, "config", "user.email", "t@t"],
+                        check=True)
+        subprocess.run(["git", "-C", d, "config", "user.name", "t"],
+                        check=True)
+        a = os.path.join(d, "a.py")
+        with open(a, "w") as f:
+            f.write("v1\n")
+        subprocess.run(["git", "-C", d, "add", "a.py"], check=True)
+        subprocess.run(["git", "-C", d, "commit", "-qm", "init"],
+                        check=True)
+        with open(a, "w") as f:
+            f.write("v2\n")
+        self.assertEqual(agentlog.cwd_lens(d)["lines"], ["v2"])
+        self.assertEqual(agentlog.cwd_lens("/nope/missing"),
+                          {"file": "", "lines": []})
+
     def test_session_steps_checklist(self):
         import time
         now = time.time()
@@ -209,6 +247,39 @@ class LedgerTest(unittest.TestCase):
                          [("fix grid", "done"), ("read a.py", "done"),
                           ("edit a.py", "active")])
         self.assertEqual(agentlog.work_today([], now=now)["steps"], [])
+
+    def test_project_of_cwd_and_docs(self):
+        import time
+        d = tempfile.mkdtemp()
+        with open(os.path.join(d, "PLAN.md"), "w") as f:
+            f.write("# Ship it\nnext steps\n")
+        with open(os.path.join(d, "notes.txt"), "w") as f:
+            f.write("not markdown\n")
+        now = time.time()
+        evs = [{"event": "UserPromptSubmit", "text": "fix grid",
+                "ts": now - 10, "cwd": d, "session": "s",
+                "tool": "", "file": "", "added": 0, "removed": 0,
+                "ok": True}]
+        p = agentlog.project_of(evs)
+        self.assertEqual(p["cwd"], d)
+        self.assertEqual(p["name"], os.path.basename(d))
+        self.assertEqual([x["name"] for x in p["docs"]], ["PLAN.md"])
+        self.assertEqual(p["docs"][0]["snippet"], "Ship it")
+        # file-dir fallback when cwd is missing (opencode events today)
+        sub = os.path.join(d, "sub")
+        os.makedirs(sub)
+        fp = os.path.join(sub, "a.py")
+        with open(fp, "w") as f:
+            f.write("x\n")
+        evs2 = [{"event": "PostToolUse", "tool": "Edit", "file": fp,
+                 "ts": now - 5, "session": "s", "added": 1,
+                 "removed": 0, "ok": True}]
+        p2 = agentlog.project_of(evs2)
+        self.assertEqual(p2["cwd"], sub)
+        # empty ledger -> honest empty, never throws
+        self.assertEqual(agentlog.project_of([]),
+                         {"cwd": "", "name": "", "docs": []})
+        self.assertIn("project", agentlog.work_today(evs, now=now))
 
     def test_transcript_roles(self):
         s = agentlog.normalize({"hook_event_name": "UserPromptSubmit",
@@ -260,6 +331,20 @@ class LedgerTest(unittest.TestCase):
         argv3, _ = agentlog.describe_command("opencode", "hello", None)
         self.assertEqual(argv3[:2], ["opencode", "run"])
         self.assertIn("--format", argv3)
+
+    def test_describe_command_model_flag(self):
+        argv, _ = agentlog.describe_command("opencode", "hi", None,
+                                             model="opencode/claude-sonnet-4-5")
+        self.assertIn("-m", argv)
+        self.assertIn("opencode/claude-sonnet-4-5", argv)
+        argv, _ = agentlog.describe_command("opencode", "hi", "s1")
+        self.assertNotIn("-m", argv)  # default: no flag
+        argv, _ = agentlog.describe_command("claude", "hi", None, model="opus")
+        self.assertIn("--model", argv)
+        self.assertIn("opus", argv)
+        argv, _ = agentlog.describe_command("claude", "hi", None,
+                                             model="router-pick")
+        self.assertNotIn("--model", argv)  # auto: no flag
 
     def test_claude_line_parsing(self):
         self.assertEqual(

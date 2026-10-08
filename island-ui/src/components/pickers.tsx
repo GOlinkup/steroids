@@ -77,8 +77,57 @@ export function PickerShell({
   );
 }
 
+// MenuRow — the ONE dropdown tile: avatar-menu rows + provider picks
+// share it. .am-row sizing (.85rem) wins over tiny .pick-opt (.72rem).
+export function MenuRow({
+  active,
+  danger,
+  className = "",
+  children,
+  ...rest
+}: {
+  active?: boolean;
+  danger?: boolean;
+  className?: string;
+  children?: ReactNode;
+} & React.ButtonHTMLAttributes<HTMLButtonElement>) {
+  const cls = active ? "am-row on" : "am-row";
+  return (
+    <button className={`${cls}${danger ? " danger" : ""}${className ? ` ${className}` : ""}`} {...rest}>
+      {children}
+    </button>
+  );
+}
+
 // Display name for a model id (router internals stay off the pills).
 export const displayModel = (m: string) => (m === "router-pick" ? "auto" : m);
+
+// Short label: last path segment (opencode/claude-sonnet-4-5 → claude-sonnet-4-5).
+export const shortModel = (m: string) => {
+  const d = displayModel(m);
+  const i = d.lastIndexOf("/");
+  return i >= 0 ? d.slice(i + 1) : d;
+};
+
+// Vendor family: leading alpha run of the model segment, skipping the
+// well-known `free` pool segment (apinex/free/… → deepseek, not free).
+export function familyOf(id: string): string {
+  const segs = displayModel(id).split("/").filter((s) => s && s.toLowerCase() !== "free");
+  const last = segs[segs.length - 1] ?? id;
+  const m = /^[a-zA-Z]+/.exec(last);
+  return (m ? m[0] : last).toLowerCase();
+}
+
+// Stable vendor hue — brand dots without vendoring trademarked logos.
+export function vendorColor(family: string): string {
+  let h = 0;
+  for (let i = 0; i < family.length; i++) h = (h * 31 + family.charCodeAt(i)) % 360;
+  return `hsl(${h},70%,60%)`;
+}
+
+// Name-based free-tier signal (opencode zen *-free ids). Heuristic, honest:
+// it reads the id, never the billing API.
+export const looksFree = (id: string) => /free/i.test(id);
 
 export const ENGINES: Array<{ id: string; label: string; mark: string; outcome: string; models: string[] }> = [  { id: "auto", label: "auto", mark: "A", outcome: "router picks", models: ["router-pick"] },
   { id: "opencode", label: "opencode", mark: "O", outcome: "everyday", models: ["auto", "gpt", "claude"] },
@@ -93,8 +142,30 @@ export const EFFORT_TIERS = [  { id: "low", label: "Low", color: "#9ca3af" },
   { id: "ultra", label: "Ultra", color: "#a855f7" },
 ] as const;
 
-// Model picker — same rounded pill + sheet as effort, name only.
-// Providers with several models expand a nested model submenu.
+export interface Engine { id: string; label: string; mark: string; outcome: string; models: string[] }
+
+// Live engines: opencode's model list rides the bridge (`GET /models`,
+// fresh from `opencode models`, cached server-side) so new drops show up
+// without a UI release. Anything else falls back to the static list.
+export function useEngines(): Engine[] {
+  const [extra, setExtra] = useState<string[] | null>(null);
+  useEffect(() => {
+    let dead = false;
+    fetch(`${window.location.origin}/models`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((j) => {
+        if (!dead && Array.isArray(j?.models) && j.models.length) setExtra(j.models);
+      })
+      .catch(() => {});
+    return () => { dead = true; };
+  }, []);
+  if (!extra) return ENGINES;
+  return ENGINES.map((e) => (e.id === "opencode" ? { ...e, models: extra } : e));
+}
+
+// Provider + model picker — ONE sheet, two sections (no nested expand:
+// tapping a provider selects it AND lists its models below, so the first
+// tap always does something visible). Long model lists get a filter box.
 // Controlled open/onToggle so only one picker is open at a time.
 // Steroids is not a model so it is not listed here.
 export function ProviderPicker({
@@ -104,6 +175,7 @@ export function ProviderPicker({
   onModel,
   open,
   onToggle,
+  engines = ENGINES,
 }: {
   provider: string;
   model: string;
@@ -111,9 +183,11 @@ export function ProviderPicker({
   onModel: (id: string) => void;
   open: boolean;
   onToggle: () => void;
+  engines?: Engine[];
 }) {
-  const [expanded, setExpanded] = useState(provider);
   const [cursor, setCursor] = useState(0);
+  const [filter, setFilter] = useState("");
+  const [fam, setFam] = useState<string | null>(null);
   const listRef = useRef<HTMLDivElement>(null);
   // ponytail: prop-to-state sync via render-adjust (React docs pattern),
   // not an effect — sync setState in useEffect double-renders every open.
@@ -121,20 +195,50 @@ export function ProviderPicker({
   if (open !== prevPick.open || provider !== prevPick.provider) {
     setPrevPick({ open, provider });
     if (open) {
-      setExpanded(provider);
-      setCursor(Math.max(0, ENGINES.findIndex((e) => e.id === provider)));
+      setCursor(Math.max(0, engines.findIndex((e) => e.id === provider)));
+      setFilter("");
+      setFam(null);
     }
   }
+  const cur = engines.find((e) => e.id === provider) ?? engines[0];
+  const q = filter.trim().toLowerCase();
+  const PIN_KEY = "island.model.pin";
+  const [pin, setPin] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(PIN_KEY);
+    } catch {
+      return null;
+    }
+  });
+  const togglePin = () => {
+    setPin((curPin) => {
+      const next = curPin === model ? null : model;
+      try {
+        if (next) localStorage.setItem(PIN_KEY, next);
+        else localStorage.removeItem(PIN_KEY);
+      } catch { /* private mode */ }
+      return next;
+    });
+  };
+  const fams = new Map<string, number>();
+  for (const m of cur.models) fams.set(familyOf(m), (fams.get(familyOf(m)) ?? 0) + 1);
+  const famList = [...fams.entries()].sort((a, b) => b[1] - a[1]);
+  const models = cur.models.filter((m) =>
+    (!fam || familyOf(m) === fam) &&
+    (!q || m.toLowerCase().includes(q) || shortModel(m).toLowerCase().includes(q)));
+  const pinned = pin && cur.models.includes(pin) ? pin : null;
   const focusProv = (i: number) => {
     listRef.current?.querySelectorAll<HTMLButtonElement>("[data-prov]")[i]?.focus();
   };
-  const chooseProv = (i: number, closeOnSingle: boolean) => {
-    const e = ENGINES[i];
+  const chooseProv = (i: number) => {
+    const e = engines[i];
     if (!e) return;
     onProvider(e.id);
-    setExpanded(e.id);
     setCursor(i);
-    if (e.models.length < 2 && closeOnSingle) onToggle();
+  };
+  const chooseModel = (m: string) => {
+    onModel(m);
+    onToggle();
   };
   return (
     <PickerShell
@@ -149,68 +253,110 @@ export function ProviderPicker({
           role="listbox"
           aria-label="Model"
           onKeyDown={(e) => {
+            if ((e.target as HTMLElement).tagName === "INPUT") return;
             if (e.key === "ArrowDown") {
               e.preventDefault();
-              const n = (cursor + 1) % ENGINES.length;
+              const n = (cursor + 1) % engines.length;
               setCursor(n);
               focusProv(n);
             } else if (e.key === "ArrowUp") {
               e.preventDefault();
-              const n = (cursor - 1 + ENGINES.length) % ENGINES.length;
+              const n = (cursor - 1 + engines.length) % engines.length;
               setCursor(n);
               focusProv(n);
-            } else if (e.key === "ArrowRight" || e.key === "Enter") {
+            } else if (e.key === "Enter") {
               e.preventDefault();
-              chooseProv(cursor, false);
-            } else if (e.key === "ArrowLeft") {
-              e.preventDefault();
-              setExpanded(provider);
+              chooseProv(cursor);
             }
           }}
         >
-          {ENGINES.map((e, i) => {
+          {engines.map((e, i) => {
             const isCur = e.id === provider;
-            const multi = e.models.length > 1;
             return (
-              <div key={e.id}>
-                <button
-                  data-prov
-                  role="option"
-                  aria-selected={isCur}
-                  className={isCur ? "pick-opt on" : "pick-opt"}
-                  onClick={() => chooseProv(i, true)}
-                >
-                  {e.label}{" "}
-                  {multi && (
-                    <span aria-hidden="true" style={{ display: "inline-flex", transform: "rotate(-90deg)" }}>
-                      <ChevronDownIcon size={12} />
-                    </span>
-                  )}
-                </button>
-                {expanded === e.id && multi && (
-                  <div className="pick-sub" role="group" aria-label={`${e.label} models`}>
-                    {e.models.map((m) => (
-                      <button
-                        key={m}
-                        className={m === model && isCur ? "pick-sub-opt on" : "pick-sub-opt"}
-                        onClick={() => {
-                          if (!isCur) onProvider(e.id);
-                          onModel(m);
-                          onToggle();
-                        }}
-                      >
-                        {m}
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
+              <MenuRow
+                key={e.id}
+                data-prov
+                role="option"
+                aria-selected={isCur}
+                active={isCur}
+                onClick={() => chooseProv(i)}
+              >
+                <b className="kind-tag">{e.mark}</b>
+                {e.label}
+                <span style={{ marginLeft: "auto", opacity: 0.55, fontSize: "var(--size-floor)" }}>{e.outcome}</span>
+              </MenuRow>
             );
           })}
+          <div className="am-sep" aria-hidden />
+          <div className="pick-models-head">
+            <div className="explore-label">{cur.label} models · {models.length}</div>
+            <button
+              className={pin === model ? "menu-act primary" : "menu-act"}
+              title={pin === model ? "Unpin this model" : "Pin the current model to the top"}
+              onClick={togglePin}
+            >
+              ★
+            </button>
+          </div>
+          {pinned && (
+            <MenuRow
+              active={pinned === model}
+              title={pinned}
+              style={{ fontFamily: "var(--font-mono)" }}
+              onClick={() => chooseModel(pinned)}
+            >
+              <span aria-hidden="true" style={{ color: "var(--brand)" }}>★&nbsp;</span>
+              <span>{shortModel(pinned)}</span>
+              <i className={looksFree(pinned) ? "model-dot free" : "model-dot"} aria-hidden="true" />
+            </MenuRow>
+          )}
+          {famList.length > 1 && (
+            <div className="trend-row" role="group" aria-label="Model families">
+              <button className={fam ? "trend-chip" : "trend-chip on"} onClick={() => setFam(null)}>
+                all<em>{cur.models.length}</em>
+              </button>
+              {famList.map(([f, n]) => (
+                <button key={f} className={fam === f ? "trend-chip on" : "trend-chip"} onClick={() => setFam(fam === f ? null : f)}>
+                  <i className="model-dot" style={{ background: vendorColor(f) }} aria-hidden="true" />{f}<em>{n}</em>
+                </button>
+              ))}
+            </div>
+          )}
+          {cur.models.length > 8 && (
+            <input
+              className="explore-search"
+              placeholder={`Filter ${cur.label} models…`}
+              value={filter}
+              aria-label="Filter models"
+              autoFocus
+              onChange={(e) => setFilter(e.target.value)}
+            />
+          )}
+          <div className="model-grid" role="group" aria-label={`${cur.label} models`}>
+            {models.filter((m) => m !== pinned).slice(0, 60).map((m) => (
+              <MenuRow
+                key={m}
+                active={m === model}
+                title={m}
+                style={{ fontFamily: "var(--font-mono)" }}
+                onClick={() => chooseModel(m)}
+              >
+                <i className="model-dot" style={{ background: vendorColor(familyOf(m)) }} aria-hidden="true" />
+                <span>{shortModel(m)}</span>
+                <i className={looksFree(m) ? "model-dot free" : "model-dot"} aria-hidden="true" />
+              </MenuRow>
+            ))}
+            {models.length === 0 && (
+              <div className="card-detail">No match for “{filter.trim()}”</div>
+            )}
+            {models.length > 60 && (
+              <div className="card-detail">…{models.length - 60} more — keep typing</div>
+            )}
+          </div>
         </div>
       }
     >
-      <span className="pill-label">{displayModel(model)}</span>{" "}
+      <span className="pill-label">{shortModel(model)}</span>{" "}
       <ChevronDownIcon size={12} />
     </PickerShell>
   );

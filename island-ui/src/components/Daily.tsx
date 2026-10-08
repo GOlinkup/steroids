@@ -1,14 +1,17 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Card } from "./Cards";
-import { MusicIcon, NextIcon, PauseIcon, PlayIcon, PrevIcon } from "./icons";
-import { fetchNowPlaying, fmtClock, mergeTrack, pushHistory, resolveArt, seekFrac, sendPlayerCmd, trackKey, type HistTrack, type NowPlaying } from "../music";
+import { NextIcon, PauseIcon, PlayIcon, PrevIcon } from "./icons";
+import { fetchNowPlaying, fmtClock, mergeTrack, resolveArt, sendPlayerCmd, trackKey, type NowPlaying } from "../music";
+import Mascot, { type MascotMood } from "./Mascot";
+import { TeamGrid, MemberDetail, SegBar, StepGlyph, LensBlock, useTeam, useSessionProgress, type AgentMini, type Lens } from "./TeamGrid";
 
 // React daily — work + tokens + day loop + music, zero keys anywhere.
 // All data rides the island bridge itself (same-origin /api/daily/*):
 // no second daemon to keep alive, offline-safe localhost.
 const API = window.location.origin;
 
-interface DayEvent { type: string; label: string; at: number }
+interface WorkDoc { name: string; snippet: string }
+interface WorkProject { cwd: string; name: string; docs: WorkDoc[] }
 interface Work {
   state: string;
   activity: string;
@@ -18,9 +21,12 @@ interface Work {
   left: number;
   pct: number;
   files: string[];
+  file?: string;
+  lens?: Lens | null;
   added: number;
   removed: number;
   steps: { label: string; status: string }[];
+  project?: WorkProject | null;
 }
 interface UsageToday { in: number; out: number; cached: number; cost: number; sessions: number }
 interface Usage {
@@ -37,130 +43,75 @@ function fmtTokens(n: number): string {
   return `${n}`;
 }
 
-// Local player (YouTube watch-page scaled to a card): 16:9 thumb with
-// duration badge, title + channel row, red progress, transport, then an
-// Up-Next rail of recent tracks on this PC. Paused renders frozen — same
-// track re-polled while paused keeps its ref (mergeTrack) so the home card
-// never churns when nothing is audible. Up-Next rows are display-only:
-// MPRIS can't remote-play history, so no fake play buttons.
-function LocalPlayer({
-  track,
-  upNext,
-  onCmd,
-}: {
-  track: NowPlaying;
-  upNext: HistTrack[];
-  onCmd: (action: "play-pause" | "next" | "previous" | "seek", position?: number) => void;
-}) {
-  const frac = seekFrac(track);
-  // MPRIS position can briefly overshoot a just-changed track: clamp the
-  // readout so it never prints 3:37 / 3:22.
-  const pos =
-    track.pos !== null && track.len !== null
-      ? Math.min(track.pos, track.len)
-      : track.pos;
-  const art = resolveArt(track.art, window.location.origin);
-  return (
-    <>
-      {/* YT-Music compact: 48px thumb + meta + inline transport. */}
-      <div className="ytm-row">
-        {art ? (
-          <img src={art} alt="" className="ytm-thumb" loading="lazy" />
-        ) : (
-          <span className="ytm-thumb empty" aria-hidden>
-            <MusicIcon size={20} />
-          </span>
-        )}
-        <span className="ytm-meta">
-          <b>{track.title}</b>
-          {!!track.artist && <em>{track.artist}</em>}
-        </span>
-        <span className="ytm-transport">
-          <button aria-label="Previous track" onClick={() => onCmd("previous")}>
-            <PrevIcon size={16} />
-          </button>
-          <button className="primary" aria-label={track.playing ? "Pause" : "Play"} onClick={() => onCmd("play-pause")}>
-            {track.playing ? <PauseIcon size={16} /> : <PlayIcon size={16} />}
-          </button>
-          <button aria-label="Next track" onClick={() => onCmd("next")}>
-            <NextIcon size={16} />
-          </button>
-        </span>
-      </div>
-      <div
-        className="music-seek yt-seek"
-        role="slider"
-        aria-label="Seek"
-        aria-valuemin={0}
-        aria-valuemax={track.len ?? 0}
-        aria-valuenow={pos ?? 0}
-        onClick={(e) => {
-          if (frac === null || track.len === null) return;
-          const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
-          const f = Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width)));
-          onCmd("seek", f * track.len);
-        }}
-      >
-        <i className="music-fill" style={{ width: `${Math.round((frac ?? 0) * 100)}%` }} />
-      </div>
-      <div className="music-times">
-        <span>{fmtClock(pos)}</span>
-        {!!track.player && <span>via {track.player}</span>}
-        <span>{fmtClock(track.len)}</span>
-      </div>
-      {upNext.length > 0 && (
-        <div className="yt-upnext">
-          <div className="yt-upnext-head">Up next · recent on this PC</div>
-          {upNext.map((h) => (
-            <div className="yt-row" key={h.key}>
-              {resolveArt(h.art, window.location.origin) ? (
-                <img src={resolveArt(h.art, window.location.origin) ?? ""} alt="" loading="lazy" />
-              ) : (
-                <span className="yt-row-thumb" aria-hidden>
-                  <MusicIcon size={18} />
-                </span>
-              )}
-              <span className="yt-row-meta">
-                <b>{h.title}</b>
-                {!!h.artist && <em>{h.artist}</em>}
-              </span>
-              {h.len !== null && <span className="yt-row-dur">{fmtClock(h.len)}</span>}
-            </div>
-          ))}
-        </div>
-      )}
-    </>
-  );
+// Groove loop: bounce to the loudness, strike a photo pose every few
+// bars. Poses hold ~1 s, then melt back into the groove.
+
+// Cover accent: average the art down to one glowing color (same-origin
+// art, so the canvas stays clean). Cached per URL, falls back warm red.
+const accentCache = new Map<string, string>();
+function coverAccent(url: string): Promise<string> {
+  const hit = accentCache.get(url);
+  if (hit) return Promise.resolve(hit);
+  return new Promise((res) => {
+    const img = new Image();
+    img.onload = () => {
+      try {
+        const c = document.createElement("canvas");
+        c.width = 24;
+        c.height = 24;
+        const g = c.getContext("2d");
+        if (!g) throw new Error("no 2d");
+        g.drawImage(img, 0, 0, 24, 24);
+        const d = g.getImageData(0, 0, 24, 24).data;
+        let r = 0, g2 = 0, b = 0, n = 0;
+        for (let i = 0; i < d.length; i += 4) {
+          if (d[i + 3] < 128) continue;
+          r += d[i];
+          g2 += d[i + 1];
+          b += d[i + 2];
+          n++;
+        }
+        if (!n) throw new Error("empty");
+        r = Math.round(r / n);
+        g2 = Math.round(g2 / n);
+        b = Math.round(b / n);
+        // lift dull grays toward vivid so the glow always reads.
+        const mx = Math.max(r, g2, b, 1);
+        const lift = Math.max(0, 190 - mx);
+        const out = `rgb(${Math.min(255, r + lift)},${Math.min(255, g2 + lift * 0.4)},${Math.min(255, b + lift * 0.4)})`;
+        accentCache.set(url, out);
+        res(out);
+      } catch {
+        res("#f43f5e");
+      }
+    };
+    img.onerror = () => res("#f43f5e");
+    img.src = url;
+  });
 }
 
-const HIST_KEY = "steroids-track-history";
+// Groove loop: bounce to the loudness, strike a photo pose every few
+// bars. Poses hold ~1 s, then melt back into the groove.
+const GROOVE_LOOP = ["groove", "groove", "pose-up", "groove", "groove", "pose-up"];
 
-function readHistory(): HistTrack[] {
-  try {
-    const raw = localStorage.getItem(HIST_KEY);
-    if (!raw) return [];
-    const arr = JSON.parse(raw);
-    if (!Array.isArray(arr)) return [];
-    return arr
-      .filter((h): h is HistTrack => !!h && typeof h.title === "string" && typeof h.key === "string")
-      .slice(0, 8);
-  } catch {
-    return [];
-  }
-}
-
-export function DailyView() {
+// Slim track bar (korus-minimal): art + title + clock + transport.
+// No Up-Next rail — history isn't playable over MPRIS, so it stays out.
+export function DailyView({ agentSessions = [], onResumeAgent }: { agentSessions?: AgentMini[]; onResumeAgent?: (sid: string, first: string) => void } = {}) {
   const [work, setWork] = useState<Work | null>(null);
   const [usage, setUsage] = useState<Usage | null>(null);
-  const [events, setEvents] = useState<DayEvent[] | null>(null);
+  // tapped mate drives the left card: his live session replaces the
+  // global work view (no bottom pop-up). Shared with the grid below.
+  const team = useTeam();
+  const live = useSessionProgress(agentSessions);
+  const [sel, setSel] = useState<string | null>(null);
+  const selIdx = team.members.findIndex((m) => m.id === sel);
+  const selSession = selIdx >= 0 ? agentSessions[selIdx] : undefined;
+  // tapped tile with a live session takes over the left card.
+  const mateOn = selIdx >= 0 && !!selSession;
 
-  useEffect(() => {
-    fetch(`${API}/api/daily/today`)
-      .then((r) => (r.ok ? r.json() : null))
-      .then((d) => d && setEvents(d.events ?? []))
-      .catch(() => {});
-  }, []);
-
+  // Live lens frame: newest watch-dir shot, refreshed with work.
+  // Proves the capsule is live — same feed the lens tab watches.
+  const [frame, setFrame] = useState<{ src: string; label: string } | null>(null);
   useEffect(() => {
     const pullWork = () => {
       fetch(`${API}/api/daily/work`)
@@ -170,6 +121,13 @@ export function DailyView() {
       fetch(`${API}/api/daily/usage`)
         .then((r) => (r.ok ? r.json() : null))
         .then((u) => u && setUsage(u))
+        .catch(() => {});
+      fetch(`${API}/shots`)
+        .then((r) => (r.ok ? r.json() : null))
+        .then((j) => {
+          const s = Array.isArray(j?.shots) ? j.shots[0] : null;
+          setFrame(s ? { src: `${API}${s.url}`, label: s.label || s.name } : null);
+        })
         .catch(() => {});
     };
     pullWork();
@@ -182,49 +140,37 @@ export function DailyView() {
   // polls are no-ops: mergeTrack keeps the ref when a paused track re-polls
   // identically, so the home card never churns when nothing is audible.
   const [local, setLocal] = useState<NowPlaying | null>(null);
-  const [hasCtl, setHasCtl] = useState<boolean | null>(null);
-  const [upNext, setUpNext] = useState<HistTrack[]>(readHistory);
-  // Up-Next rail insert, straight from a fetch result (no render effect —
-  // sync setState in an effect double-renders every track change).
-  const notePlayed = (t: NowPlaying) => {
-    if (!t.playing || !t.title) return;
-    setUpNext((prev) => {
-      const next = pushHistory(prev, t);
-      if (next.length === prev.length && next[0]?.key === prev[0]?.key) return prev;
-      try {
-        localStorage.setItem(HIST_KEY, JSON.stringify(next));
-      } catch {
-        // private mode / quota — rail still works for the session
-      }
-      return next;
-    });
-  };
   useEffect(() => {
     let dead = false;
     const pull = () => {
       fetchNowPlaying(window.location.origin, fetch)
         .then((t) => {
           if (dead) return;
-          setHasCtl(t.hasPlayerctl);
           setLocal((prev) => mergeTrack(prev, t));
-          notePlayed(t);
         })
         .catch(() => {});
     };
     pull();
     const timer = setInterval(pull, 3000);
+    // background tabs throttle intervals: a song changed while away
+    // paints the moment we're seen again, not a minute later.
+    const wake = () => {
+      if (!document.hidden) pull();
+    };
+    document.addEventListener("visibilitychange", wake);
+    window.addEventListener("focus", wake);
     return () => {
       dead = true;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", wake);
+      window.removeEventListener("focus", wake);
     };
   }, []);
   const cmd = (action: "play-pause" | "next" | "previous" | "seek", position?: number) => {
     const refresh = () => {
       fetchNowPlaying(window.location.origin, fetch)
         .then((t) => {
-          setHasCtl(t.hasPlayerctl);
           setLocal((prev) => mergeTrack(prev, t));
-          notePlayed(t);
         })
         .catch(() => {});
     };
@@ -241,150 +187,314 @@ export function DailyView() {
     window.setTimeout(refresh, 2000);
   };
 
+  const pos =
+    local?.pos !== null && local?.pos !== undefined && local?.len
+      ? Math.min(local.pos, local.len)
+      : null;
+  const remain =
+    local?.len !== null && local?.len !== undefined && pos !== null
+      ? Math.max(0, local.len - pos)
+      : null;
+  const frac =
+    local?.len ? Math.max(0, Math.min(1, (pos ?? 0) / local.len)) : 0;
+  const rawArt = local ? resolveArt(local.art, window.location.origin) : null;
+  // /np-art is one URL for every song — bust it per track or the old
+  // cover (img + blur + accent) sticks after a song change.
+  const art = rawArt && local && rawArt.includes("/np-art")
+    ? `${rawArt}?t=${encodeURIComponent(trackKey(local))}`
+    : rawArt;
+  // Liked tracks: local only (no backend), survives reloads.
+  const LIKED_KEY = "steroids-liked-tracks";
+  const [liked, setLiked] = useState<string[]>(() => {
+    try {
+      const raw = localStorage.getItem(LIKED_KEY);
+      const arr: unknown = raw ? JSON.parse(raw) : [];
+      return Array.isArray(arr) ? arr.filter((x): x is string => typeof x === "string").slice(0, 200) : [];
+    } catch {
+      return [];
+    }
+  });
+  const trackId = local ? trackKey(local) : "";
+  const isLiked = !!trackId && liked.includes(trackId);
+  const toggleLiked = () => {
+    if (!trackId) return;
+    setLiked((prev) => {
+      const next = prev.includes(trackId)
+        ? prev.filter((x) => x !== trackId)
+        : [...prev, trackId].slice(-200);
+      try {
+        localStorage.setItem(LIKED_KEY, JSON.stringify(next));
+      } catch {
+        /* private mode — memory only */
+      }
+      return next;
+    });
+  };
+  // Accent follows the cover: re-extract only when the art URL changes.
+  const [accent, setAccent] = useState("#f43f5e");
+  useEffect(() => {
+    let dead = false;
+    if (!art) {
+      setAccent("#f43f5e");
+      return;
+    }
+    void coverAccent(art).then((c) => {
+      if (!dead) setAccent(c);
+    });
+    return () => {
+      dead = true;
+    };
+  }, [art]);
+  const [groove, setGroove] = useState("groove");
+  const danceRef = useRef<HTMLSpanElement>(null);
+  const dancing = !!local?.title && !!local.playing;
+  // Energy loop: loudness rides --e on the dancer + the stage; hop:true
+  // kicks a jump. Polls only while a track exists (no parec otherwise).
+  useEffect(() => {
+    const dancer = danceRef.current;
+    if (!dancing) {
+      dancer?.classList.remove("grooving", "hop");
+      return;
+    }
+    let dead = false;
+    const tick = () => {
+      fetch(`${window.location.origin}/audio-energy`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((j) => {
+          if (dead) return;
+          const el = danceRef.current;
+          const e = typeof j?.energy === "number" ? Math.max(0, Math.min(1, j.energy)) : 0;
+          el?.style.setProperty("--e", e.toFixed(2));
+          el?.classList.add("grooving");
+          if (j?.hop && el) {
+            el.classList.remove("hop");
+            void el.offsetWidth;
+            el.classList.add("hop");
+          }
+        })
+        .catch(() => {});
+    };
+    tick();
+    const timer = setInterval(tick, 150);
+    return () => {
+      dead = true;
+      clearInterval(timer);
+    };
+  }, [dancing, local?.title]);
+  // Mood machine: finished > error > music×energy > thinking >
+  // late-night idle > neutral. 5 s hysteresis — never flickers.
+  const [mood, setMood] = useState<MascotMood>("neutral");
+  const energyRef = useRef(0);
+  const lastPoke = useRef(0);
+  const moodCand = useRef<{ m: MascotMood; since: number }>({ m: "neutral", since: 0 });
+  useEffect(() => {
+    const tick = () => {
+      const h = new Date().getHours();
+      let m: MascotMood = "neutral";
+      if (work?.state === "finished") m = "joyful-wide";
+      else if (work?.state === "error") m = "annoyed";
+      else if (dancing) m = energyRef.current > 0.55 ? "joyful-wide" : "happy";
+      else if (work?.state === "thinking" || work?.state === "working") m = "thinking";
+      else if ((h >= 23 || h < 6) && Date.now() - lastPoke.current > 60000) m = "sleepy-squint";
+      const now = Date.now();
+      if (m !== moodCand.current.m) moodCand.current = { m, since: now };
+      if (now - moodCand.current.since >= 5000) {
+        setMood((cur) => (cur === moodCand.current.m ? cur : moodCand.current.m));
+      }
+    };
+    tick();
+    const timer = setInterval(tick, 1000);
+    return () => clearInterval(timer);
+  }, [dancing, work?.state]);
+  // Groove cycler: hold the bounce, flash a pose, melt back.
+  useEffect(() => {
+    if (!dancing) {
+      setGroove("groove");
+      return;
+    }
+    let i = 0;
+    let back: ReturnType<typeof setTimeout> | null = null;
+    setGroove(GROOVE_LOOP[0]);
+    const timer = setInterval(() => {
+      i = (i + 1) % GROOVE_LOOP.length;
+      const g = GROOVE_LOOP[i];
+      setGroove(g);
+      if (g !== "groove") {
+        if (back) clearTimeout(back);
+        back = setTimeout(() => setGroove("groove"), 1200);
+      }
+    }, 4000);
+    return () => {
+      clearInterval(timer);
+      if (back) clearTimeout(back);
+    };
+  }, [dancing, local?.title]);
   return (
-    <Card className="daily bento">
-      {/* Work: what we're on, where it stands, %/left — off the ledger. */}
-      <div className="card-row bento-hero">
-        <div className="work-top">
-          <div className="card-title">Now working 🔨</div>
-          {work !== null && work.asks > 0 && (
-            <div className="work-pct">{work.pct}%</div>
-          )}
-        </div>
-        {work === null ? (
-          <div className="card-detail">Checking work…</div>
-        ) : work.asks === 0 ? (
-          <div className="card-detail">
-            Quiet day — no asks logged yet. No filler, just calm.
-          </div>
-        ) : (
-          <>
-            <div className="work-line">
-              <i
-                className={
-                  work.state === "working" || work.state === "thinking"
-                    ? "live-dot"
-                    : "dead-dot"
-                }
-              />
-              <b>{work.state}</b>
-              {!!work.activity && <span>{work.activity}</span>}
-            </div>
-            {!!work.current && <div className="work-ask">“{work.current}”</div>}
-            {work.steps.length > 0 && (
-              <div className="work-steps">
-                {work.steps.map((s, i) => (
-                  <div key={i} className={`work-step ${s.status}`}>
-                    {s.status === "active" ? (
-                      <i className="live-dot" />
-                    ) : s.status === "error" ? (
-                      <b className="tick">✕</b>
-                    ) : s.status === "pending" ? (
-                      <i className="dead-dot" />
-                    ) : (
-                      <b className="tick">✓</b>
-                    )}
-                    <span>{s.label}</span>
+    <Card className="daily home-min">
+      <div className="hm-grid">
+        {/* Work capsule: nicki + global work by default; tapped mate owns
+            the whole card korus-style (mascot row on top, his steps below). */}
+        <div className="live work" style={{ ["--live-accent" as string]: "#fb923c" }}>
+          <div className={mateOn ? "live-main mate-on" : "live-main"}>
+            {/* rail is just the buddy — name + file already live below. */}
+            <span className="live-nicki">
+              <span ref={danceRef} className={dancing ? `live-char dance grooving ${groove}` : "live-char dance"} aria-hidden>
+                <Mascot mood={mood} onTap={() => { lastPoke.current = Date.now(); }} />
+              </span>
+            </span>
+            <div className="live-body">
+              {mateOn && selSession ? (
+                <MemberDetail
+                  member={team.members[selIdx]}
+                  session={selSession}
+                  progress={live.prog[selSession.session]}
+                  onResume={onResumeAgent}
+                  manage={false}
+                  onClose={() => setSel(null)}
+                />
+              ) : work === null ? (
+                <div className="live-mono">Checking work…</div>
+              ) : work.asks === 0 ? (
+                <div className="live-top">
+                  <span className="live-hero">calm</span>
+                  <span className="live-sub">nothing logged yet</span>
+                </div>
+              ) : (
+                <>
+                  <div className="live-now">
+                    <i className={(work.state === "working" || work.state === "thinking") ? "work-pulse" : "dead-dot"} />
+                    <span>{work.activity.replace(/^· /, "") || work.state}</span>
                   </div>
-                ))}
-              </div>
-            )}
-            <div className="music-seek" aria-label={`${work.pct}% done`}>
-              <i className="music-fill" style={{ width: `${work.pct}%` }} />
-            </div>
-            <div className="card-detail">
-              {work.done}/{work.asks} done · {work.left} left · {work.pct}%
-              {(work.added > 0 || work.removed > 0) &&
-                ` · +${work.added} −${work.removed}`}
-            </div>
-            {work.files.length > 0 && (
-              <div className="card-detail">{work.files.join(" · ")}</div>
-            )}
-          </>
-        )}
-      </div>
-
-      {/* Tokens: provider in use, today's burn + current session. */}
-      <div className="card-row">
-        <div className="card-title">Tokens ⚡</div>
-        {usage === null ? (
-          <div className="card-detail">Checking usage…</div>
-        ) : usage.today.sessions === 0 ? (
-          <div className="card-detail">
-            No sessions on {usage.provider || "opencode"} yet today.
-          </div>
-        ) : (
-          <>
-            <div className="work-line">
-              <i className="live-dot" />
-              <b>{usage.model || usage.provider}</b>
-              {!!usage.current.title && (
-                <span>{usage.current.title}</span>
+                  <div className="live-top">
+                    <span className="live-hero">{work.pct}%</span>
+                    <span className="live-sub">
+                      {work.project?.name || work.state}
+                      {!!work.current && ` · ${work.current}`}
+                    </span>
+                    <span className="live-side">{work.done}/{work.asks}</span>
+                  </div>
+                  <SegBar ratio={work.pct / 100} n={20} />
+                  {frame && (
+                    <div className="live-frame">
+                      <img src={frame.src} alt={frame.label} loading="lazy" />
+                      <span>{frame.label}</span>
+                    </div>
+                  )}
+                  <div className="live-dim">
+                    {work.activity.replace(/^· /, "") || work.state}
+                    {(work.added > 0 || work.removed > 0) && ` +${work.added} −${work.removed}`}
+                    {(work.project?.docs?.length ?? 0) > 0 &&
+                      ` · 📄 ${(work.project?.docs ?? []).slice(0, 2).map((d) => d.name).join(" · ")}`}
+                  </div>
+                  {work.steps.length > 0 && (
+                    <div className="live-steps">
+                      {work.steps.slice(-5).map((s, i) => (
+                        <div
+                          key={i}
+                          className={s.status === "done" ? "st-done" : s.status === "error" ? "st-error" : s.status === "active" ? "st-active" : "st-todo"}
+                        >
+                          <span className="ln">{String(i + 1).padStart(2, "0")}</span>
+                          <span className={`st-ic ${s.status === "done" ? "st-done" : s.status === "error" ? "st-error" : s.status === "active" ? "st-active" : ""}`}>
+                            <StepGlyph label={s.label} status={s.status} />
+                          </span>
+                          {s.label}
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                  <LensBlock lens={work.lens} />
+                  <div className="live-tokens">
+                    <span>
+                      {usage ? (
+                        <>
+                          <span className="tok-total">⚡ {fmtTokens(usage.today.in + usage.today.out)}</span>
+                          <span className="tok-split">{fmtTokens(usage.today.in)} in / {fmtTokens(usage.today.out)} out · {usage.today.sessions} sess</span>
+                        </>
+                      ) : (
+                        "⚡ checking usage…"
+                      )}
+                    </span>
+                    <SegBar
+                      ratio={usage && (usage.today.in + usage.today.out) > 0
+                        ? usage.today.in / (usage.today.in + usage.today.out)
+                        : 0}
+                      n={16}
+                      flat
+                    />
+                  </div>
+                </>
               )}
             </div>
-            <div className="tok-stats">
-              <div className="tok-stat">
-                <b>{fmtTokens(usage.today.in)}</b>
-                <span>in</span>
-              </div>
-              <div className="tok-stat">
-                <b>{fmtTokens(usage.today.out)}</b>
-                <span>out</span>
-              </div>
-              <div className="tok-stat">
-                <b>{usage.today.sessions}</b>
-                <span>session{usage.today.sessions === 1 ? "" : "s"}</span>
-              </div>
-            </div>
-            <div className="card-detail">
-              today
-              {usage.today.cached > 0 &&
-                ` · ${fmtTokens(usage.today.cached)} cached`}
-              {usage.today.cost > 0 && ` · $${usage.today.cost.toFixed(2)}`}
-            </div>
-          </>
-        )}
-      </div>
-
-      {/* Day-close: exactly what moved today, or an honest empty. */}
-      <div className="card-row">
-        <div className="card-title">Today moved</div>
-        {events === null ? (
-          <div className="card-detail">Checking today…</div>
-        ) : events.length === 0 ? (
-          <div className="card-detail">
-            Quiet day — nothing logged yet. No filler, just calm.
           </div>
-        ) : (
-          <ul className="daily-list">
-            {events.map((e, i) => (
-              <li key={i}>{e.label}</li>
-            ))}
-          </ul>
+        </div>
+
+        {/* Team capsule (right top, where tokens was): 2x2 crew grid. */}
+        <div className="hm-team">
+          <TeamGrid sessions={agentSessions} onResume={onResumeAgent} sel={sel} onSel={setSel} detail="none" team={team} live={live} />
+        </div>
+
+        {/* Sugar capsule (right, full height): cover-blend glow, add, seek, transport. */}
+        {local?.title && (
+          <div className="live music combo" style={{ ["--live-accent" as string]: accent }}>
+            {!!art && (
+              <>
+                <div className="live-blur" style={{ backgroundImage: `url("${art}")` }} aria-hidden />
+                <div className="live-shade" aria-hidden />
+              </>
+            )}
+            <div className="sugar-row">
+              {!!art && (
+                <img src={art} alt="" className="sugar-art" loading="lazy" />
+              )}
+              <span className="sugar-meta">
+                <b>{local.title}</b>
+                {!!local.artist && <span>{local.artist}</span>}
+              </span>
+              <button
+                className="sugar-add"
+                aria-label={isLiked ? "Liked" : "Like this track"}
+                title={isLiked ? "Liked ✓" : "Like this track"}
+                onClick={toggleLiked}
+                style={isLiked ? { borderColor: accent, color: accent } : undefined}
+              >
+                {isLiked ? "✓" : "+"}
+              </button>
+            </div>
+            <div
+              className="sugar-seek"
+              role="slider"
+              aria-label="Seek"
+              aria-valuemin={0}
+              aria-valuemax={local.len ?? 0}
+              aria-valuenow={pos ?? 0}
+              onClick={(e) => {
+                if (!local.len) return;
+                const r = (e.currentTarget as HTMLDivElement).getBoundingClientRect();
+                const f = Math.max(0, Math.min(1, (e.clientX - r.left) / Math.max(1, r.width)));
+                cmd("seek", f * local.len);
+              }}
+            >
+              <i className="sugar-fill" style={{ width: `${Math.round(frac * 100)}%` }} />
+              <i className="sugar-knob" style={{ left: `${Math.round(frac * 100)}%` }} />
+            </div>
+            <div className="sugar-times">
+              <span>{fmtClock(pos)}</span>
+              <span>-{fmtClock(remain)}</span>
+            </div>
+            <div className="sugar-transport">
+              <button aria-label="Previous track" onClick={() => cmd("previous")}>
+                <PrevIcon size={17} />
+              </button>
+              <button className="sugar-main" aria-label={local.playing ? "Pause" : "Play"} onClick={() => cmd("play-pause")}>
+                {local.playing ? <PauseIcon size={17} /> : <PlayIcon size={17} />}
+              </button>
+              <button aria-label="Next track" onClick={() => cmd("next")}>
+                <NextIcon size={17} />
+              </button>
+            </div>
+          </div>
         )}
       </div>
-
-      {/* Music: confirmed playback only — the whole row stays out
-          until the first real reading lands, and an empty reading
-          stays a one-liner. No placeholder content, ever. */}
-      {(local?.title || hasCtl !== null) && (
-        <div className="card-row">
-          <div className="card-title">Now playing 🎵</div>
-          {local?.title ? (
-            <LocalPlayer
-              track={local}
-              upNext={upNext.filter((h) => h.key !== trackKey(local))}
-              onCmd={cmd}
-            />
-          ) : (
-            <div className="card-detail">
-              {hasCtl === false
-                ? "No player detected on this PC."
-                : "Nothing playing."}
-            </div>
-          )}
-        </div>
-      )}
     </Card>
   );
 }

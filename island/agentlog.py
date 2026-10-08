@@ -251,6 +251,74 @@ def latest(evs):
     return state, activity
 
 
+def project_of(evs=None, day=None):
+    """Newest project dir + its MD docs, for the project-centric hero.
+
+    cwd wins (hook relay captures it); falls back to the newest edited
+    file's dirname since opencode events often carry file but no cwd.
+    docs = top-level *.md, priority order, cap 6, first-line snippet.
+    Never throws — {} with [] docs when nothing resolves."""
+    empty = {'cwd': '', 'name': '', 'docs': []}
+    try:
+        now = time.time()
+        day = day or time.strftime('%Y-%m-%d', time.localtime(now))
+        cands = []
+        for e in reversed(evs or []):
+            try:
+                ts = e.get('ts') or 0
+            except AttributeError:
+                continue
+            if not ts:
+                continue
+            try:
+                same = time.strftime('%Y-%m-%d',
+                                      time.localtime(ts)) == day
+            except (TypeError, ValueError):
+                continue
+            if not same:
+                continue
+            cwd = (e.get('cwd') or '').strip()
+            if cwd and os.path.isdir(cwd):
+                cands.append(cwd)
+                break
+            f = (e.get('file') or '').strip()
+            if f:
+                d = os.path.dirname(os.path.abspath(f))
+                if os.path.isdir(d):
+                    cands.append(d)
+                    break
+        if not cands:
+            return empty
+        cwd = cands[0]
+        name = os.path.basename(os.path.normpath(cwd)) or cwd
+        docs = []
+        try:
+            names = sorted(os.listdir(cwd))
+        except OSError:
+            return {'cwd': cwd, 'name': name, 'docs': []}
+        pri = ('README.md', 'PLAN.md', 'TODO.md', 'HANDOFF.md',
+               'ROADMAP.md', 'CHANGELOG.md', 'AGENTS.md')
+        mds = [n for n in names if n.lower().endswith('.md')
+               and os.path.isfile(os.path.join(cwd, n))]
+        mds.sort(key=lambda n: (pri.index(n) if n in pri else 99, n.lower()))
+        for n in mds[:6]:
+            snippet = ''
+            try:
+                with open(os.path.join(cwd, n), encoding='utf-8',
+                          errors='replace') as fh:
+                    for ln in fh.read(4096).splitlines():
+                        ln = ln.strip().lstrip('# ').strip()
+                        if ln:
+                            snippet = ln[:120]
+                            break
+            except OSError:
+                snippet = ''
+            docs.append({'name': n, 'snippet': snippet})
+        return {'cwd': cwd, 'name': name, 'docs': docs}
+    except Exception:
+        return empty
+
+
 def work_today(evs=None, now=None):
     """Today's work snapshot for the Daily grid: what/where/%/left.
 
@@ -263,6 +331,8 @@ def work_today(evs=None, now=None):
         state, activity = latest(evs)
         asks, dones, files, added, removed = 0, 0, set(), 0, 0
         current = ''
+        newest_file, newest_ts = '', 0.0
+        newest_cwd = ''
         for e in evs:
             try:
                 ts = e.get('ts') or 0
@@ -283,21 +353,38 @@ def work_today(evs=None, now=None):
             elif ev in ('PreToolUse', 'PostToolUse'):
                 if e.get('file'):
                     files.add(os.path.basename(e['file']))
+                    try:
+                        if (e.get('ts') or 0) >= newest_ts:
+                            newest_ts = e.get('ts') or 0
+                            newest_file = e['file']
+                    except (TypeError, AttributeError):
+                        pass
+                if e.get('cwd'):
+                    newest_cwd = str(e['cwd'])
                 added += e.get('added') or 0
                 removed += e.get('removed') or 0
         done = min(dones, asks)
         left = asks - done
+        wlens = file_lens(newest_file)
+        if not wlens['file']:
+            wlens = cwd_lens(newest_cwd)
         return {'state': state, 'activity': activity,
                 'current': current, 'asks': asks,
                 'done': done, 'left': left,
                 'pct': round(done * 100 / asks) if asks else 0,
-                'files': sorted(files)[:8], 'added': added,
+                'files': sorted(files)[:8], 'file': newest_file,
+                'added': added,
                 'removed': removed,
-                'steps': session_steps(evs, day)}
+                'steps': session_steps(evs, day),
+                'lens': wlens,
+                'project': project_of(evs, day)}
     except Exception:
         return {'state': 'idle', 'activity': '', 'current': '',
                 'asks': 0, 'done': 0, 'left': 0, 'pct': 0,
-                'files': [], 'added': 0, 'removed': 0, 'steps': []}
+                'files': [], 'file': '', 'added': 0, 'removed': 0,
+                'steps': [],
+                'lens': {'file': '', 'lines': []},
+                'project': {'cwd': '', 'name': '', 'docs': []}}
 
 
 def session_steps(evs, day, limit=6):
@@ -408,6 +495,147 @@ def sessions(evs, limit=12):
         if len(out) >= limit:
             break
     return out
+
+
+LENS_MAX_BYTES = 120_000
+LENS_TAIL_LINES = 14
+
+
+def file_lens(path):
+    """Tail of the file the agent is touching, for the island code lens.
+    Basename + last lines only; missing/binary/huge -> honest empty.
+    Never throws."""
+    empty = {'file': '', 'lines': []}
+    try:
+        p = str(path or '').strip()
+        if not p or not os.path.isfile(p):
+            return dict(empty)
+        if os.path.getsize(p) > LENS_MAX_BYTES:
+            return {'file': os.path.basename(p), 'lines': []}
+        with open(p, encoding='utf-8', errors='strict') as f:
+            text = f.read(LENS_MAX_BYTES + 1)
+    except (OSError, ValueError, UnicodeError):
+        return dict(empty)
+    if '\0' in text[:4096]:
+        return {'file': os.path.basename(p), 'lines': []}
+    return {'file': os.path.basename(p),
+            'lines': text.splitlines()[-LENS_TAIL_LINES:]}
+
+
+def cwd_lens(cwd):
+    """Newest dirty file under a session cwd, for the island code lens.
+    Uncommitted work = what the agent is editing right now. Non-repo or
+    clean tree -> honest empty. Never throws."""
+    empty = {'file': '', 'lines': []}
+    try:
+        import subprocess
+        c = str(cwd or '').strip()
+        if not c or not os.path.isdir(c):
+            return dict(empty)
+        r = subprocess.run(
+            ['git', '-C', c, 'status', '--porcelain=v1',
+             '--untracked-files=no'],
+            capture_output=True, text=True, timeout=5)
+        if r.returncode != 0:
+            return dict(empty)
+        cands = []
+        for ln in r.stdout.splitlines():
+            p = ln.split(' -> ')[-1].strip().strip('"') if ' -> ' in ln \
+                else ln[3:].strip().strip('"')
+            fp = os.path.join(c, p)
+            if p and os.path.isfile(fp):
+                try:
+                    cands.append((os.path.getmtime(fp), fp))
+                except OSError:
+                    pass
+        if not cands:
+            return dict(empty)
+        cands.sort()
+        return file_lens(cands[-1][1])
+    except Exception:
+        return dict(empty)
+
+
+def session_progress(evs, sid):
+    """One session's live progress for the island team tiles.
+
+    {task, state, activity, steps:[{label,status}], files:[{name,added,removed}]}.
+    Steps mirror the ref checklist (Read/Edit/Bash/Done); the running step
+    is 'active' while state is working/thinking. Never throws."""
+    try:
+        sev = [e for e in (evs or []) if isinstance(e, dict)
+               and (e.get('session') or '') == sid]
+        if not sev:
+            return {'task': '', 'state': 'idle', 'activity': '',
+                    'steps': [], 'files': [],
+                    'lens': {'file': '', 'lines': []}}
+        task = ''
+        for e in sev:
+            if (e.get('event') or '') == 'UserPromptSubmit' and e.get('text'):
+                task = str(e['text'])[:120]
+                break
+        if not task:
+            first = sev[0]
+            task = str(first.get('text') or first.get('tool')
+                       or first.get('event') or '')[:120]
+        state, activity = latest(sev)
+        order, seen = [], set()
+        for e in sev:
+            if (e.get('event') or '') not in ('PreToolUse', 'PostToolUse'):
+                continue
+            tool = str(e.get('tool') or '')
+            low = tool.lower()
+            if tool in FILE_TOOLS:
+                label = 'Edit'
+            elif low in ('read', 'grep', 'glob', 'cat', 'ls', 'find'):
+                label = 'Read'
+            elif low in ('bash', 'shell', 'sh'):
+                label = 'Bash'
+            else:
+                label = tool[:16] or 'tool'
+            if label not in seen:
+                seen.add(label)
+                order.append(label)
+        phases = [p for p in ('Read', 'Edit', 'Bash') if p in seen]
+        phases += [p for p in order if p not in ('Read', 'Edit', 'Bash')]
+        stopped = [e for e in sev if (e.get('event') or '') == 'Stop']
+        if stopped:
+            phases.append('Done')
+        steps = []
+        for i, label in enumerate(phases):
+            last = i == len(phases) - 1
+            if label == 'Done':
+                ok = all(s.get('ok', True) for s in stopped)
+                status = 'done' if ok else 'error'
+            elif last and state in ('working', 'thinking'):
+                status = 'active'
+            else:
+                status = 'done'
+            steps.append({'label': label, 'status': status})
+        files, fseen = [], set()
+        last_path, last_cwd = '', ''
+        for e in sev:
+            if e.get('cwd'):
+                last_cwd = str(e['cwd'])
+            if e.get('tool') not in FILE_TOOLS or not e.get('file'):
+                continue
+            last_path = str(e['file'])
+            name = os.path.basename(last_path)
+            if name in fseen:
+                continue
+            fseen.add(name)
+            files.append({'name': name, 'added': e.get('added') or 0,
+                          'removed': e.get('removed') or 0})
+        lens = file_lens(last_path)
+        if not lens['file']:
+            lens = cwd_lens(last_cwd)
+        return {'task': task, 'state': state, 'activity': activity,
+                'steps': steps[:8], 'files': files[:6],
+                'lens': lens}
+    except Exception:
+        return {'task': '', 'state': 'idle', 'activity': '',
+                'steps': [], 'files': [],
+                'lens': {'file': '', 'lines': []}}
 
 # --- hidden agent sessions (island UI delete) ------------------------------
 
@@ -707,7 +935,37 @@ def provider_available(provider):
     return provider == 'router'
 
 
-def describe_command(provider, msg, session_id=None, yolo=False):
+def _model_flag(provider, model):
+    """CLI model flag for a turn, or [] when default/auto. Never throws."""
+    try:
+        m = (model or "").strip()
+        if not m or m in ("auto", "router-pick", "local"):
+            return []
+        if provider == "opencode":
+            return ["-m", m]
+        if provider == "claude":
+            return ["--model", m]
+    except Exception:
+        pass
+    return []
+
+
+def list_models(timeout=20):
+    """Live `opencode models` ids (provider/model). [] on any failure."""
+    try:
+        import subprocess
+        p = subprocess.run(["opencode", "models"], capture_output=True,
+                           text=True, timeout=timeout)
+        if p.returncode != 0:
+            return []
+        out = [ln.strip() for ln in (p.stdout or "").splitlines()
+               if ln.strip() and "/" in ln.strip()]
+        return sorted(set(out))[:500]
+    except Exception:
+        return []
+
+
+def describe_command(provider, msg, session_id=None, yolo=False, model=None):
     """argv list for running an agent turn. msg/argv safe (no shell)."""
     if provider == 'claude':
         if session_id:  # multi-turn: resume + stream-json in/out
@@ -716,6 +974,7 @@ def describe_command(provider, msg, session_id=None, yolo=False):
                     '--output-format', 'stream-json', '--verbose']
             if yolo:
                 argv.append('--dangerously-skip-permissions')
+            argv.extend(_model_flag(provider, model))
             return argv, json.dumps({'type': 'user',
                                      'message': {'role': 'user',
                                                  'content': msg}}) + '\n'
@@ -723,12 +982,14 @@ def describe_command(provider, msg, session_id=None, yolo=False):
                 '--verbose', '--include-partial-messages']
         if yolo:
             argv.append('--dangerously-skip-permissions')
+        argv.extend(_model_flag(provider, model))
         return argv, None
     if provider == 'opencode':
         argv = ['opencode', 'run', '--format', 'json']
         if session_id:
             argv.append('--session')
             argv.append(session_id)
+        argv.extend(_model_flag(provider, model))
         argv.append(msg)
         return argv, None
     raise ValueError(provider)

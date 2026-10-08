@@ -1,16 +1,18 @@
 import { useEffect, useRef, useState } from "react";
-import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon, PhoneIcon } from "./icons";
-import { EffortPicker, ProviderPicker, useDismiss, ENGINES, displayModel } from "./pickers";
+import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon, PhoneIcon, BoltIcon } from "./icons";
+import { EffortPicker, PillButton, ProviderPicker, useDismiss, useEngines, ENGINES, displayModel } from "./pickers";
 export { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
 import { ActivityOrb } from "../orb";
 import { IDLE_ACTIVITY } from "../orb_state";
 import {
+  classifyAttachment,
   formatSize,
   type AgentSession,
   type Approval,
   type Attachment,
   type ChatMessage,
   type ExploreFeed,
+  type IslandView,
   type Question,
   type SkillHit,
 } from "../store";
@@ -231,10 +233,10 @@ function DropFrame({ rx = 20 }: { rx?: number }) {
   );
 }
 
-// Composer status: last-turn time + phone-pipe state (relay live vs
-// offline queue). The offline count is the only hint a queued drop waits.
-export function StatusLine({ thinking, turnMs, linked, queued }: { thinking: boolean; turnMs: number | null; linked: boolean; queued: number }) {
-  const link = linked ? "phone linked" : queued > 0 ? `phone offline · queued ${queued}` : "phone offline";
+// Composer status: last-turn time + phone-pipe state. Queue count lives
+// only in the chat strip suggestion, never nagged here.
+export function StatusLine({ thinking, turnMs, linked }: { thinking: boolean; turnMs: number | null; linked: boolean }) {
+  const link = linked ? "phone linked" : "phone offline";
   const bits = [thinking ? "…" : turnMs !== null ? `${turnMs.toFixed(1)}s` : null, link].filter(
     (b): b is string => b !== null,
   );
@@ -258,9 +260,11 @@ export function ChatPanel({
   onDropToPhone,
   onDropFilesToPhone,
   phoneLinked = false,
-  queuedDrops = 0,
   liveShots = [],
   bridgeOn = false,
+  providers = null,
+  installState = "idle",
+  onInstall = () => {},
   liveActivity = null,
   livePartial = null,
   turnEngine = "",
@@ -280,13 +284,18 @@ export function ChatPanel({
   onDropToPhone?: () => void;
   onDropFilesToPhone?: (files: File[]) => void;
   phoneLinked?: boolean;
-  queuedDrops?: number;
   liveShots?: Array<{ src: string; label: string }>;
   bridgeOn?: boolean;
+  // No-agent setup: bridge up but neither CLI found. Card installs
+  // opencode in one click; hidden in every other state.
+  providers?: { opencode: boolean; claude: boolean } | null;
+  installState?: "idle" | "working" | "error";
+  onInstall?: () => void;
   liveActivity?: string | null;
   livePartial?: string | null;
   turnEngine?: string;
 }) {
+  const engines = useEngines();
   const [provider, setProvider] = useState(ENGINES[0].id);
   const [model, setModel] = useState(ENGINES[0].models[0]);
   const [effort, setEffort] = useState<string>("med");
@@ -304,6 +313,26 @@ export function ChatPanel({
     setPrevThinking(thinking);
     if (thinking) setWorkSecs(0);
   }
+  // Live strip (Atoll live activities): mic / queued drops / battery poll.
+  // Rows render only while live — nothing live, no strip.
+  const [battery, setBattery] = useState<{ has_battery: boolean; pct: number | null; charging: boolean } | null>(null);
+  useEffect(() => {
+    let alive = true;
+    const poll = () => {
+      fetch(`${window.location.origin}/battery`)
+        .then((r) => r.json())
+        .then((j) => {
+          if (alive && j && typeof j.has_battery === "boolean") setBattery(j);
+        })
+        .catch(() => {});
+    };
+    poll();
+    const t = setInterval(poll, 30000);
+    return () => {
+      alive = false;
+      clearInterval(t);
+    };
+  }, []);
   useEffect(() => {
     if (!thinking) return;
     const t0 = Date.now();
@@ -322,9 +351,11 @@ export function ChatPanel({
   const sentAt = useRef(0);
   const recRef = useRef<{ rec: MediaRecorder; chunks: Blob[]; timer: ReturnType<typeof setInterval> } | null>(null);
   const pickProvider = (id: string) => {
-    const eng = ENGINES.find((e) => e.id === id) ?? ENGINES[0];
+    const eng = engines.find((e) => e.id === id) ?? engines[0];
     setProvider(eng.id);
-    setModel(eng.models[0]);
+    // keep the current model when it exists on the new engine (e.g. the
+    // live opencode list); otherwise fall back to its first model.
+    setModel((cur) => (eng.models.includes(cur) ? cur : eng.models[0]));
   };
   const togglePicker = (which: "provider" | "effort") =>
     setOpenPicker((cur) => (cur === which ? null : which));
@@ -461,6 +492,22 @@ export function ChatPanel({
       }}
     >
       <div className="chat-log">
+        {(recording ||
+          (battery?.has_battery === true && (battery.charging || (battery.pct ?? 100) <= 20))) && (
+          <div className="live-strip" aria-live="polite">
+            {recording && (
+              <span className="live-row">
+                <i className="live-dot" />Recording {recSecs}s — tap the mic to stop
+              </span>
+            )}
+            {battery?.has_battery === true && (battery.charging || (battery.pct ?? 100) <= 20) && (
+              <span className="live-row">
+                <BoltIcon size={12} />
+                {battery.charging ? `Charging ${battery.pct ?? "?"}%` : `Battery ${battery.pct ?? "?"}% — plug in`}
+              </span>
+            )}
+          </div>
+        )}
         {messages.length === 0 && !thinking && (
           <ActivityOrb
             activity={{ ...IDLE_ACTIVITY, listening: recording }}
@@ -586,6 +633,26 @@ export function ChatPanel({
               </span>
             )
           ))}
+        </div>
+      )}
+      {bridgeOn && providers && !providers.opencode && !providers.claude && (
+        <div className="card" role="status" aria-label="Agent setup">
+          <div className="card-title">No agent installed yet</div>
+          <div className="card-detail">
+            Steroids chats through your own CLI. One click installs opencode — free, no API key.
+          </div>
+          {installState === "error" ? (
+            <div className="card-detail">
+              Automatic install failed — run this in a terminal, then send again:<br />
+              <span className="inline-code">curl -fsSL https://opencode.ai/install | bash</span>
+            </div>
+          ) : (
+            <div className="btn-row">
+              <PillButton onClick={onInstall} disabled={installState === "working"}>
+                {installState === "working" ? "Installing…" : "Install opencode"}
+              </PillButton>
+            </div>
+          )}
         </div>
       )}
       <div
@@ -738,6 +805,7 @@ export function ChatPanel({
               onModel={setModel}
               open={openPicker === "provider"}
               onToggle={() => togglePicker("provider")}
+              engines={engines}
             />
             <EffortPicker
               value={effort}
@@ -759,7 +827,7 @@ export function ChatPanel({
       </div>
       {(thinking || turnMs !== null) && (
         <div className="composer-status">
-          <StatusLine thinking={thinking} turnMs={turnMs} linked={phoneLinked} queued={queuedDrops} />
+          <StatusLine thinking={thinking} turnMs={turnMs} linked={phoneLinked} />
         </div>
       )}
     </Card>
@@ -799,7 +867,9 @@ export function md(text: string): React.ReactNode[] {
   });
 }
 
-// Settings state — sound + volume, provider, active pills, auto-close.
+// Settings state — sound + volume, provider, active pills, auto-close,
+// hover-open + dwell (Atoll: openNotchOnHover + minimumHoverDuration),
+// hiddenViews (Atoll: enableXFeature gates tabs — off tabs never render).
 export interface SettingsState {
   soundOn: boolean;
   volume: number;
@@ -807,9 +877,10 @@ export interface SettingsState {
   activePills: string[];
   autoClose: number;
   autoSave: boolean;
+  hoverOpen: boolean;
+  hoverDelay: number;
+  hiddenViews: IslandView[];
 }
-
-const ALL_PILLS = ["steroids", "opencode", "claude", "codex", "ollama"];
 
 // Pair panel — links this browser with the phone over the self relay.
 // Zero typing: the phone knocks, the PC taps Allow once, linked forever.
@@ -947,34 +1018,177 @@ export function PairPanel({
     </div>
   );
 }
+// Shelf (Atoll tray tab): staged files waiting to attach or beam. Session
+// only — object URLs die on reload, so staged files do too. Rows, not a
+// grid: attach / send-to-phone / remove per file.
+export interface ShelfItem {
+  file: File;
+  url: string;
+}
+
+export function ShelfView({
+  items,
+  onStage,
+  onAttach,
+  onSendToPhone,
+  onRemove,
+}: {
+  items: ShelfItem[];
+  onStage: (files: File[]) => void;
+  onAttach: (file: File) => void;
+  onSendToPhone: (file: File) => void;
+  onRemove: (url: string) => void;
+}) {
+  const pickRef = useRef<HTMLInputElement>(null);
+  return (
+    <div
+      className="card shelf"
+      onDragOver={(e) => {
+        e.preventDefault();
+        e.stopPropagation();
+      }}
+      onDrop={(e) => {
+        // Stop here: the App root would otherwise file these into the
+        // composer. Dropped on the shelf = staged, not attached.
+        e.preventDefault();
+        e.stopPropagation();
+        const files = Array.from(e.dataTransfer?.files ?? []);
+        if (files.length) onStage(files);
+      }}
+    >
+      <div className="btn-row">
+        <PillButton onClick={() => pickRef.current?.click()}>+ Stage files</PillButton>
+        <input
+          ref={pickRef}
+          type="file"
+          multiple
+          hidden
+          aria-hidden
+          tabIndex={-1}
+          onChange={(e) => {
+            if (e.target.files?.length) onStage(Array.from(e.target.files));
+            e.target.value = "";
+          }}
+        />
+      </div>
+      {!items.length ? (
+        <div className="card-detail">
+          Shelf is empty — stage error screenshots, logs, docs, or anything
+          you&apos;ll attach or beam in a bit. Drop files here or stage them.
+          Session only, clears on reload.
+        </div>
+      ) : (
+        <div className="try-col">
+          {items.map((it) => (
+            <div key={it.url} className="shelf-row">
+              {it.file.type.startsWith("image/") ? (
+                <img src={it.url} alt="" className="shelf-thumb" />
+              ) : (
+                <i className="chip-dot" />
+              )}
+              <span className="shelf-name">
+                <b className="kind-tag">{kindIcon(classifyAttachment(it.file.name, it.file.type))}</b>
+                {it.file.name} · {formatSize(it.file.size)}
+              </span>
+              <button className="menu-act" title="Attach to composer" onClick={() => onAttach(it.file)}>
+                Attach
+              </button>
+              <button className="menu-act" title="Send to phone" onClick={() => onSendToPhone(it.file)}>
+                <DropIcon size={14} />
+              </button>
+              <button
+                className="chip-x"
+                aria-label={`Remove ${it.file.name}`}
+                onClick={() => onRemove(it.url)}
+              >
+                <XIcon />
+              </button>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+export type SettingsPage = "general" | "phone";
+
+// Equalizer bars (Vorssaint NotchEqualizerBars, CSS edition): synthetic
+// stepped motion while playing, frozen frame when paused. No audio tap.
+export function EqBars({ playing }: { playing: boolean }) {
+  return (
+    <span className={playing ? "eq-bars" : "eq-bars paused"} aria-hidden>
+      <i /><i /><i /><i />
+    </span>
+  );
+}
 
 export function SettingsView({
   settings,
   onChange,
   pair,
   extra,
+  page = "general",
+  onPage,
 }: {
   settings: SettingsState;
   onChange: (s: SettingsState) => void;
   pair?: React.ReactNode;
   extra?: React.ReactNode;
+  page?: SettingsPage;
+  onPage?: (p: SettingsPage) => void;
 }) {
+  const tab = page;
   const set = (patch: Partial<SettingsState>) => onChange({ ...settings, ...patch });
-  const togglePill = (id: string) =>
-    set({
-      activePills: settings.activePills.includes(id)
-        ? settings.activePills.filter((p) => p !== id)
-        : [...settings.activePills, id],
-    });
-  // One page, no tabs: identity card (account panel) first, then the
-  // switches, phone link last. Everything visible, nothing tabbed away.
+  // Only the prefs worth touching: provider default, notifications,
+  // auto-save. The rest (auto-close, hover, hidden tabs/pills) rides its
+  // default from SettingsState — fewer knobs, nothing downstream breaks.
+  const PROVIDERS = ENGINES.map((e) => e.id);
+  const cycleProvider = () =>
+    set({ provider: PROVIDERS[(PROVIDERS.indexOf(settings.provider) + 1) % PROVIDERS.length] });
+  // Master-detail: nav lives on the left, page on the right — one tap
+  // per hop, no dropdown round-trips. The avatar menu still deep-links
+  // (same page state), the sidebar is the always-visible switcher.
+  const NAV: Array<{ id: SettingsPage; label: string }> = [
+    { id: "general", label: "General" },
+    { id: "phone", label: "Phone link" },
+  ];
   return (
     <div className="card settings">
-      <div className="set-col">
+      <div className="set-layout">
+        <div className="menu-card set-nav" role="tablist" aria-label="Settings pages">
+          {NAV.map((n) => (
+            <button
+              key={n.id}
+              role="tab"
+              aria-selected={tab === n.id}
+              className="menu-row action"
+              onClick={() => onPage?.(n.id)}
+            >
+              <span>{n.label}</span>
+              {tab === n.id && <CheckIcon size={14} />}
+            </button>
+          ))}
+        </div>
+        <div className="set-page">
+        {tab === "general" && (
+        <>
         <div id="island-account">{extra}</div>
-      <div className="menu-card" aria-label="Drops and sound">
-        <div className="menu-row menu-head">
-          <b>Sound &amp; drops</b>
+        <div className="set-head">Preferences</div>
+      <div className="menu-card" aria-label="Preferences">
+        <button className="menu-row action" onClick={cycleProvider} aria-label="Chat provider">
+          <span>Chat provider</span>
+          <em className="badge on">{settings.provider}</em>
+        </button>
+        <div className="menu-row">
+          <span>Notification sounds</span>
+          <button
+            className={settings.soundOn ? "switch on" : "switch"}
+            onClick={() => set({ soundOn: !settings.soundOn })}
+            aria-label="Notification sounds"
+          >
+            <i />
+          </button>
         </div>
         <div className="menu-row">
           <span>Auto-save incoming drops</span>
@@ -986,83 +1200,11 @@ export function SettingsView({
             <i />
           </button>
         </div>
-        <div className="menu-row">
-          <span>Notification sounds</span>
-          <button
-            className={settings.soundOn ? "switch on" : "switch"}
-            onClick={() => set({ soundOn: !settings.soundOn })}
-            aria-label="Notification sounds"
-          >
-            <i />
-          </button>
-        </div>
-        {settings.soundOn && (
-          <div className="menu-row">
-            <input
-              type="range"
-              min={0}
-              max={100}
-              value={Math.round(settings.volume * 100)}
-              onChange={(e) => set({ volume: Number(e.target.value) / 100 })}
-              className="vol"
-              aria-label="Volume"
-            />
-          </div>
+      </div>
+        </>
         )}
-      </div>
-      <div className="menu-card" aria-label="Chat provider">
-        <div className="menu-row menu-head">
-          <b>Chat provider</b>
-          <em className="badge on">{settings.provider}</em>
+        {tab === "phone" && pair}
         </div>
-        {ENGINES.map((e) => (
-          <button
-            key={e.id}
-            className="menu-row action"
-            onClick={() => set({ provider: e.id })}
-            aria-pressed={settings.provider === e.id}
-          >
-            <span>{e.label}</span>
-            <span className="menu-dim">{e.outcome}</span>
-            {settings.provider === e.id && <CheckIcon size={14} />}
-          </button>
-        ))}
-      </div>
-      <div className="menu-card" aria-label="Auto-close">
-        <div className="menu-row menu-head">
-          <b>Auto-close</b>
-          <em className="badge on">{settings.autoClose}s</em>
-        </div>
-        {[5, 15, 30, 60].map((s) => (
-          <button
-            key={s}
-            className="menu-row action"
-            onClick={() => set({ autoClose: s })}
-            aria-pressed={settings.autoClose === s}
-          >
-            <span>{s}s</span>
-            {settings.autoClose === s && <CheckIcon size={14} />}
-          </button>
-        ))}
-      </div>
-      <div className="menu-card" aria-label="Active pills">
-        <div className="menu-row menu-head">
-          <b>Active pills</b>
-          <em className="badge on">{settings.activePills.length}</em>
-        </div>
-        {ALL_PILLS.map((p) => (
-          <button
-            key={p}
-            className="menu-row action"
-            onClick={() => togglePill(p)}
-            aria-pressed={settings.activePills.includes(p)}
-          >
-            <span>{p}</span>
-            {settings.activePills.includes(p) && <CheckIcon size={14} />}
-          </button>
-        ))}
-      </div>
-        {pair}
       </div>
     </div>
   );
