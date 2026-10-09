@@ -84,6 +84,7 @@ function AvatarMenu({
   settingsPage = "general",
   onAvatarNav = () => {},
   onSignOut = () => {},
+  onOpen = () => {},
 }: {
   email?: string | null;
   avatarUrl?: string | null;
@@ -91,6 +92,7 @@ function AvatarMenu({
   settingsPage?: SettingsPage;
   onAvatarNav?: (page: "profile" | "explore" | "settings" | "account" | "phone") => void;
   onSignOut?: () => void;
+  onOpen?: () => void;
 }) {
   const [open, setOpen] = useState(false);
   const [imgDead, setImgDead] = useState(false);
@@ -111,7 +113,7 @@ function AvatarMenu({
         className={email ? "avatar-btn signed" : "avatar-btn"}
         title={email ?? "Account — sign in"}
         aria-label="Account menu"
-        onClick={() => setOpen((o) => !o)}
+        onClick={() => { if (!open) onOpen(); setOpen((o) => !o); }}
       >
         {face}
       </button>
@@ -152,6 +154,7 @@ export function Header({
   unread,
   onTab,
   sessions = [],
+  histHint = null,
   activeSessionId = null,
   onResumeSession,
   onDeleteSession,
@@ -173,6 +176,7 @@ export function Header({
   unread: number;
   onTab: (v: IslandView) => void;
   sessions?: ChatSession[];
+  histHint?: string | null;
   activeSessionId?: number | null;
   onResumeSession?: (id: number) => void;
   onDeleteSession?: (id: number) => void;
@@ -235,7 +239,7 @@ export function Header({
         >
           <BellIcon bold={notifOpen} size={22} />
         </HeaderIconButton>
-        <AvatarMenu email={email} avatarUrl={avatarUrl} view={view} settingsPage={settingsPage} onAvatarNav={onAvatarNav} onSignOut={onSignOut} />
+        <AvatarMenu email={email} avatarUrl={avatarUrl} view={view} settingsPage={settingsPage} onAvatarNav={onAvatarNav} onSignOut={onSignOut} onOpen={closeBoth} />
       </div>
       {notifOpen && (
         <div className="hist-panel" role="dialog" aria-label="Notifications">
@@ -280,12 +284,15 @@ export function Header({
               <span>New chat</span>
             </button>
           </div>
-          {!hasChats && !hasAgents && <div className="history-empty">No previous chats</div>}
+          {histHint && <div className="history-empty">{histHint}</div>}
+          {!hasChats && !hasAgents && (
+            <div className="history-empty">No previous chats</div>
+          )}
           {hasChats && sessions.map((s) => (
             <div key={s.id} className={s.id === activeSessionId ? "hist-row on" : "hist-row"}>
               <button
                 className="hist-title"
-                title={s.title}
+                title={s.handoff ? `${s.title} — last: ${s.handoff}` : s.title}
                 onClick={() => { onResumeSession?.(s.id); setHistOpen(false); }}
               >
                 <span className="hist-label">{s.title}</span>

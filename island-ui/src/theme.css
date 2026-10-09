@@ -1,6 +1,8 @@
 /* Steroids theme tokens — GOlinkup AppColors/AppTextStyles equivalent.
    Single source for app color + text. Change here, the whole UI follows.
    Brand accents stay fixed (like GOlinkup BRAND); surfaces/text flip light/dark. */
+/* ponytail: no remote fonts — offline PWA install must not fetch Google. */
+/* Local Montserrat + system stack below covers it. */
 @font-face{font-family:'Montserrat';font-style:normal;font-weight:100 900;font-display:swap;src:url('/fonts/montserrat-latin.woff2') format('woff2')}
 :root{
   /* brand (same in both themes) */
@@ -32,7 +34,7 @@
   --border:rgba(255,255,255,.08);
   --border-strong:rgba(255,255,255,.12);
   /* type */
-  --font-ui:'Outfit','Montserrat',ui-sans-serif,system-ui,sans-serif;
+  --font-ui:'Montserrat',ui-sans-serif,system-ui,sans-serif;
   --font-mono:ui-monospace,Menlo,Consolas,monospace;
   /* type scale (iOS HIG: floor = Caption 2 11px, emphasis = Semibold 600) */
   --size-floor:.7rem;
@@ -43,4 +45,21 @@
   /* gradient — one reusable: effort fill, ready send, every CTA.
      House brand (index.html --bar-hot direction): orange → peach, never blue/purple */
   --grad:linear-gradient(90deg,var(--brand),var(--brand-light));
+  /* reverse-engineered from home (index.html): bars + motion tokens.
+     Island never renders charts, but tokens stay 1:1 so house style
+     can't drift between pages. */
+  --bar-gray:linear-gradient(to bottom,#3d3e45 0%,#26272c 100%);
+  --bar-hot:linear-gradient(to bottom,#ff4a1a 0%,#ff6a2b 35%,#ffb08a 70%,#ffffff 100%);
+  --bar-gold:linear-gradient(to bottom,#ffedb0 0%,#ffd35c 40%,#ff9d1f 100%);
+  --gutter:1.5rem;
+  --ios:cubic-bezier(.32,.72,0,1);
+  /* home aliases (index.html names): paste home CSS verbatim, it resolves.
+     Island never renders charts, but tokens stay 1:1 so house style
+     can't drift between pages. */
+  --accent:var(--brand);
+  --accent-2:var(--brand-light);
+  --txt:var(--text);
+  --dim:var(--text-mute);
+  --dimmer:var(--text-faint);
+  --border-soft:var(--border-strong);
 }
