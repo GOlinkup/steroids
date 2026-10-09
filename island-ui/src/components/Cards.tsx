@@ -1,9 +1,11 @@
 import { useEffect, useRef, useState } from "react";
-import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon, PhoneIcon, BoltIcon } from "./icons";
+import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon, PhoneIcon, BoltIcon, StopIcon } from "./icons";
 import { EffortPicker, PillButton, ProviderPicker, useDismiss, useEngines, ENGINES, displayModel } from "./pickers";
 export { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
-import { ActivityOrb } from "../orb";
-import { IDLE_ACTIVITY } from "../orb_state";
+import { SafeOrb } from "../orb";
+import { chatOrbFor } from "../orb_state";
+import { LensBlock, StepsList, useSessionProgress } from "./TeamGrid";
+import { HiveBoard, LoopTile, LoopTasks, LiveLoops, SchedulesSection, useLoopTasks } from "./Loop";
 import {
   classifyAttachment,
   formatSize,
@@ -233,21 +235,6 @@ function DropFrame({ rx = 20 }: { rx?: number }) {
   );
 }
 
-// Composer status: last-turn time + phone-pipe state. Queue count lives
-// only in the chat strip suggestion, never nagged here.
-export function StatusLine({ thinking, turnMs, linked }: { thinking: boolean; turnMs: number | null; linked: boolean }) {
-  const link = linked ? "phone linked" : "phone offline";
-  const bits = [thinking ? "…" : turnMs !== null ? `${turnMs.toFixed(1)}s` : null, link].filter(
-    (b): b is string => b !== null,
-  );
-  if (!bits.length) return null;
-  return (
-    <span className="tokens" title="last turn time · phone pipe (relay live, outbox offline)">
-      {bits.join(" · ")}
-    </span>
-  );
-}
-
 export function ChatPanel({
   messages,
   onSend,
@@ -255,12 +242,9 @@ export function ChatPanel({
   attachments,
   onFiles,
   onRemoveAttachment,
-  onAdoptAttachments,
-  onOpenLens,
   onDropToPhone,
   onDropFilesToPhone,
   phoneLinked = false,
-  liveShots = [],
   bridgeOn = false,
   providers = null,
   installState = "idle",
@@ -268,23 +252,28 @@ export function ChatPanel({
   liveActivity = null,
   livePartial = null,
   turnEngine = "",
+  teamNode = null,
+  liveSession = null,
+  threadKey = null,
+  onEditMessage,
+  lastThought = null,
+  onStop,
 }: {
   messages: ChatMessage[];
   // filesOverride: explicit attachment set for this turn. undefined = use
   // the composer's pending chips; [] = text-only (skill taps must never
   // steal chips you staged for another question).
   onSend: (text: string, provider?: string, opts?: { model: string; effort: string }, filesOverride?: Attachment[] | null) => void;
+  // edit-in-place: truncate the log at the edited message; the panel then
+  // re-sends the new text as a fresh turn (stale replies below are dropped).
+  onEditMessage?: (id: number) => void;
   thinking: boolean;
   attachments: Attachment[];
   onFiles: (files: File[]) => void;
   onRemoveAttachment: (id: number) => void;
-  // history chips carry no File handle — the app re-resolves them via url.
-  onAdoptAttachments: (atts: Attachment[]) => void;
-  onOpenLens: () => void;
   onDropToPhone?: () => void;
   onDropFilesToPhone?: (files: File[]) => void;
   phoneLinked?: boolean;
-  liveShots?: Array<{ src: string; label: string }>;
   bridgeOn?: boolean;
   // No-agent setup: bridge up but neither CLI found. Card installs
   // opencode in one click; hidden in every other state.
@@ -294,17 +283,54 @@ export function ChatPanel({
   liveActivity?: string | null;
   livePartial?: string | null;
   turnEngine?: string;
+  // last finished turn: collapsed "Thought for Ns" receipt (Claude/Cursor
+  // language) — the working bubble unmounts, this one line stays.
+  lastThought?: { secs: number; label: string } | null;
+  // stop a live turn: the send button morphs into stop while thinking.
+  onStop?: () => void;
+  // active agent session: the working bubble reuses the home widgets
+  // (steps + lens) off its live progress — nothing extra fetched.
+  liveSession?: string | null;
+  // team rail: rendered above the log always (empty or chatting), so the
+  // crew never disappears mid-conversation — nicki leads it, this chat is hers.
+  teamNode?: React.ReactNode;
+  // draft belongs to the open thread: new/resumed chat clears the box.
+  // View switches + reloads keep it (init reads storage, mount run skips).
+  threadKey?: string | number | null;
 }) {
   const engines = useEngines();
   const [provider, setProvider] = useState(ENGINES[0].id);
   const [model, setModel] = useState(ENGINES[0].models[0]);
   const [effort, setEffort] = useState<string>("med");
   const [openPicker, setOpenPicker] = useState<null | "provider" | "effort">(null);
-  const [draft, setDraft] = useState("");
+  // Composer draft survives view switches + reloads: the panel unmounts
+  // whenever you leave chat, so the text lives in localStorage, not state.
+  // NOTE: must NOT share LIVE_KEY ("island.draft.v1" — JSON transcript) or
+  // the transcript renders inside the textbox and deletes come back.
+  const DRAFT_KEY = "island.composer.v1";
+  const [draft, setDraft] = useState(() => {
+    try {
+      return localStorage.getItem(DRAFT_KEY) ?? "";
+    } catch {
+      return "";
+    }
+  });
+  useEffect(() => {
+    try {
+      if (draft) localStorage.setItem(DRAFT_KEY, draft);
+      else localStorage.removeItem(DRAFT_KEY);
+    } catch { /* private mode — draft just won't survive reload */ }
+  }, [draft]);
+  const firstThread = useRef(true);
+  useEffect(() => {
+    if (firstThread.current) { firstThread.current = false; return; }
+    setDraft("");
+    try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
+    if (boxRef.current) boxRef.current.style.height = "auto";
+  }, [threadKey]);
   const [dragOver, setDragOver] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
-  const [turnMs, setTurnMs] = useState<number | null>(null);
   const [workSecs, setWorkSecs] = useState(0);
   // ponytail: reset-on-prop-change via render-adjust, not an effect —
   // sync setState in useEffect double-renders every turn start.
@@ -315,8 +341,7 @@ export function ChatPanel({
   }
   // Live strip (Atoll live activities): mic / queued drops / battery poll.
   // Rows render only while live — nothing live, no strip.
-  const [battery, setBattery] = useState<{ has_battery: boolean; pct: number | null; charging: boolean } | null>(null);
-  useEffect(() => {
+  const [battery, setBattery] = useState<{ has_battery: boolean; pct: number | null; charging: boolean } | null>(null);  useEffect(() => {
     let alive = true;
     const poll = () => {
       fetch(`${window.location.origin}/battery`)
@@ -339,16 +364,44 @@ export function ChatPanel({
     const timer = setInterval(() => setWorkSecs(Math.floor((Date.now() - t0) / 1000)), 1000);
     return () => clearInterval(timer);
   }, [thinking]);
+  // working bubble reuses the home live-progress hook: same steps/lens the
+  // tiles show, polled while the turn runs. Renders only when in use.
+  const liveFeed = useSessionProgress(liveSession && thinking ? [{ session: liveSession, agent: "", first: "" }] : []);
+  const liveProgress = liveSession ? liveFeed.prog[liveSession] : undefined;
+  const refreshLive = liveFeed.refresh;
+  // one design per live signal: searching (tool reads) > solving (step
+  // running) > composing (answer streaming) > working. Same inputs the
+  // bubble already renders below — nothing invented.
+  const chatOrb = chatOrbFor({
+    bridgeOn,
+    activity: liveActivity ?? liveProgress?.activity,
+    partial: livePartial,
+    stepsActive: (liveProgress?.steps ?? []).some((s) => s.status === "active"),
+  });
+  useEffect(() => {
+    if (!thinking || !liveSession) return;
+    // instant, not next-tick: fetch now so steps/lens/code show what the
+    // turn is touching right away, then keep a 2s rhythm while it runs.
+    refreshLive(liveSession);
+    const t = setInterval(() => refreshLive(liveSession), 2000);
+    return () => clearInterval(t);
+  }, [thinking, liveSession, refreshLive]);
   const [attachOpen, setAttachOpen] = useState(false);
   const [votes, setVotes] = useState<Record<number, 1 | -1>>({});
   const [copiedId, setCopiedId] = useState<number | null>(null);
   const attachDismiss = useDismiss<HTMLDivElement>(attachOpen, () => setAttachOpen(false));  const [composerDrag, setComposerDrag] = useState(false);
   const [phoneDrag, setPhoneDrag] = useState(false);
   const dragDepth = useRef(0);
+  const logRef = useRef<HTMLDivElement>(null);
+
+  // newest reply always visible: pin the log to the bottom as turns stream.
+  useEffect(() => {
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [messages, thinking, livePartial]);
   const fileRef = useRef<HTMLInputElement>(null);
   const snapRef = useRef<HTMLInputElement>(null);
   const boxRef = useRef<HTMLTextAreaElement>(null);
-  const sentAt = useRef(0);
   const recRef = useRef<{ rec: MediaRecorder; chunks: Blob[]; timer: ReturnType<typeof setInterval> } | null>(null);
   const pickProvider = (id: string) => {
     const eng = engines.find((e) => e.id === id) ?? engines[0];
@@ -362,32 +415,42 @@ export function ChatPanel({
   const submit = () => {
     const t = draft.trim();
     if ((!t && !attachments.length) || thinking) return;
-    sentAt.current = performance.now();
-    setTurnMs(null);
     setDraft("");
     if (boxRef.current) boxRef.current.style.height = "auto";
     onSend(t, provider, { model, effort });
   };
   const canSend = (draft.trim().length > 0 || attachments.length > 0) && !thinking;
 
-  // edit a sent message back into the composer, attachments ride along
-  // (fresh ids, same object URLs); regen re-sends the last user turn
-  // WITH its attachments as an explicit set, composer chips untouched.
-  const editBack = (text: string, atts?: Attachment[]) => {
-    setDraft(text);
-    if (atts?.length) onAdoptAttachments(atts);
-    const el = boxRef.current;
-    if (el) {
-      el.style.height = "auto";
-      el.style.height = Math.min(120, el.scrollHeight) + "px";
-      el.focus();
-    }
+  // inline bubble edit: pencil opens a textarea inside the bubble (never
+  // copies into the composer). Save truncates the log at the edited message
+  // and re-sends the new text as a fresh turn with the same attachments.
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editDraft, setEditDraft] = useState("");
+  const editBoxRef = useRef<HTMLTextAreaElement>(null);
+  // exact-size edit field: the textarea opens at the message's own height
+  // (scrollHeight, not a fixed row count) and follows as you type.
+  useEffect(() => {
+    const el = editBoxRef.current;
+    if (!el || editingId === null) return;
+    el.style.height = "auto";
+    el.style.height = Math.min(window.innerHeight * 0.4, el.scrollHeight) + "px";
+  }, [editingId, editDraft]);
+  const startEdit = (m: ChatMessage) => {
+    if (thinking) return;
+    setEditingId(m.id);
+    setEditDraft(m.content);
+  };
+  const saveEdit = () => {
+    const m = messages.find((x) => x.id === editingId);
+    const t = editDraft.trim();
+    if (!m || !t || thinking) return;
+    setEditingId(null);
+    onEditMessage?.(m.id);
+    onSend(t, provider, { model, effort }, m.attachments ?? []);
   };
   const regenLast = () => {
     const last = [...messages].reverse().find((m) => m.role === "user");
     if (!last || thinking) return;
-    sentAt.current = performance.now();
-    setTurnMs(null);
     onSend(last.content, provider, { model, effort }, last.attachments ?? []);
   };
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
@@ -456,17 +519,9 @@ export function ChatPanel({
       // mic denied — no fake state, just stay idle
     }
   };
-  // stamp turn time when the reply lands
-  const wasThinking = useRef(false);  useEffect(() => {
-    if (wasThinking.current && !thinking && sentAt.current) {
-      setTurnMs((performance.now() - sentAt.current) / 1000);
-      sentAt.current = 0;
-    }
-    wasThinking.current = thinking;
-  }, [thinking]);
   return (
     <Card
-      className={dragOver ? "chat-card dragover" : "chat-card"}
+      className={`chat-card${dragOver ? " dragover" : ""}${messages.length ? " chatting" : ""}`}
       onDragOver={(e) => {
         if (!e.dataTransfer?.types.includes("Files")) return;
         e.preventDefault();
@@ -491,7 +546,8 @@ export function ChatPanel({
         }
       }}
     >
-      <div className="chat-log">
+      {teamNode}
+      <div className="chat-log" ref={logRef}>
         {(recording ||
           (battery?.has_battery === true && (battery.charging || (battery.pct ?? 100) <= 20))) && (
           <div className="live-strip" aria-live="polite">
@@ -507,12 +563,6 @@ export function ChatPanel({
               </span>
             )}
           </div>
-        )}
-        {messages.length === 0 && !thinking && (
-          <ActivityOrb
-            activity={{ ...IDLE_ACTIVITY, listening: recording }}
-            label={recording ? "listening" : "breathing"}
-          />
         )}
         {messages.map((m) => (
           <div key={m.id} className={m.role === "user" ? "chat-row user" : "chat-row"}>
@@ -533,8 +583,34 @@ export function ChatPanel({
               {m.attachments?.filter((a) => !(a.kind === "image" && a.url) && !(a.kind === "audio" && a.url)).map((a) => (
                 <span key={a.id} className="inline-chip"><b className="kind-tag">{kindIcon(a.kind)}</b> {a.name}</span>
               ))}
-              {m.content && <div>{md(m.content)}</div>}
-              {m.role === "user" && m.content && (
+              {m.content && editingId !== m.id && <div>{md(m.content)}</div>}
+              {m.role === "user" && m.content && editingId === m.id && (
+                <div className="bubble-edit">
+                  <textarea
+                    ref={editBoxRef}
+                    className="bubble-textarea"
+                    value={editDraft}
+                    autoFocus
+                    rows={2}
+                    onChange={(e) => setEditDraft(e.target.value)}
+                    onKeyDown={(e) => {
+                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveEdit();
+                      if (e.key === "Escape") setEditingId(null);
+                    }}
+                  />
+                  <div className="edit-row">
+                    <button className="effort-pill" onClick={() => setEditingId(null)}>Cancel</button>
+                    <button
+                      className="effort-pill"
+                      disabled={!editDraft.trim() || thinking}
+                      onClick={saveEdit}
+                    >
+                      Save &amp; resend
+                    </button>
+                  </div>
+                </div>
+              )}
+              {m.role === "user" && m.content && editingId !== m.id && (
                 <div className="msg-actions">
                   <button
                     className="msg-act"
@@ -545,8 +621,8 @@ export function ChatPanel({
                   </button>
                   <button
                     className="msg-act"
-                    title="Edit in composer (attachments ride along)"
-                    onClick={() => editBack(m.content, m.attachments)}
+                    title="Edit this message in place"
+                    onClick={() => startEdit(m)}
                   >
                     <PencilIcon size={14} />
                   </button>
@@ -591,29 +667,41 @@ export function ChatPanel({
         ))}
         {thinking && (
           <div className="chat-row">
-            <div className="reply working">
-              <div className="work-pulse" aria-hidden />
+            <div className="reply working" role="status">
+              {/* orb where people stare: one design per live signal
+                  (searching / solving / composing / working), so the wait
+                  reads end-to-end instead of one static spinner.
+                  Bridge down = breathing, honest idle. Status reads by
+                  shimmer text, never a colored dot. */}
+              <SafeOrb state={chatOrb} size={20} />
               <div className="work-meta">
                 <span className="work-cap">
-                  <i className={bridgeOn ? "live-dot" : "dead-dot"} />
-                  {bridgeOn ? (liveActivity || `talking to ${turnEngine || `${provider}/${displayModel(model)}`}`) : "bridge down — nothing running"}
+                  <span className="shimmer">
+                    {bridgeOn ? (liveActivity || `talking to nicki · ${turnEngine || `${provider}/${displayModel(model)}`}`) : "bridge down — nothing running"}
+                  </span>
                 </span>
                 <span className="work-sub">
-                  {workSecs}s{liveShots[0] ? ` · seeing ${liveShots[0].label}` : ""}
+                  {workSecs}s
                 </span>
+                {liveProgress && liveProgress.steps.length > 0 && (
+                  <StepsList steps={liveProgress.steps} />
+                )}
+                <LensBlock lens={liveProgress?.lens} />
+                {liveProgress && liveProgress.files.length > 0 && (
+                  <div className="live-dim">
+                    {liveProgress.files.slice(0, 3).map((f) => `${f.name} +${f.added} −${f.removed}`).join(" · ")}
+                  </div>
+                )}
                 {!!livePartial && (
-                  <div className="work-partial">{livePartial.slice(-600)}</div>
+                  <div className="work-partial">{md(livePartial.slice(-1200))}</div>
                 )}
               </div>
-              {liveShots[0] && (
-                <img
-                  src={liveShots[0].src}
-                  alt={liveShots[0].label}
-                  className="bubble-img"
-                  onClick={onOpenLens}
-                />
-              )}
             </div>
+          </div>
+        )}
+        {!thinking && lastThought && (
+          <div className="thought-receipt" title={`${lastThought.label} · collapsed, latest turn only`}>
+            Thought for {lastThought.secs}s · {lastThought.label}
           </div>
         )}
       </div>
@@ -822,14 +910,13 @@ export function ChatPanel({
           >
             {recording ? <span className="rec-dot" /> : <MicIcon size={20} />}
           </button>
-          <button className={canSend ? "send-btn ready" : "send-btn"} onClick={submit} aria-label="Send" disabled={!canSend}><ArrowUpIcon size={20} /></button>
+          {thinking && onStop ? (
+            <button className="send-btn stop" onClick={onStop} aria-label="Stop the turn" title="Stop — keeps the partial above"><StopIcon size={16} /></button>
+          ) : (
+            <button className={canSend ? "send-btn ready" : "send-btn"} onClick={submit} aria-label="Send" disabled={!canSend}><ArrowUpIcon size={20} /></button>
+          )}
         </div>
       </div>
-      {(thinking || turnMs !== null) && (
-        <div className="composer-status">
-          <StatusLine thinking={thinking} turnMs={turnMs} linked={phoneLinked} />
-        </div>
-      )}
     </Card>
   );
 }
@@ -844,27 +931,91 @@ function kindIcon(kind: Attachment["kind"]): string {
   }
 }
 
-// Minimal markdown-lite: **bold**, `code`, line breaks. No dep, offline.
-export function md(text: string): React.ReactNode[] {
-  const parts = text.split(/(\*\*[^*]+\*\*|`[^`]+`)/g);
-  return parts.map((p, i) => {
-    if (p.startsWith("**") && p.endsWith("**") && p.length > 4) {
-      return <b key={i}>{p.slice(2, -2)}</b>;
+// Minimal markdown-lite: fenced code, headings, lists, tables, **bold**,
+// `code`, [links]. No dep, offline, text-nodes only (never innerHTML).
+export function md(text: string): React.ReactNode {
+  const inlines = (s: string, key: string): React.ReactNode[] =>
+    s.split(/(\*\*[^*]+\*\*|`[^`]+`|\[[^\]]+\]\([^)\s]+\))/g).map((p, i) => {
+      const k = `${key}-${i}`;
+      if (p.startsWith("**") && p.endsWith("**") && p.length > 4) {
+        return <b key={k}>{p.slice(2, -2)}</b>;
+      }
+      if (p.startsWith("`") && p.endsWith("`") && p.length > 2) {
+        return <code key={k} className="inline-code">{p.slice(1, -1)}</code>;
+      }
+      const lm = p.match(/^\[([^\]]+)\]\(([^)\s]+)\)$/);
+      if (lm) {
+        return <a key={k} href={lm[2]} target="_blank" rel="noreferrer">{lm[1]}</a>;
+      }
+      return <span key={k}>{p}</span>;
+    });
+  const cells = (r: string): string[] =>
+    r.trim().replace(/^\||\|$/g, "").split("|").map((c) => c.trim());
+  const out: React.ReactNode[] = [];
+  const blocks = (t: string, key: string) => {
+    const lines = t.split("\n");
+    let i = 0;
+    while (i < lines.length) {
+      const ln = lines[i];
+      const hm = ln.match(/^(#{1,4})\s+(.*)$/);
+      if (hm) {
+        out.push(<div key={`${key}-h${i}`} className={`md-h${hm[1].length}`}>{inlines(hm[2], `${key}-h${i}`)}</div>);
+        i++;
+        continue;
+      }
+      if (/^\s*[-*]\s+/.test(ln)) {
+        const items: string[] = [];
+        while (i < lines.length && /^\s*[-*]\s+/.test(lines[i])) {
+          items.push(lines[i].replace(/^\s*[-*]\s+/, ""));
+          i++;
+        }
+        out.push(<ul key={`${key}-u${i}`} className="md-ul">{items.map((it, j) => <li key={j}>{inlines(it, `${key}-u${i}-${j}`)}</li>)}</ul>);
+        continue;
+      }
+      const sep = (lines[i + 1] ?? "").trim();
+      if (ln.includes("|") && sep.includes("|") && /^[\s|:-]+$/.test(sep)) {
+        const head = cells(ln);
+        i += 2;
+        const rows: string[][] = [];
+        while (i < lines.length && lines[i].trim().startsWith("|")) {
+          rows.push(cells(lines[i]));
+          i++;
+        }
+        out.push(
+          <table key={`${key}-t${i}`} className="md-table">
+            <thead><tr>{head.map((h, j) => <th key={j}>{inlines(h, `${key}-t${i}-h${j}`)}</th>)}</tr></thead>
+            <tbody>{rows.map((r, a) => <tr key={a}>{r.map((c, b) => <td key={b}>{inlines(c, `${key}-t${i}-${a}-${b}`)}</td>)}</tr>)}</tbody>
+          </table>,
+        );
+        continue;
+      }
+      if (ln.trim() === "") {
+        out.push(<br key={`${key}-b${i}`} />);
+        i++;
+        continue;
+      }
+      out.push(<span key={`${key}-p${i}`}>{inlines(ln, `${key}-p${i}`)}<br /></span>);
+      i++;
     }
-    if (p.startsWith("`") && p.endsWith("`") && p.length > 2) {
-      return <code key={i} className="inline-code">{p.slice(1, -1)}</code>;
-    }
-    return (
-      <span key={i}>
-        {p.split("\n").map((line, j, arr) => (
-          <span key={j}>
-            {line}
-            {j < arr.length - 1 && <br />}
-          </span>
-        ))}
-      </span>
+  };
+  // tolerant fences: an unclosed fence (mid-stream) still reads as code.
+  // (Split-then-pair misreads trailing text as a second block — match instead.)
+  const fenceRe = /```(\w*)\n?([\s\S]*?)(?:```|$)/g;
+  let last = 0;
+  let n = 0;
+  for (;;) {
+    const m = fenceRe.exec(text);
+    if (!m) break;
+    if (m.index > last) blocks(text.slice(last, m.index), `md${n}`);
+    n++;
+    out.push(
+      <pre key={`mdf${n}`} className="md-pre">{m[1] ? <em>{m[1]}</em> : null}<code>{m[2].replace(/\n$/, "")}</code></pre>,
     );
-  });
+    last = m.index + m[0].length;
+    if (last >= text.length) break;
+  }
+  if (last < text.length) blocks(text.slice(last), `md${n}`);
+  return <>{out}</>;
 }
 
 // Settings state — sound + volume, provider, active pills, auto-close,
@@ -880,6 +1031,9 @@ export interface SettingsState {
   hoverOpen: boolean;
   hoverDelay: number;
   hiddenViews: IslandView[];
+  edgeStrip: boolean;
+  edgeBlur: number;
+  edgeAlways: boolean;
 }
 
 // Pair panel — links this browser with the phone over the self relay.
@@ -1040,6 +1194,7 @@ export function ShelfView({
   onRemove: (url: string) => void;
 }) {
   const pickRef = useRef<HTMLInputElement>(null);
+  const [loopTasks, addLoopTask] = useLoopTasks();
   return (
     <div
       className="card shelf"
@@ -1056,7 +1211,20 @@ export function ShelfView({
         if (files.length) onStage(files);
       }}
     >
-      <div className="btn-row">
+      <HiveBoard />
+      <LoopTile onDone={addLoopTask} />
+      <LiveLoops />
+      <SchedulesSection />
+      {loopTasks.length === 0 && items.length === 0 ? (
+        <div className="card-detail">
+          Nothing shelved yet — run the team above, or stage error
+          screenshots, logs, docs, anything you&apos;ll attach or beam.
+          Drop files here or stage them. Session only, clears on reload.
+        </div>
+      ) : (
+        <>
+          <LoopTasks tasks={loopTasks} />
+          <div className="btn-row">
         <PillButton onClick={() => pickRef.current?.click()}>+ Stage files</PillButton>
         <input
           ref={pickRef}
@@ -1073,9 +1241,8 @@ export function ShelfView({
       </div>
       {!items.length ? (
         <div className="card-detail">
-          Shelf is empty — stage error screenshots, logs, docs, or anything
-          you&apos;ll attach or beam in a bit. Drop files here or stage them.
-          Session only, clears on reload.
+          No staged files — drop error screenshots, logs, or docs here,
+          or stage them for later.
         </div>
       ) : (
         <div className="try-col">
@@ -1107,6 +1274,84 @@ export function ShelfView({
           ))}
         </div>
       )}
+        </>
+      )}
+    </div>
+  );
+}
+
+// Automation rules — the Custom Rules ladder (Dots/ChatGPT language):
+// allow / deny per tool pattern, deny wins. "Always" on an approval card
+// writes one; this list owns them. Owner-only (bridge enforces local).
+function RulesSection() {
+  const [rules, setRules] = useState<Array<{ tool: string; action: string; kind: string; workspace: string }>>([]);
+  const [tool, setTool] = useState("");
+  const [action, setAction] = useState("allow");
+  const [err, setErr] = useState("");
+  const pull = () => {
+    fetch(`${window.location.origin}/rules`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (Array.isArray(j.rules)) setRules(j.rules);
+      })
+      .catch(() => {});
+  };
+  useEffect(() => { pull(); }, []);
+  const add = () => {
+    const t = tool.trim();
+    if (!t) return;
+    setErr("");
+    fetch(`${window.location.origin}/rules`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ tool: t, action }),
+    })
+      .then((r) => r.json())
+      .then((j) => {
+        if (!j.ok) setErr(String(j.error || "rule failed"));
+        else { setTool(""); pull(); }
+      })
+      .catch(() => setErr("bridge unreachable"));
+  };
+  const del = (t: string) => {
+    fetch(`${window.location.origin}/rules?tool=${encodeURIComponent(t)}&kind=glob`, { method: "DELETE" })
+      .catch(() => {})
+      .finally(pull);
+  };
+  return (
+    <div className="menu-card" aria-label="Automation rules">
+      <div className="menu-row menu-head">
+        <BoltIcon size={16} />
+        <b>Automation rules</b>
+        <em className="badge">{rules.length || "off"}</em>
+      </div>
+      {rules.map((r) => (
+        <div className="menu-row" key={`${r.kind}:${r.tool}`}>
+          <span>{r.tool}</span>
+          <em className={r.action === "deny" ? "badge" : "badge on"}>{r.action}</em>
+          <button className="menu-act" title={`Delete ${r.action} rule for ${r.tool}`} onClick={() => del(r.tool)}>✕</button>
+        </div>
+      ))}
+      <div className="menu-row">
+        <input
+          className="team-edit"
+          aria-label="Tool pattern"
+          value={tool}
+          onChange={(e) => setTool(e.target.value)}
+          placeholder="Bash: rm *"
+          onKeyDown={(e) => { if (e.key === "Enter") add(); }}
+        />
+        <button
+          className={action === "allow" ? "menu-act primary" : "menu-act"}
+          title="Toggle allow / deny"
+          onClick={() => setAction((a) => (a === "allow" ? "deny" : "allow"))}
+        >
+          {action}
+        </button>
+        <button className="menu-act primary" disabled={!tool.trim()} onClick={add}>Add</button>
+      </div>
+      {!!err && <div className="menu-note">{err}</div>}
+      {!err && <div className="menu-note">Deny wins. Matching tools skip the approval card.</div>}
     </div>
   );
 }
@@ -1201,6 +1446,8 @@ export function SettingsView({
           </button>
         </div>
       </div>
+        <div className="set-head">Automation</div>
+        <RulesSection />
         </>
         )}
         {tab === "phone" && pair}
