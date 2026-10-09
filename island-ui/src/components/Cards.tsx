@@ -6,6 +6,7 @@ import { SafeOrb } from "../orb";
 import { chatOrbFor } from "../orb_state";
 import { LensBlock, StepsList, useSessionProgress } from "./TeamGrid";
 import { HiveBoard, LoopTile, LoopTasks, LiveLoops, SchedulesSection, useLoopTasks } from "./Loop";
+import MermaidBlock from "./Mermaid";
 import {
   classifyAttachment,
   formatSize,
@@ -1018,9 +1019,18 @@ export function md(text: string): React.ReactNode {
     if (!m) break;
     if (m.index > last) blocks(text.slice(last, m.index), `md${n}`);
     n++;
-    out.push(
-      <pre key={`mdf${n}`} className="md-pre">{m[1] ? <em>{m[1]}</em> : null}<code>{m[2].replace(/\n$/, "")}</code></pre>,
-    );
+    const lang = (m[1] || "").toLowerCase();
+    const body = m[2].replace(/\n$/, "");
+    // model-drawn diagrams render live (ADHD-first: picture over
+    // paragraph); everything else stays a code block. Unclosed mermaid
+    // mid-stream stays code until the fence closes — no half flicker.
+    if (lang === "mermaid" && m[0].endsWith("```") && body.trim()) {
+      out.push(<MermaidBlock key={`mdf${n}`} code={body} />);
+    } else {
+      out.push(
+        <pre key={`mdf${n}`} className="md-pre">{m[1] ? <em>{m[1]}</em> : null}<code>{body}</code></pre>,
+      );
+    }
     last = m.index + m[0].length;
     if (last >= text.length) break;
   }

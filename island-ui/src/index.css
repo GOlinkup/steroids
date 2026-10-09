@@ -424,6 +424,19 @@ button:disabled{opacity:.4;cursor:default}
 .md-table{border-collapse:collapse;font-size:.8rem;margin:.35rem 0;max-width:100%;display:block;overflow:auto}
 .md-table th,.md-table td{border:1px solid var(--border-strong);padding:.3rem .5rem;text-align:left}
 .md-table th{background:rgba(255,255,255,.05)}
+/* model-drawn diagrams: pop-in nodes, fading edges, slight stagger. */
+.mermaid{display:flex;justify-content:center;padding:.5rem .1rem;overflow:auto;scrollbar-width:thin;animation:viewIn .25s ease-out}
+.mermaid svg{max-width:100%;height:auto}
+.mermaid .node{animation:mmd-pop .3s cubic-bezier(.34,1.56,.64,1) both}
+.mermaid .node:nth-child(2){animation-delay:.05s}
+.mermaid .node:nth-child(3){animation-delay:.1s}
+.mermaid .node:nth-child(4){animation-delay:.15s}
+.mermaid .node:nth-child(5){animation-delay:.2s}
+.mermaid .node:nth-child(6){animation-delay:.25s}
+.mermaid .node:nth-child(n+7){animation-delay:.3s}
+.mermaid .edgePath{animation:viewIn .45s ease-out both}
+@keyframes mmd-pop{from{opacity:0;transform:scale(.6)}to{opacity:1;transform:scale(1)}}
+@media (prefers-reduced-motion:reduce){.mermaid,.mermaid .node,.mermaid .edgePath{animation:none}}
 .dead-dot{width:7px;height:7px;border-radius:50%;background:var(--danger);align-self:center}
 .reply.working .bubble-img{margin-bottom:0;max-height:220px;width:100%;object-fit:cover}
 .work-cap{display:inline-flex;align-items:center;gap:.35rem;font-size:var(--size-floor);color:var(--text-mute)}
