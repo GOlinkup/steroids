@@ -1,6 +1,6 @@
 @import "./theme.css";
-/* Steroids island UI — colors/type come from theme.css (GOlinkup-style tokens).
-   Montserrat (self-hosted, Circular lookalike) for UI, mono only for route strings. Plate snap, no bounce. */
+/* Steroids island UI — colors/type come from theme.css (TalkStream house tokens:
+   Outfit UI, orange brand, radial card, mono only for route strings). Plate snap, no bounce. */
 *{box-sizing:border-box}
 /* buttons/inputs never inherit type from body (UA stylesheet) — route them via the theme */
 button,input,select,textarea{font-family:var(--font-ui)}
@@ -35,7 +35,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .ticker b{color:var(--brand)}
 
 /* cards: approval / question / finished / chat */
-.card{background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 28px rgba(0,0,0,.45);padding:.7rem;display:flex;flex-direction:column;gap:.55rem}
+.card{background:var(--card,var(--surface));border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 28px rgba(0,0,0,.45);padding:.7rem;display:flex;flex-direction:column;gap:.55rem}
 .card-title{font-weight:var(--weight-em);font-size:.85rem;letter-spacing:-.02em}
 .card-detail{opacity:.6;font-size:.78rem;font-family:var(--font-ui)}
 .btn-row{display:flex;gap:.45rem}

@@ -14,11 +14,13 @@
   --info:#3b82f6;
   --info-strong:#2563eb;
   --purple:#a855f7;
-  /* surfaces */
-  --bg:#101114;
+  /* surfaces — TalkStream house style (index.html): page is pure black,
+     cards are the radial gradient below, not flat gray */
+  --bg:#000;
   --ink:#000;
   --surface:#17181c;
   --surface-2:#26272c;
+  --card:radial-gradient(120% 90% at 50% 0%, #2b2d34 0%, #17181c 55%);
   --field:#0b0c0e;
   --overlay:rgba(0,0,0,.55);
   /* text */
@@ -30,7 +32,7 @@
   --border:rgba(255,255,255,.08);
   --border-strong:rgba(255,255,255,.12);
   /* type */
-  --font-ui:'Montserrat','Outfit',ui-sans-serif,system-ui,sans-serif;
+  --font-ui:'Outfit','Montserrat',ui-sans-serif,system-ui,sans-serif;
   --font-mono:ui-monospace,Menlo,Consolas,monospace;
   /* type scale (iOS HIG: floor = Caption 2 11px, emphasis = Semibold 600) */
   --size-floor:.7rem;
@@ -38,6 +40,7 @@
   --weight-em:600;
   /* corners — one knob: cards, composer, sheets/dropdowns all follow */
   --radius:20px;
-  /* gradient — one reusable: effort fill, ready send, every CTA */
-  --grad:linear-gradient(90deg,var(--info),var(--purple));
+  /* gradient — one reusable: effort fill, ready send, every CTA.
+     House brand (index.html --bar-hot direction): orange → peach, never blue/purple */
+  --grad:linear-gradient(90deg,var(--brand),var(--brand-light));
 }
