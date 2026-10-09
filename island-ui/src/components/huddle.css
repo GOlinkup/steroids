@@ -1,0 +1,97 @@
+/* Startup-huddle moment — tokens per docs/TEAM-READY.md §1 appendix. */
+.huddle-stage {
+  --huddle-ease-out: cubic-bezier(0.2, 0, 0.2, 1);
+  --huddle-pop: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --huddle-enter: 200ms;
+  --huddle-nicki-drop: 220ms;
+  --huddle-type: 400ms;
+  --huddle-chip-stagger: 80ms;
+  --huddle-idle: 1s;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  gap: 12px;
+  pointer-events: auto;
+  animation: huddle-stage-in 350ms var(--huddle-ease-out) backwards;
+}
+
+/* B2: Nicki drops in + squash, then settles to idle bob. */
+.huddle-nicki {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  text-align: center;
+  animation:
+    huddle-nicki-drop var(--huddle-nicki-drop) var(--huddle-pop) 100ms backwards,
+    huddle-idle var(--huddle-idle) steps(2) infinite 2400ms;
+}
+
+/* B5: leader bubble typewriter. */
+.huddle-bubble {
+  max-width: 100%;
+  text-align: center;
+}
+.huddle-bubble-text {
+  display: inline-block;
+  overflow: hidden;
+  white-space: nowrap;
+  text-align: center;
+  width: 26ch;
+  animation: huddle-type var(--huddle-type) steps(26) backwards;
+  animation-delay: 1600ms;
+}
+
+/* B6: pills flip in 3×80ms stagger, centered row. */
+.huddle-chips {
+  display: flex;
+  gap: 8px;
+  justify-content: center;
+  align-items: center;
+  text-align: center;
+}
+.huddle-chips .hpill {
+  animation: huddle-chip-in 180ms var(--huddle-ease-out) backwards;
+  animation-delay: calc(2000ms + var(--i) * var(--huddle-chip-stagger));
+}
+
+@keyframes huddle-stage-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+@keyframes huddle-nicki-drop {
+  0% { transform: translateY(-24px); }
+  70% { transform: translateY(2px) scale(1.04, 0.96); }
+  100% { transform: none; }
+}
+@keyframes huddle-type {
+  from { width: 0; }
+  to { width: 26ch; }
+}
+@keyframes huddle-chip-in {
+  from { opacity: 0; transform: rotateX(90deg); }
+  to { opacity: 1; transform: none; }
+}
+@keyframes huddle-idle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+/* Lite + reduced-motion: instant end-state, opacity only. */
+.huddle-static,
+.huddle-static * {
+  animation: none !important;
+  opacity: 1 !important;
+  transform: none !important;
+}
+@media (prefers-reduced-motion: reduce) {
+  .huddle-stage,
+  .huddle-stage * {
+    animation: none !important;
+    opacity: 1 !important;
+    transform: none !important;
+  }
+  .huddle-stage .huddle-bubble-text {
+    width: auto;
+  }
+}
