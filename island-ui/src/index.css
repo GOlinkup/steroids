@@ -228,6 +228,20 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .lens-block{display:flex;flex-direction:column;gap:.25rem;background:rgba(255,255,255,.04);border:1px solid rgba(255,255,255,.09);border-radius:12px;padding:.45rem .6rem;min-width:0}
 .lens-file{font-family:var(--font-mono);font-size:.64rem;font-weight:700;color:rgba(255,255,255,.85);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 .lens-code{margin:0;font-family:var(--font-mono);font-size:.66rem;line-height:1.5;color:rgba(255,255,255,.75);white-space:pre-wrap;word-break:break-word;max-height:9.5em;overflow:hidden}
+/* live diff: real unified hunks only (never invented) — green adds, red dels. */
+.lens-diff{margin:.15rem 0 0;font-family:var(--font-mono);font-size:.66rem;line-height:1.5;white-space:pre-wrap;word-break:break-word;max-height:8em;overflow:auto;background:rgba(0,0,0,.3);border-radius:8px;padding:.35rem .5rem}
+/* live diff: real unified hunks only (never invented) — green adds, red dels. */
+.lens-diff .ld-add{color:#4ade80}
+.lens-diff .ld-del{color:#f87171}
+.lens-diff .ld-hunk{color:rgba(255,255,255,.4)}
+/* working-bubble skeleton: grey bones shaped like incoming rows, shown only
+   while the turn has produced nothing yet (steps/lens/partial all empty). */
+.work-bones{display:flex;flex-direction:column;gap:.3rem;padding:.25rem 0}
+.work-bone{display:block;height:.7em;border-radius:6px}
+/* touched-file delta colors: green adds, red dels (same as the live diff). */
+.lf-add{color:#4ade80}
+.lf-del{color:#f87171}
+.reply.working .lens-diff{scrollbar-color:rgba(255,255,255,.22) transparent}
 .live-tokens>span{display:flex;align-items:baseline;gap:.4rem}
 .live-tokens .tok-total{color:#fff;font-weight:700;font-size:.72rem}
 .live-tokens .tok-split{margin-left:auto;font-size:.62rem}
@@ -387,9 +401,10 @@ button:disabled{opacity:.4;cursor:default}
 .team-mini .team-name{font-size:.68rem}
 .team-mini .team-meta .team-sub,.team-mini .team-prov{font-size:.55rem}
 .team-mini .team-add{height:22px;line-height:22px;font-size:.66rem;padding:0 .55rem}
-/* inline bubble edit: textarea lives inside the bubble, never the composer */
-.bubble-edit{display:flex;flex-direction:column;gap:.4rem;min-width:min(320px,100%)}
-.bubble-textarea{background:rgba(0,0,0,.3);border:1px solid var(--brand);border-radius:8px;color:var(--text);font-size:.85rem;font-family:var(--font-ui);line-height:1.5;padding:.45rem .6rem;resize:vertical;outline:none;min-height:3.2em}
+/* inline bubble edit: textarea matches the closed bubble exactly (same width,
+   type metrics, padding) so opening edit never reflows the text. */
+.bubble-edit{display:flex;flex-direction:column;gap:.4rem;width:100%}
+.bubble-textarea{background:rgba(0,0,0,.3);border:1px solid var(--brand);border-radius:8px;color:var(--text);font-size:.92rem;font-family:var(--font-ui);line-height:1.55;letter-spacing:-.01em;padding:.55rem .8rem;resize:vertical;outline:none;min-height:3.2em;width:100%;box-sizing:border-box}
 .edit-row{display:flex;gap:.4rem;justify-content:flex-end}
 
 .reply.working{display:flex;flex-direction:row;align-items:flex-start;gap:.6rem;max-width:100%;background:var(--surface-2);border:1px solid var(--border)}
@@ -462,11 +477,11 @@ p.hint{opacity:.6;font-size:.78rem;margin:0;text-align:center;letter-spacing:.01
 @media (prefers-reduced-motion:reduce){.orb-fallback{animation:none}}
 /* modern thin scrollbars on text fields only — page chrome untouched.
    (Firefox already gets scrollbar-width:thin above; this covers Chromium.) */
-.chat-log,.composer-input,.bubble-textarea,.work-partial,.md-pre{scrollbar-color:rgba(255,255,255,.22) transparent}
-.chat-log::-webkit-scrollbar,.composer-input::-webkit-scrollbar,.bubble-textarea::-webkit-scrollbar,.work-partial::-webkit-scrollbar,.md-pre::-webkit-scrollbar{width:8px;height:8px}
-.chat-log::-webkit-scrollbar-track,.composer-input::-webkit-scrollbar-track,.bubble-textarea::-webkit-scrollbar-track,.work-partial::-webkit-scrollbar-track,.md-pre::-webkit-scrollbar-track{background:transparent}
-.chat-log::-webkit-scrollbar-thumb,.composer-input::-webkit-scrollbar-thumb,.bubble-textarea::-webkit-scrollbar-thumb,.work-partial::-webkit-scrollbar-thumb,.md-pre::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:99px;border:2px solid transparent;background-clip:content-box}
-.chat-log::-webkit-scrollbar-thumb:hover,.composer-input::-webkit-scrollbar-thumb:hover,.bubble-textarea::-webkit-scrollbar-thumb:hover,.work-partial::-webkit-scrollbar-thumb:hover,.md-pre::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.32);border:2px solid transparent;background-clip:content-box}
+.chat-log,.composer-input,.bubble-textarea,.work-partial,.md-pre,.lens-diff{scrollbar-color:rgba(255,255,255,.22) transparent}
+.chat-log::-webkit-scrollbar,.composer-input::-webkit-scrollbar,.bubble-textarea::-webkit-scrollbar,.work-partial::-webkit-scrollbar,.md-pre::-webkit-scrollbar,.lens-diff::-webkit-scrollbar{width:8px;height:8px}
+.chat-log::-webkit-scrollbar-track,.composer-input::-webkit-scrollbar-track,.bubble-textarea::-webkit-scrollbar-track,.work-partial::-webkit-scrollbar-track,.md-pre::-webkit-scrollbar-track,.lens-diff::-webkit-scrollbar-track{background:transparent}
+.chat-log::-webkit-scrollbar-thumb,.composer-input::-webkit-scrollbar-thumb,.bubble-textarea::-webkit-scrollbar-thumb,.work-partial::-webkit-scrollbar-thumb,.md-pre::-webkit-scrollbar-thumb,.lens-diff::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:99px;border:2px solid transparent;background-clip:content-box}
+.chat-log::-webkit-scrollbar-thumb:hover,.composer-input::-webkit-scrollbar-thumb:hover,.bubble-textarea::-webkit-scrollbar-thumb:hover,.work-partial::-webkit-scrollbar-thumb:hover,.md-pre::-webkit-scrollbar-thumb:hover,.lens-diff::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.32);border:2px solid transparent;background-clip:content-box}
 
 /* lens — one full live picture (what the AI is doing now) */
 .lens-live{position:relative;border-radius:var(--radius);overflow:hidden;background:var(--ink);cursor:pointer;animation:viewIn .18s ease-out}

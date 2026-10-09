@@ -676,20 +676,30 @@ export function ChatPanel({
               <SafeOrb state={chatOrb} size={20} />
               <div className="work-meta">
                 <span className="work-cap">
-                  <span className="shimmer">
+                  <span className="shimmer" key={liveActivity || "idle"}>
                     {bridgeOn ? (liveActivity || `talking to nicki · ${turnEngine || `${provider}/${displayModel(model)}`}`) : "bridge down — nothing running"}
                   </span>
                 </span>
                 <span className="work-sub">
-                  {workSecs}s
+                  {liveProgress && liveProgress.steps.length > 0
+                    ? `${liveProgress.steps.filter((s) => s.status === "done").length}/${liveProgress.steps.length} steps · ${workSecs}s`
+                    : `${workSecs}s`}
                 </span>
+                {!livePartial && !(liveProgress && (liveProgress.steps.length > 0 || (liveProgress.lens && liveProgress.lens.file))) && (
+                  <div className="work-bones" aria-hidden>
+                    <span className="bone shimmer work-bone" style={{ width: "82%" }} />
+                    <span className="bone shimmer work-bone" style={{ width: "64%" }} />
+                  </div>
+                )}
                 {liveProgress && liveProgress.steps.length > 0 && (
                   <StepsList steps={liveProgress.steps} />
                 )}
                 <LensBlock lens={liveProgress?.lens} />
                 {liveProgress && liveProgress.files.length > 0 && (
                   <div className="live-dim">
-                    {liveProgress.files.slice(0, 3).map((f) => `${f.name} +${f.added} −${f.removed}`).join(" · ")}
+                    {liveProgress.files.slice(0, 3).map((f, i) => (
+                      <span key={f.name}>{i > 0 ? " · " : ""}{f.name} <b className="lf-add">+{f.added}</b> <b className="lf-del">−{f.removed}</b></span>
+                    ))}
                   </div>
                 )}
                 {!!livePartial && (

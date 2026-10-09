@@ -10,25 +10,79 @@ import { BashIcon, CheckIcon, PencilIcon, ReadIcon, XIcon } from "./icons";
 // rename inline. Slots persist local; live state rides the bridge.
 const TEAM_KEY = "island.team.v1";
 const TEAM_COLORS = ["#38bdf8", "#f87171", "#fb923c", "#a855f7", "#34d399", "#f472b6", "#facc15", "#22d3ee"];
+
 const API = window.location.origin;
 
 export interface AgentMini { session: string; agent: string; first: string }
-export interface Member { id: string; name: string; color: string }
+// Crew roles (Munder-Dufflin-style: every mate grabs a lane). Slot-owned,
+// cycled from the tile menu — the mate keeps it across sessions.
+export const ROLE_POOL = ["lead", "scout", "coder", "critic", "scribe", "runner", "sage", "relay"];
+export interface Member { id: string; name: string; color: string; role: string; sid?: string }
+// Slot → live session: a bound sid wins (assign/relay pin it); otherwise
+// the legacy positional slot. Missing session reads idle, never a stranger.
+export function slotSession(members: Member[], sessions: AgentMini[], idx: number): AgentMini | undefined {
+  const sid = members[idx]?.sid;
+  if (sid) return sessions.find((s) => s.session === sid);
+  return sessions[idx];
+}
 export interface Step { label: string; status: string }
 export interface ProgFile { name: string; added: number; removed: number }
-export interface Lens { file: string; lines: string[] }
+export interface Lens { file: string; lines: string[]; diff?: string[] }
 export interface Progress { task: string; state: string; activity: string; steps: Step[]; files: ProgFile[]; lens: Lens }
 
-// Name pool: every mate arrives named, deletes free the name back up.
-const NAME_POOL = ["atlas", "bolt", "korus", "nova", "pixel", "mochi", "dash", "echo", "fizz", "maro", "tico", "yuki"];
+// Name pool: short, easy names — no celebrities. Every slot takes the pool
+// name in order on load (customs included); deletes free the name back up.
+const NAME_POOL = ["luna", "milo", "nala", "zuri", "kaya", "finn", "nova", "remy", "coco", "juno", "theo", "wren"];
+// Per-mate look: hue-rotated buddy by member color (orange ≈ 25° base).
+// Nicki (work buddy, mascot-top) stays untinted — she's the main.
+const HUE_ROT = [175, 335, 0, 245, 135, 305, 20, 165];
+export function hueFor(color: string): number {
+  const i = TEAM_COLORS.indexOf(color);
+  return i >= 0 ? HUE_ROT[i % HUE_ROT.length] : 0;
+}
+// Crew quips — the Dunder Mifflin rule: people choose the team for the
+// people, not the room. One personality line per pool name (customs get
+// none); the job itself is member.role, slot-owned and cyclable by the user.
+const MATE_QUIPS: Record<string, string> = {
+  luna: "keeps the loop honest",
+  milo: "first to try, loudest to cheer",
+  nala: "sniffs out new routes",
+  zuri: "thinks three moves ahead",
+  kaya: "ships it done-done",
+  finn: "pokes holes, keeps it honest",
+  nova: "morale and victory laps",
+  remy: "counts every token",
+  coco: "calm after errors",
+  juno: "watches the loop, retries",
+  theo: "reads the docs so you don't",
+  wren: "carries drops phone to pc",
+};
+// Crew packs — one-install team shapes (Cowork-plugin spirit at our
+// scale): one tap sets every slot's role, names stay yours.
+export const TEAM_PACKS = [
+  { id: "balanced", label: "Balanced", roles: ["lead", "scout", "coder", "critic"] },
+  { id: "research", label: "Research", roles: ["scout", "sage", "scribe", "critic"] },
+  { id: "ship", label: "Ship it", roles: ["coder", "coder", "runner", "critic"] },
+];
+// Affection — Grok-companion spirit, honest version: drives per mate id,
+// persisted local. Tiles show a heart once driven 3+ times.
+const AFF_KEY = "island.affection.v1";
+function loadAff(): Record<string, number> {
+  try {
+    const raw = localStorage.getItem(AFF_KEY);
+    const d: unknown = JSON.parse(raw ?? "{}");
+    if (typeof d === "object" && d !== null) return d as Record<string, number>;
+  } catch { /* private mode */ }
+  return {};
+}
 function nextName(ms: Member[]): string {
   const taken = new Set(ms.map((m) => m.name.toLowerCase()));
   return NAME_POOL.find((n) => !taken.has(n)) ?? `mate${ms.length + 1}`;
 }
 
 function loadTeam(): Member[] {
-  const fresh = (): Member[] => ["atlas", "bolt", "korus", "nova"].map((name, i) => ({
-    id: `m${i + 1}`, name, color: TEAM_COLORS[i],
+  const fresh = (): Member[] => ["luna", "milo", "nala", "zuri"].map((name, i) => ({
+    id: `m${i + 1}`, name, color: TEAM_COLORS[i], role: ROLE_POOL[i % ROLE_POOL.length] ?? "mate",
   }));
   try {
     const raw = localStorage.getItem(TEAM_KEY);
@@ -40,7 +94,23 @@ function loadTeam(): Member[] {
           typeof m === "object" && m !== null && typeof (m as Member).name === "string" &&
           (m as Member).id !== "m-nicki"
         ).slice(0, 8);
-        if (ok.length) return ok;
+        if (ok.length) {
+          // force-rename: every slot takes the pool name (and color) in
+          // order — customs included. Old names are gone for good.
+          // Missing roles backfill by slot; kept roles + session pins
+          // survive migration.
+          return ok.map((m, i) => ({
+            ...m,
+            name: NAME_POOL[i % NAME_POOL.length] ?? m.name,
+            color: TEAM_COLORS[i % TEAM_COLORS.length] ?? m.color,
+            role: typeof (m as Member).role === "string" && (m as Member).role
+              ? (m as Member).role
+              : (ROLE_POOL[i % ROLE_POOL.length] ?? "mate"),
+            sid: typeof (m as Member).sid === "string" && (m as Member).sid
+              ? (m as Member).sid
+              : undefined,
+          }));
+        }
       }
     }
   } catch { /* private mode — defaults */ }
@@ -81,7 +151,7 @@ export function useSessionProgress(sessions: AgentMini[]) {
   return { prog, refresh };
 }
 
-export function useTeam(): { members: Member[]; rename: (id: string, name: string) => void; remove: (id: string) => void; add: () => void } {
+export function useTeam(): { members: Member[]; rename: (id: string, name: string) => void; remove: (id: string) => void; cycleRole: (id: string) => void; setSid: (id: string, sid: string) => void; add: () => void; applyPack: (roles: string[]) => void } {
   const [members, setMembers] = useState<Member[]>(loadTeam);
   useEffect(() => {
     try {
@@ -92,14 +162,24 @@ export function useTeam(): { members: Member[]; rename: (id: string, name: strin
     setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, name: name.slice(0, 24) } : m)));
   const remove = (id: string) =>
     setMembers((ms) => (ms.length <= 1 ? ms : ms.filter((m) => m.id !== id)));
+  const cycleRole = (id: string) =>
+    setMembers((ms) => ms.map((m) => {
+      if (m.id !== id) return m;
+      const i = ROLE_POOL.indexOf(m.role);
+      return { ...m, role: ROLE_POOL[(i + 1) % ROLE_POOL.length] ?? "mate" };
+    }));
+  const setSid = (id: string, sid: string) =>
+    setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, sid } : m)));
   const add = () =>
     setMembers((ms) => {
       if (ms.length >= 8) return ms;
       const name = nextName(ms);
       const color = TEAM_COLORS[NAME_POOL.indexOf(name) % TEAM_COLORS.length] ?? TEAM_COLORS[ms.length % TEAM_COLORS.length];
-      return [...ms, { id: `m${Date.now()}`, name, color }];
+      return [...ms, { id: `m${Date.now()}`, name, color, role: ROLE_POOL[ms.length % ROLE_POOL.length] ?? "mate" }];
     });
-  return { members, rename, remove, add };
+  const applyPack = (roles: string[]) =>
+    setMembers((ms) => ms.map((m, i) => ({ ...m, role: roles[i % roles.length] ?? m.role })));
+  return { members, rename, remove, cycleRole, setSid, add, applyPack };
 }
 
 // Step glyph — one icon per kind (navbar stroke family), shared by
@@ -114,18 +194,47 @@ export function StepGlyph({ label, status }: { label: string; status: string }) 
   if (l.includes("edit")) return <PencilIcon size={13} />;
   if (l.includes("bash")) return <BashIcon size={13} />;
   if (l.includes("done") || l.includes("finish")) return <CheckIcon size={13} />;
-  return <span aria-hidden>·</span>;
+  // ponytail: every step gets the same 13px icon slot — a centered dot,
+  // never a text glyph that sits off-baseline vs the icons.
+  return <span className="st-dot" aria-hidden />;
+}
+// Step list — one shared composite (was pasted 3× across TeamGrid /
+// Cards / Daily with the same slice(-5) + status-class mapping). Steps
+// in, rows out; empty renders nothing.
+export function StepsList({ steps, n = 5 }: { steps: Step[]; n?: number }) {
+  if (!steps.length) return null;
+  return (
+    <div className="live-steps">
+      {steps.slice(-n).map((st) => (
+        <div
+          key={st.label}
+          className={st.status === "done" ? "st-done" : st.status === "error" ? "st-error" : st.status === "active" ? "st-active" : "st-todo"}
+        >
+          <span className={`st-ic ${st.status === "done" ? "st-done" : st.status === "error" ? "st-error" : st.status === "active" ? "st-active" : ""}`}>
+            <StepGlyph label={st.label} status={st.status} />
+          </span>
+          <span className="st-label">{st.label}</span>
+        </div>
+      ))}
+    </div>
+  );
 }
 // Code lens — what the agent is touching right now (coucou-frames
 // style): filename bar + tail of the file. Rides the progress payload,
 // so no extra fetch; absent file renders nothing.
 export function LensBlock({ lens }: { lens?: Lens | null }) {
   if (!lens || !lens.file) return null;
+  const diff = (lens.diff ?? []).slice(-8);
   return (
     <div className="lens-block">
       <div className="lens-file">{lens.file}</div>
       {lens.lines.length > 0 && (
         <pre className="lens-code">{lens.lines.join("\n")}</pre>
+      )}
+      {diff.length > 0 && (
+        <pre className="lens-diff">{diff.map((ln, i) => (
+          <span key={i} className={ln.startsWith("+") ? "ld-add" : ln.startsWith("-") ? "ld-del" : ln.startsWith("@") ? "ld-hunk" : undefined}>{ln}{"\n"}</span>
+        ))}</pre>
       )}
     </div>
   );
@@ -145,7 +254,7 @@ export function SegBar({ ratio, n = 20, flat = false }: { ratio: number; n?: num
 // One member's live session: task, Read/Edit/Bash/Done checklist with
 // spinner on the running step, touched files, resume. Rendered inside
 // Daily's left card (and below the grid in Lens).
-export function MemberDetail({ member, session, progress, onResume, onRename, onRemove, onClose, manage = true }: {
+export function MemberDetail({ member, session, progress, onResume, onRename, onRemove, onClose, onRole, team, onAssign, onRelay, manage = true }: {
   member: Member;
   session?: AgentMini;
   progress?: Progress;
@@ -153,8 +262,19 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
   onRename?: (name: string) => void;
   onRemove?: () => void;
   onClose?: () => void;
+  onRole?: () => void;
+  // crew dispatch: give-a-task posts a real turn; relay hands this
+  // mate's latest work to the target mate (bridge /handoff brief).
+  team?: Member[];
+  onAssign?: (targetId: string, text: string) => Promise<{ ok: boolean; error?: string }>;
+  onRelay?: (fromId: string, targetId: string, text: string) => Promise<{ ok: boolean; error?: string }>;
   manage?: boolean;
 }) {
+  const [task, setTask] = useState("");
+  const [target, setTarget] = useState(member.id);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState("");
+  useEffect(() => { setTarget(member.id); setNote(""); }, [member.id]);
   const done = progress?.steps.filter((s) => s.status === "done").length ?? 0;
   const total = progress?.steps.length ?? 0;
   const liveStep = progress?.steps.find((s) => s.status === "active" || s.status === "pending");
@@ -162,32 +282,22 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
     <div className="member-detail" style={{ ["--live-accent" as string]: member.color }}>
       <div className="live-top">
         <span className="live-hero">{member.name}</span>
-        <span className="live-sub">{session?.agent ?? "no session yet"}</span>
+        <span className="live-sub">{session ? `nicki · ${session.agent}` : `${member.role} · no session yet`}</span>
         {total > 0 && <span className="live-side">{done}/{total}</span>}
         {onClose && <button className="team-x" aria-label="Back to work" onClick={onClose}>×</button>}
       </div>
       {total > 0 && <SegBar ratio={done / total} n={20} />}
       {progress && progress.steps.length > 0 && (
-        <div className="live-steps">
-          {progress.steps.slice(-5).map((st, i) => (
-            <div
-              key={st.label}
-              className={st.status === "done" ? "st-done" : st.status === "error" ? "st-error" : st.status === "active" ? "st-active" : "st-todo"}
-            >
-              <span className="ln">{String(i + 1).padStart(2, "0")}</span>
-              <span className={`st-ic ${st.status === "done" ? "st-done" : st.status === "error" ? "st-error" : st.status === "active" ? "st-active" : ""}`}>
-                <StepGlyph label={st.label} status={st.status} />
-              </span>{" "}
-              {st.label}
-            </div>
-          ))}
-        </div>
+        <StepsList steps={progress.steps} />
       )}
+      {/* ponytail: idle slot with no session renders nothing — never an empty dim line. */}
+      {(session || progress) && (
       <div className="live-dim">
         {liveStep ? `· ${liveStep.label}` : ""}
         {liveStep && progress && (progress.activity || progress.task || session?.first) ? " — " : ""}
-        {progress ? ((progress.activity || progress.task || session?.first) ?? "") : (session ? "loading…" : "quiet — no live session in this slot")}
+        {progress ? ((progress.activity || progress.task || session?.first) ?? "") : (session ? "loading…" : "")}
       </div>
+      )}
       {progress && progress.files.length > 0 && (
         <>
           <LensBlock lens={progress?.lens} />
@@ -202,6 +312,9 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
             Resume in chat
           </button>
         )}
+        {manage && onRole && (
+          <button className="menu-act" title="Cycle crew role" onClick={onRole}>↻ {member.role}</button>
+        )}
         {manage && onRename && (
           <input
             className="team-edit"
@@ -214,23 +327,113 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
           <button className="menu-act" onClick={onRemove}>Remove</button>
         )}
       </div>
+      {(onAssign || onRelay) && (team ?? []).length > 0 && (
+        <div className="assign-row">
+          <select
+            className="assign-sel"
+            aria-label="Assign to mate"
+            value={target}
+            disabled={busy}
+            onChange={(e) => setTarget(e.target.value)}
+          >
+            {(team ?? []).map((m) => (
+              <option key={m.id} value={m.id}>{m.name} · {m.role}</option>
+            ))}
+          </select>
+          <input
+            className="team-edit"
+            value={task}
+            aria-label="Task text"
+            placeholder={`Give ${((team ?? []).find((m) => m.id === target)?.name) ?? "mate"} a task…`}
+            disabled={busy}
+            onChange={(e) => setTask(e.target.value)}
+            onKeyDown={(e) => {
+              if (e.key === "Enter" && task.trim() && onAssign && !busy) {
+                setBusy(true);
+                setNote("sending…");
+                onAssign(target, task.trim()).then((r) => {
+                  setBusy(false);
+                  setNote(r.ok ? "sent — watch the tile light up" : `stuck: ${r.error || "bridge refused"}`);
+                  if (r.ok) setTask("");
+                });
+              }
+            }}
+          />
+          {onAssign && (
+            <button
+              className="menu-act primary"
+              disabled={busy || !task.trim()}
+              onClick={() => {
+                if (!task.trim()) return;
+                setBusy(true);
+                setNote("sending…");
+                onAssign(target, task.trim()).then((r) => {
+                  setBusy(false);
+                  setNote(r.ok ? "sent — watch the tile light up" : `stuck: ${r.error || "bridge refused"}`);
+                  if (r.ok) setTask("");
+                });
+              }}
+            >
+              Assign
+            </button>
+          )}
+          {onRelay && (
+            <button
+              className="menu-act"
+              title="Relay this mate's latest work to the selected mate"
+              disabled={busy}
+              onClick={() => {
+                setBusy(true);
+                setNote("relaying…");
+                onRelay(member.id, target, task.trim()).then((r) => {
+                  setBusy(false);
+                  setNote(r.ok ? "relayed — brief handed over" : `stuck: ${r.error || "nothing to relay"}`);
+                  if (r.ok) setTask("");
+                });
+              }}
+            >
+              ⤳
+            </button>
+          )}
+        </div>
+      )}
+      {note && <div className="live-dim">{note}</div>}
     </div>
   );
 }
 
-export function TeamGrid({ sessions = [], onResume, sel, onSel, detail = "below", team: teamProp, live: liveProp }: {
+export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel, detail = "below", team: teamProp, live: liveProp, compact = false }: {
   sessions?: AgentMini[];
   onResume?: (sid: string, first: string) => void;
+  // pick mode (chat view): tapping a live tile opens that agent's chat
+  // instead of selecting — the conversation moves, no detail panel.
+  onPick?: (sid: string, first: string) => void;
+  // jump to the chat composer (home of the provider dropdown).
+  onGoChat?: () => void;
   sel?: string | null;
   onSel?: (id: string | null) => void;
   detail?: "below" | "none";
   team?: ReturnType<typeof useTeam>;
   live?: ReturnType<typeof useSessionProgress>;
+  // compact (chat view): start collapsed so the crew costs one header row
+  // while chatting; the user can expand. Null = follow compact.
+  compact?: boolean;
 }) {
   const teamInternal = useTeam();
   const liveInternal = useSessionProgress(sessions);
-  const { members, rename, remove, add } = teamProp ?? teamInternal;
+  const { members, rename, remove, cycleRole, add, applyPack } = teamProp ?? teamInternal;
   const { prog, refresh } = liveProp ?? liveInternal;
+  // affection: drives per mate id (see AFF_KEY). Bumped on explicit
+  // Resume; tiles show one heart at 3+ drives.
+  const [aff, setAff] = useState<Record<string, number>>(loadAff);
+  const bumpAff = (id: string) =>
+    setAff((prev) => {
+      const next = { ...prev, [id]: (prev[id] ?? 0) + 1 };
+      try {
+        localStorage.setItem(AFF_KEY, JSON.stringify(next));
+      } catch { /* private mode */ }
+      return next;
+    });
   const [inner, setInner] = useState<string | null>(null);
   const cur = onSel ? sel ?? null : inner;
   // ⋯ menu: resume / rename / remove without leaving the grid.
@@ -262,7 +465,7 @@ export function TeamGrid({ sessions = [], onResume, sel, onSel, detail = "below"
   useEffect(() => {
     if (!cur) return;
     const idx = members.findIndex((m) => m.id === cur);
-    const s = idx >= 0 ? sessions[idx] : undefined;
+    const s = idx >= 0 ? slotSession(members, sessions, idx) : undefined;
     if (!s) return;
     refresh(s.session);
     const t = setInterval(() => refresh(s.session), 4000);
@@ -270,18 +473,49 @@ export function TeamGrid({ sessions = [], onResume, sel, onSel, detail = "below"
   }, [cur, members, sessions, refresh]);
 
   const selIdx = members.findIndex((m) => m.id === cur);
-  const selSession = selIdx >= 0 ? sessions[selIdx] : undefined;
+  const selSession = selIdx >= 0 ? slotSession(members, sessions, selIdx) : undefined;
+  // grid stays visible while chatting (compact class shrinks it);
+  // toggle only hides on explicit tap. compact no longer auto-collapses.
+  const [shut, setShut] = useState<boolean | null>(null);
+  const collapsed = shut ?? false;
+  void compact;
   return (
     <div className="team-wrap">
       <div className="team-head">
-        <b className="team-title">TEAM</b>
-        <button className="effort-pill team-add" onClick={add} title={members.length >= 8 ? "Team is full (8)" : "Add a mate"}>
-          + Add mate
+        <button
+          className="team-title team-toggle"
+          aria-expanded={!collapsed}
+          title={collapsed ? `Show crew (${members.length})` : "Hide crew while chatting"}
+          onClick={() => setShut(!collapsed)}
+        >
+          TEAM {members.length} {collapsed ? "▸" : "▾"}
         </button>
+        <button className="effort-pill team-add" onClick={add} title={members.length >= 8 ? "Team is full (8)" : "Add a mate"}>
+          {collapsed ? "+" : "+ Add mate"}
+        </button>
+        {!collapsed && (
+          <select
+            className="team-pack"
+            aria-label="Crew pack"
+            value=""
+            title="One-tap crew shape — roles only, names stay yours"
+            onChange={(e) => {
+              const p = TEAM_PACKS.find((x) => x.id === e.target.value);
+              if (p) applyPack(p.roles);
+              e.target.value = "";
+            }}
+          >
+            <option value="" disabled>Pack…</option>
+            {TEAM_PACKS.map((p) => (
+              <option key={p.id} value={p.id}>{p.label}</option>
+            ))}
+          </select>
+        )}
       </div>
+      {!collapsed && (
       <div className="team-grid">
         {members.map((m, i) => {
-          const s = sessions[i];
+          const s = slotSession(members, sessions, i);
           const p = s ? prog[s.session] : undefined;
           const mood: MascotMood =
             p?.state === "error" ? "annoyed"
@@ -293,14 +527,27 @@ export function TeamGrid({ sessions = [], onResume, sel, onSel, detail = "below"
             <div key={m.id} className="team-cellwrap">
               <button
                 className={m.id === cur ? "team-cell on" : "team-cell"}
-                title={s ? `${s.agent} · ${s.first}` : `${m.name} — tap to view`}
+                title={s ? `${m.name} — ${m.role}${MATE_QUIPS[m.name] ? `. ${MATE_QUIPS[m.name]}` : ""} · ${s.agent} · ${s.first}` : `${m.name} — ${m.role}${MATE_QUIPS[m.name] ? `. ${MATE_QUIPS[m.name]}` : ""} · tap to view`}
                 aria-pressed={m.id === cur}
                 onClick={() => {
+                  // pick mode: the tile IS the jump — open the mate's
+                  // chat directly instead of selecting a detail panel.
+                  if (onPick && s) {
+                    refresh(s.session);
+                    onPick(s.session, s.first);
+                    return;
+                  }
+                  // pick mode + idle mate (no session yet): stay on
+                  // nicki's chat — focus the composer, select nothing.
+                  if (onPick) {
+                    document.querySelector<HTMLTextAreaElement>(".composer-input")?.focus();
+                    return;
+                  }
                   pick(m.id === cur ? null : m.id);
                   if (s) refresh(s.session);
                 }}
               >
-                <span className="team-face" aria-hidden>
+                <span className="team-face" style={{ filter: `hue-rotate(${hueFor(m.color)}deg)` }} aria-hidden>
                   <Mascot
                     ref={(h) => { faces.current.set(m.id, h); }}
                     mood={mood}
@@ -332,7 +579,37 @@ export function TeamGrid({ sessions = [], onResume, sel, onSel, detail = "below"
                     onClick={(e) => e.stopPropagation()}
                   />
                 ) : (
-                  <span className="team-name">{m.name}</span>
+                  <span className="team-meta">
+                    <span className="team-name">{m.name}{(aff[m.id] ?? 0) >= 3 && <span className="team-hearts" title={`${aff[m.id]} drives`}>♥</span>}</span>
+                    {!s && <span className="team-sub">{m.role}</span>}
+                  </span>
+                )}
+                {/* engine row, full tile width: nicki first, then the model.
+                    Own row so it never squeezes the name. Tap jumps to the
+                    chat composer dropdown that owns the switch. */}
+                {s && (
+                  onGoChat ? (
+                    <span
+                      className="team-prov"
+                      role="button"
+                      tabIndex={0}
+                      title={`nicki · ${s.agent} — open provider in chat`}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onGoChat();
+                      }}
+                      onKeyDown={(e) => {
+                        if (e.key === "Enter" || e.key === " ") {
+                          e.stopPropagation();
+                          onGoChat();
+                        }
+                      }}
+                    >
+                      nicki · {s.agent}
+                    </span>
+                  ) : (
+                    <span className="team-sub team-wide">nicki · {s.agent}</span>
+                  )
                 )}
               </button>
               <button
@@ -353,6 +630,7 @@ export function TeamGrid({ sessions = [], onResume, sel, onSel, detail = "below"
                     <MenuRow
                       role="menuitem"
                       onClick={() => {
+                        bumpAff(m.id);
                         onResume(s.session, s.first);
                         setMenuId(null);
                       }}
@@ -388,13 +666,15 @@ export function TeamGrid({ sessions = [], onResume, sel, onSel, detail = "below"
           );
         })}
       </div>
-      {detail === "below" && cur && selIdx >= 0 && (
+      )}
+      {detail === "below" && !onPick && !collapsed && cur && selIdx >= 0 && (
         <div className="team-detail">
           <MemberDetail
             member={members[selIdx]}
             session={selSession}
             progress={selSession ? prog[selSession.session] : undefined}
-            onResume={onResume}
+            onResume={onResume ? (sid, first) => { if (selIdx >= 0) bumpAff(members[selIdx].id); onResume(sid, first); } : undefined}
+            onRole={() => cycleRole(members[selIdx].id)}
             onRename={(n) => rename(members[selIdx].id, n)}
             onRemove={members.length > 1 ? () => { remove(members[selIdx].id); pick(null); } : undefined}
             onClose={() => pick(null)}
