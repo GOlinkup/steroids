@@ -5,9 +5,7 @@ export { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
 import { SafeOrb } from "../orb";
 import { chatOrbFor } from "../orb_state";
 import { LensBlock, StepsList, useSessionProgress } from "./TeamGrid";
-import Mascot from "./Mascot";
 import { HiveBoard, LoopTile, LoopTasks, LiveLoops, SchedulesSection, useLoopTasks } from "./Loop";
-import MermaidBlock from "./Mermaid";
 import {
   classifyAttachment,
   formatSize,
@@ -449,6 +447,17 @@ export function ChatPanel({
     const el = logRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages, thinking, livePartial]);
+  // late growth the message deps miss (bubble images, webfont swap): while
+  // stuck, follow the log's own resize too. Scrolled-up stays put.
+  useLayoutEffect(() => {
+    const el = logRef.current;
+    if (!el) return;
+    const ro = new ResizeObserver(() => {
+      if (stick.current) el.scrollTop = el.scrollHeight;
+    });
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, []);
   const fileRef = useRef<HTMLInputElement>(null);
   const snapRef = useRef<HTMLInputElement>(null);
   // desktop has no camera to capture from: keep capture=environment on
@@ -628,12 +637,6 @@ export function ChatPanel({
         {messages.map((m) => (
           <div key={m.id} className={m.role === "user" ? "chat-row user" : "chat-row"}>
             <div className={m.role === "user" ? "bubble" : "reply"}>
-              {m.role === "assistant" && (
-                <div className="reply-pill" aria-hidden>
-                  <i className="pill-dot" />
-                  <span>nicki</span>
-                </div>
-              )}
               {m.attachments?.filter((a) => a.kind === "image" && a.url).map((a) => (
                 <img
                   key={a.id}
@@ -697,6 +700,7 @@ export function ChatPanel({
               )}
               {m.role === "assistant" && m.content && (
                 <div className="msg-actions">
+                  <span className="reply-pill" aria-hidden>nicki</span>
                   <button
                     className="msg-act"
                     title={copiedId === m.id ? "Copied" : "Copy reply"}
@@ -752,11 +756,6 @@ export function ChatPanel({
                     ? `${liveProgress.steps.filter((s) => s.status === "done").length}/${liveProgress.steps.length} steps · ${workSecs}s`
                     : `${workSecs}s`}
                 </span>
-                {!livePartial && !(liveProgress && (liveProgress.steps.length > 0 || (liveProgress.lens && liveProgress.lens.file))) && (
-                  <div className="typing" aria-hidden>
-                    <i /><i /><i />
-                  </div>
-                )}
                 {liveProgress && liveProgress.steps.length > 0 && (
                   <StepsList steps={liveProgress.steps} />
                 )}
@@ -906,9 +905,6 @@ export function ChatPanel({
           }}
         />
         <div className="composer-innerbar">
-          <span className="chat-buddy" aria-hidden>
-            <Mascot mood="neutral" />
-          </span>
           <div ref={attachDismiss} className="attach-wrap">
             <button
               className="tool-btn"
@@ -1087,18 +1083,12 @@ export function md(text: string): React.ReactNode {
     if (!m) break;
     if (m.index > last) blocks(text.slice(last, m.index), `md${n}`);
     n++;
-    const lang = (m[1] || "").toLowerCase();
     const body = m[2].replace(/\n$/, "");
-    // model-drawn diagrams render live (ADHD-first: picture over
-    // paragraph); everything else stays a code block. Unclosed mermaid
-    // mid-stream stays code until the fence closes — no half flicker.
-    if (lang === "mermaid" && m[0].endsWith("```") && body.trim()) {
-      out.push(<MermaidBlock key={`mdf${n}`} code={body} />);
-    } else {
-      out.push(
+    // every fence renders as a plain code block (mermaid included —
+    // diagrams no longer render live, so a diagram never breaks the reply).
+    out.push(
         <pre key={`mdf${n}`} className="md-pre">{m[1] ? <em>{m[1]}</em> : null}<code>{body}</code></pre>,
       );
-    }
     last = m.index + m[0].length;
     if (last >= text.length) break;
   }
