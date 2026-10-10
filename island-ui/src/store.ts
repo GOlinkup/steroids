@@ -10,7 +10,20 @@ export type IslandView =
   | "lens"
   | "shelf"
   | "settings"
-  | "finished";
+  | "finished"
+  | "feed";
+
+// one opencode/claude ledger event, as GET /events serves it.
+export interface FeedEvent {
+  ts?: number;
+  event?: string;
+  tool?: string;
+  file?: string;
+  text?: string;
+  session?: string;
+  agent?: string;
+  ok?: boolean;
+}
 
 export interface Pill {
   id: string;
@@ -45,12 +58,35 @@ export interface ChatSession {
   messages: ChatMessage[];
   updatedAt: number;
   cloudId?: string; // steroid_chats.chat_id — set on cloud merge, sent back on push
+  handoff?: string; // self-text note filed on archive: goal → result (N turns)
 }
 
 export function sessionTitle(messages: ChatMessage[]): string {
   const first = messages.find((m) => m.role === "user");
   const raw = (first?.content ?? "").trim() || "Untitled chat";
   return raw.length > 28 ? `${raw.slice(0, 28)}…` : raw;
+}
+
+// Session handoff note — the Munder-Difflin self-text habit, scribed
+// locally on archive (no model call, works offline): first goal → last
+// result + turn count. Feeds the startup greeting, history tooltips,
+// and cloud sync so the other screen knows where you left off.
+export function sessionHandoff(messages: ChatMessage[]): string | undefined {
+  const flat = (s: string) => s.trim().replace(/\s+/g, " ");
+  const goal = messages.find((m) => m.role === "user" && m.content.trim())
+    ?? messages.find((m) => m.content.trim());
+  if (!goal) return undefined;
+  const turns = messages.filter((m) => m.role === "user").length;
+  const lastBot = [...messages].reverse().find(
+    (m) => m.role === "assistant" && m.content.trim() && m !== goal,
+  );
+  const cut = (s: string, n: number) => {
+    const t = flat(s);
+    return t.length > n ? `${t.slice(0, n)}…` : t;
+  };
+  const g = cut(goal.content, 80);
+  if (!lastBot) return `${g} (started, ${turns} turn${turns === 1 ? "" : "s"})`;
+  return `${g} → ${cut(lastBot.content, 80)} (${turns} turn${turns === 1 ? "" : "s"})`;
 }
 
 export interface AgentSession {

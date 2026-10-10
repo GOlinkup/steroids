@@ -137,4 +137,9 @@ describe("pushHistory up-next rail", () => {
   it("title-less polls never enter history", () => {
     assert.deepEqual(pushHistory([], { ...NO_MUSIC }), []);
   });
+  it("trackKey never collides across field boundaries", () => {
+    const a = { ...NO_MUSIC, player: "ab", title: "c" };
+    const b = { ...NO_MUSIC, player: "a", title: "bc" };
+    assert.notEqual(trackKey(a), trackKey(b));
+  });
 });

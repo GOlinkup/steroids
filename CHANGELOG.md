@@ -4,6 +4,31 @@ Format follows Keep a Changelog. Versions: `0.1.1` (current, pyproject).
 
 ## [Unreleased]
 
+- Hive floor (Munder Difflin patterns, MIT — see
+  `docs/munder-difflin/NOTICE.md`, no vendored code): new stdlib
+  `island/hive.py` (floor layout, task ledger, append-only log, roster,
+  markdown memory, FIPA-lite inbox/outbox + router with hop-cap
+  escalation). Crew runs file ledger rows and report to Nicki;
+  mates read handed-off notes at turn start. Bridge: GET /hive,
+  GET /hive/inbox, POST /hive/send|ack|task. Chat turns carry the
+  god brief (roster + open tasks + inbox + escalate-if-critical);
+  `[name·role]` mate lanes skip it. Shelf grows a Floor board
+  (ledger + hand-written todos, home bento design). Tests:
+  `tests/test_hive.py` (9 cases) + crew ledger smoke.
+- Team loop is async end to end: POST /loop starts a job (max 2 concurrent),
+  GET /loop?id= polls route>plan>execute>verify progress, DELETE stops
+  between steps (verdict `cancelled`, partial boxes kept). Shelf runner
+  polls with a live activity line + Stop; poll exits honestly on
+  restart/sweep (never spins). `island/loop.py` takes an optional
+  `cancel` hook.
+- Bridge hardening: 7-day upload retention sweep on arrival; port collision
+  refuses with a clear message; PIN verify throttled per-IP (growing delay);
+  duplicate `do_DELETE` merged (DELETE /agent-sessions was dead 404);
+  empty `/session` sid is 400 (was leaking session-less event text);
+  handoff without hook events says so; `e2e-*` test sessions hide unless
+  `?showTests=1`; GET /version (single-sourced from pyproject, island pill
+  reads it live instead of a hardcoded string).
+- Island honesty: "joining its hub…" on pair, "joined" only on relay open.
 - Island is now a live agent companion (the Coucou killer feature, our
   own plumbing): Claude Code hooks and an OpenCode events plugin
   (`plugins/opencode/steroids-events.ts`) append normalized events to

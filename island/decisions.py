@@ -181,6 +181,22 @@ def add_allow_rule(tool, action, kind='glob', workspace=''):
     return rule
 
 
+def remove_allow_rule(tool, kind='glob'):
+    """Drop the matching allow/deny rule. Returns True when removed."""
+    try:
+        rs = allow_rules()
+        kept = [r for r in rs if not (r.get('tool') == tool
+                                      and r.get('kind', 'glob') == kind)]
+        if len(kept) == len(rs):
+            return False
+        os.makedirs(os.path.dirname(_rules_path()), exist_ok=True)
+        with open(_rules_path(), 'w', encoding='utf-8') as f:
+            json.dump(kept[-100:], f)
+        return True
+    except OSError:
+        return False
+
+
 def _rule_hit(rule, tool, cwd=''):
     if rule.get('workspace') and cwd not in (rule['workspace'],) \
             and not str(cwd).startswith(rule['workspace']):

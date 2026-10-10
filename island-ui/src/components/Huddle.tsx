@@ -1,19 +1,22 @@
-import type { CSSProperties } from "react";
-import Mascot from "./Mascot";
+import { useEffect, useRef } from "react";
+import Mascot, { type MascotHandle } from "./Mascot";
 import "./huddle.css";
 
 export interface HuddleProps {
-  chips: { bridge: boolean; agent: boolean; phone: boolean };
   lite: boolean;
-  onChip?: (kind: "bridge" | "agent" | "phone") => void;
-  onDone: () => void;
 }
-
-const CHIP_ORDER: Array<"bridge" | "agent" | "phone"> = ["bridge", "agent", "phone"];
 
 // ponytail: empty-state hero — stays until the first message sends
 // (parent shows it when messages.length===0). No timers, no tap-to-kill.
-export default function Huddle({ chips, lite, onChip }: HuddleProps) {
+export default function Huddle({ lite }: HuddleProps) {
+  const mascotRef = useRef<MascotHandle>(null);
+  // ambient life: wave + jump every 9s so all mascot motion plays here
+  // (breathe + blink run on their own loops). Tap still pokes/annoys/dizzies.
+  useEffect(() => {
+    if (lite) return;
+    const t = window.setInterval(() => mascotRef.current?.poke(), 9000);
+    return () => window.clearInterval(t);
+  }, [lite]);
   return (
     <div
       className={lite ? "huddle-stage huddle-static" : "huddle-stage"}
@@ -21,28 +24,11 @@ export default function Huddle({ chips, lite, onChip }: HuddleProps) {
       aria-label="Crew ready"
     >
       <div className="huddle-nicki">
-        <Mascot mood="neutral" />
+        {/* wave mood: rounded hands up, always (neutral hides them). */}
+        <Mascot ref={mascotRef} mood="wave" />
         <div className="huddle-bubble" aria-live="polite">
           <span className="huddle-bubble-text">Crew ready — what&apos;s first?</span>
         </div>
-      </div>
-      <div className="pill-row huddle-chips">
-        {CHIP_ORDER.map((kind, i) => (
-          <button
-            key={kind}
-            type="button"
-            className={chips[kind] ? "hpill live" : "hpill"}
-            style={{ "--i": i, "--pill": chips[kind] ? "#22c55e" : "#888" } as CSSProperties}
-            aria-label={`${kind} ${chips[kind] ? "connected" : "off"}`}
-            onClick={(e) => {
-              e.stopPropagation();
-              onChip?.(kind);
-            }}
-          >
-            <span className="dot" aria-hidden="true" />
-            {kind} <em>{chips[kind] ? "connected" : "off"}</em>
-          </button>
-        ))}
       </div>
     </div>
   );

@@ -23,7 +23,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(
     os.path.dirname(os.path.abspath(__file__))), "src"))
 from steroids import drop_pair, drop_qr  # noqa: E402
 
-_WS_GUID = "258EAFA5-E914-47DA-95CA-CAB33FB9A466"
+_WS_GUID = "258EAFA5-E914-47DA-95CA-C5AB0DC85B11"
 
 _pending = {}  # pin -> (key, expires)
 _pending_lock = threading.Lock()

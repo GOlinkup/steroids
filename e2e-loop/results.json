@@ -1,0 +1,95 @@
+{
+ "results": [
+  {
+   "name": "boot-mobile",
+   "pass": true,
+   "detail": "root renders"
+  },
+  {
+   "name": "lens-mobile",
+   "pass": true,
+   "detail": "381 chars"
+  },
+  {
+   "name": "sessions-live",
+   "pass": true,
+   "detail": "12 sessions"
+  },
+  {
+   "name": "skills-search",
+   "pass": true,
+   "detail": "sr-testing-python,golang-testing,test-detect"
+  },
+  {
+   "name": "attach-seed",
+   "pass": true,
+   "detail": "2 chips, names visible"
+  },
+  {
+   "name": "upload-ui",
+   "pass": true,
+   "detail": "probe.txt attached"
+  },
+  {
+   "name": "relay-settings",
+   "pass": true,
+   "detail": "phone-link surface present"
+  },
+  {
+   "name": "relay-qr",
+   "pass": true,
+   "detail": "QR png issued"
+  },
+  {
+   "name": "approve-loop",
+   "pass": true,
+   "detail": "seed->decide->hook deny + UI deny tapped"
+  },
+  {
+   "name": "voice-record",
+   "pass": true,
+   "detail": "mic denied gracefully on 192.168.43.237 (browser policy)"
+  },
+  {
+   "name": "voice-attach",
+   "pass": true,
+   "detail": "SKIP — no recording, nothing to land"
+  },
+  {
+   "name": "shelf-team",
+   "pass": true,
+   "detail": "runner + 2 demo cards"
+  },
+  {
+   "name": "fleet-api",
+   "pass": true,
+   "detail": "0 ranked"
+  },
+  {
+   "name": "handoff-error",
+   "pass": true,
+   "detail": "no handoff data — session has no hook events yet"
+  },
+  {
+   "name": "chat-turn",
+   "pass": true,
+   "detail": "created->snapshot->deleted"
+  },
+  {
+   "name": "boot-desktop",
+   "pass": true,
+   "detail": "root renders"
+  },
+  {
+   "name": "shots-desktop",
+   "pass": true,
+   "detail": "captured"
+  },
+  {
+   "name": "console-clean",
+   "pass": true,
+   "detail": "zero product page errors"
+  }
+ ],
+ "errors": []
+}

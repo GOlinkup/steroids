@@ -295,10 +295,21 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.end_headers()
         self.wfile.write(data)
 
+    def _send_page(self):
+        body = PAGE.encode()
+        self.send_response(200)
+        self.send_header("Content-Type", "text/html; charset=utf-8")
+        self.send_header("Content-Length", str(len(body)))
+        self.send_header("Cache-Control", "no-store")
+        self.end_headers()
+        self.wfile.write(body)
+
     def do_GET(self):
         part = urllib.parse.urlsplit(self.path)
         qs = urllib.parse.parse_qs(part.query)
-        if part.path == "/api/daily/briefing":
+        if part.path in ("/", "/index.html"):
+            self._send_page()
+        elif part.path == "/api/daily/briefing":
             self._send(200, load_briefing(self.cache_path))
         elif part.path == "/api/daily/today":
             self._send(200, {"events": today_events(self.log_path)})
@@ -331,6 +342,53 @@ class _Handler(http.server.BaseHTTPRequestHandler):
         self.send_header("Access-Control-Allow-Methods", "GET, POST, OPTIONS")
         self.send_header("Access-Control-Allow-Headers", "Content-Type")
         self.end_headers()
+
+
+# ponytail: one self-contained page, no assets — the :8906 root has to
+# just run. Same-origin fetch, stdlib-styled dark.
+PAGE = """<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title> Steroids daily</title>
+<style>
+*{box-sizing:border-box}body{margin:0;background:#000;color:#fff;
+font-family:ui-sans-serif,system-ui,sans-serif;padding:1.2rem;max-width:44rem}
+h1{font-size:1.3rem;margin:.2rem 0 .6rem}.wx{opacity:.65;font-size:.9rem}
+h2{font-size:.75rem;text-transform:uppercase;letter-spacing:.08em;
+opacity:.5;margin:1.4rem 0 .5rem}ul{list-style:none;margin:0;padding:0}
+li{padding:.55rem .7rem;border:1px solid rgba(255,255,255,.1);
+border-radius:12px;margin-bottom:.45rem;font-size:.9rem}
+li a{color:#fff;text-decoration:none}li small{display:block;opacity:.5;
+font-size:.68rem;margin-top:.15rem}.row{display:flex;gap:.45rem;flex-wrap:wrap}
+button{background:#1c1d22;color:#fff;border:1px solid rgba(255,255,255,.14);
+border-radius:99px;padding:.45rem .9rem;font-size:.8rem;cursor:pointer}
+button:active{transform:scale(.96)}.ok{color:#34d399;font-size:.8rem;opacity:0}
+</style></head><body>
+<h1>Today</h1><div class="wx" id="wx">loading…</div>
+<h2>Headlines</h2><ul id="news"></ul>
+<h2>Log the day</h2><div class="row" id="logrow"></div>
+<span class="ok" id="ok">✓</span>
+<h2>Today</h2><ul id="today"></ul>
+<script>
+const $=id=>document.getElementById(id);
+fetch("api/daily/briefing").then(r=>r.json()).then(j=>{
+  $("wx").textContent=j.weatherLine||"offline — cached";
+  $("news").innerHTML=(j.headlines||[]).map(h=>
+    `<li><a href="${h.url}">${h.title}</a><small>${h.outlet||""}</small></li>`
+  ).join("")||"<li>no headlines</li>";
+}).catch(()=>{$("wx").textContent="briefing unreachable";});
+const pull=()=>fetch("api/daily/today").then(r=>r.json()).then(j=>{
+  $("today").innerHTML=(j.events||[]).map(e=>`<li>${e.label}<small>${e.type}</small></li>`).join("")||"<li>nothing logged yet</li>";
+});pull();
+[["work","Did work"],["gym","Gym"],["read","Read"],["ship","Shipped"],["rest","Rest"]].forEach(([t,l])=>{
+  const b=document.createElement("button");b.textContent=l;
+  b.onclick=()=>fetch("api/daily/log",{method:"POST",
+    headers:{"Content-Type":"application/json"},
+    body:JSON.stringify({type:t,label:l})}).then(()=>{pull();
+    const o=$("ok");o.style.opacity=1;setTimeout(()=>o.style.opacity=0,900);});
+  $("logrow").appendChild(b);
+});
+</script></body></html>"""
 
 
 def ensure(port=PORT):

@@ -5,6 +5,8 @@ installed `opencode` (plain CLI, no API keys, no cloud account needed).
   GET  /health    -> {ok, opencode, claude}
   POST /chat      {message, session_id?, provider?} -> {ok, text, session, error?}
   GET  /sessions  -> recent agent sessions from the hooks event log
+  GET  /events    -> live event feed (newest first) for the crew
+  POST /events    -> opencode/claude hook payload in, ledger line out
 
 With --serve it also serves ../island-ui/dist, so one process is the
 whole thing: `python3 island/bridge.py --serve`, open the printed URL,
@@ -17,6 +19,7 @@ import base64
 import mimetypes
 import os
 import re
+import signal
 import socket
 import subprocess
 import sys
@@ -40,10 +43,23 @@ import display as _display  # noqa: E402  (external display-state.json)
 import quota as _quota  # noqa: E402  (Claude OAuth usage)
 import demo as _demo  # noqa: E402  (scripted fixtures)
 import fleet as _fleet  # noqa: E402  (attention ranking + overlap)
+import echo as _echo  # noqa: E402  (command-echo levels: volume+brightness)
+import hive as _hive  # noqa: E402  (team floor: ledger + inbox/outbox)
 
 HOST, PORT = "127.0.0.1", 8096
 BODY_LIMIT = 64 * 1024
 SEARCH_TIMEOUT = 20
+
+
+def app_version():
+    """Single source: pyproject.toml. Never throws (UI falls back)."""
+    try:
+        base = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
+        with open(os.path.join(base, "pyproject.toml"), encoding="utf-8") as f:
+            m = re.search(r'^version\s*=\s*["\']([^"\']+)', f.read(), re.M)
+        return m.group(1) if m else "?"
+    except OSError:
+        return "?"
 
 REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROUTER = os.path.join(REPO_ROOT, "src", "steroids", "router.py")
@@ -402,6 +418,15 @@ def live_dir():
     return os.path.expanduser("~/.config/opencode/plugins/steroids")
 
 
+def is_test_sid(sid):
+    """Loop/self-test sessions stay out of the island unless asked."""
+    return str(sid or "").startswith("e2e-")
+
+
+def show_tests(parts):
+    return (parse_qs(parts.query).get("showTests") or [""])[0] == "1"
+
+
 def lan_base(port):
     """This machine's LAN URL, so a phone browser can reach the bridge."""
     ip = "127.0.0.1"
@@ -501,8 +526,256 @@ def trending(limit_rows=500):
 
 TURNS = {}  # tid -> live turn snapshot (the UI polls while it streams)
 TURNS_LOCK = threading.Lock()
+_BOOT_ID = os.urandom(4).hex()  # persisted on first boot: stable across
+# restarts so polls reattach instead of crying "restarted" (durability §)
 _MODELS = {"at": 0.0, "data": []}  # `opencode models` cache (5 min)
 TURN_TTL = 600  # forget finished turns after 10 min
+
+LOOPS = {}  # lid -> team-loop job (route>plan>execute>verify, minutes long)
+LOOPS_LOCK = threading.Lock()
+_VERIFY_FAILS = {}  # ip -> (count, ts): PIN-guess throttle state
+LOOP_TTL = 3600  # forget finished loops after an hour (cards persist in UI)
+# ponytail: 2 team loops at once; each fans out to agent subprocesses,
+# so unbounded starts would pile threads + model bills. Third start waits.
+MAX_LOOPS = 2
+
+
+def _loop_sweep():
+    now = time.time()
+    stale = [k for k, v in LOOPS.items()
+             if v["done"] and now - v["started"] > LOOP_TTL]
+    for lid in stale:
+        del LOOPS[lid]
+    return bool(stale)  # callers save outside the lock when True
+
+
+def _pump_loop(lid, prompt, provider, crew=None):
+    """Run the team loop off-thread; the shelf polls the snapshot."""
+    job = LOOPS.get(lid)
+    if job is None:
+        return
+    cancelled = job["cancel"]
+
+    def emit(name, status, result):
+        with LOOPS_LOCK:
+            j = LOOPS.get(lid)
+            if j is not None:
+                j["activity"] = "%s: %s" % (name, status)
+                # live mate checklist: pollers render progress mid-run.
+                steps = j.setdefault("steps", [])
+                steps[:] = [s for s in steps if s.get("name") != name]
+                steps.append({"name": name, "status": status})
+                del steps[:-12]
+        _loop_save()  # outside the lock (it takes LOOPS_LOCK itself)
+
+    try:
+        import loop as _loop  # noqa: E402  (team loop module)
+        out = _loop.run_loop(prompt, provider,
+                             emit=emit, cancel=cancelled.is_set,
+                             crew=job.get("crew"))
+    except Exception as exc:  # noqa: BLE001 — surfaced as loop error
+        out = {"ok": False, "verdict": "error",
+               "detail": str(exc)[:500], "steps": []}
+    with LOOPS_LOCK:
+        j = LOOPS.get(lid)
+        if j is not None:
+            j.update(done=True, activity="finished",
+                     elapsed=round(time.time() - j["started"], 1),
+                     loop=out)
+    _loop_save()
+
+
+def start_loop(prompt, provider="opencode", crew=None):
+    """Spawn a team loop in the background. Returns {ok, id}."""
+    if provider not in ("opencode", "claude"):
+        return {"ok": False, "error": "unknown provider %r" % provider}
+    lid = os.urandom(8).hex()
+    with LOOPS_LOCK:
+        _loop_sweep()
+        live = sum(1 for v in LOOPS.values() if not v["done"])
+        if live >= MAX_LOOPS:
+            return {"ok": False,
+                    "error": "2 team loops already running — open the Shelf tab and Stop one, then send again"}
+        LOOPS[lid] = {"done": False, "activity": "routing…",
+                      "started": time.time(), "crew": crew,
+                      "prompt": prompt, "provider": provider,
+                      "cancel": threading.Event(), "loop": None}
+    _loop_save()
+    threading.Thread(target=_pump_loop,
+                     args=(lid, prompt, provider, crew), daemon=True).start()
+    return {"ok": True, "id": lid}
+
+
+def _boot_recover():
+    """Stable boot id + reattach live turns + flag dead loops. Runs once
+    before serving: polls simply keep working across restarts."""
+    global _BOOT_ID
+    bootf = _state_file("boot.id")
+    old = _json_load(bootf, "")
+    if isinstance(old, str) and old:
+        _BOOT_ID = old
+    else:
+        _json_save(bootf, _BOOT_ID)
+    # turns: recent receipts stay pollable; live ones reattach to their
+    # detached agent, or close honestly off the log when the agent died.
+    for tid, s in _json_load(_state_file("turns.json"), {}).items():
+        if not isinstance(s, dict):
+            continue
+        base = {"done": True, "ok": True, "activity": s.get("activity", ""),
+                "partial": s.get("partial", ""), "session": s.get("session"),
+                "provider": s.get("provider", "opencode"),
+                "started": s.get("started", time.time()), "proc": None,
+                "text": s.get("text"), "error": s.get("error")}
+        if not s.get("done"):
+            pid, logpath = s.get("pid"), s.get("log")
+            if (pid and logpath and os.path.exists(logpath)
+                    and _proc_alive(pid)):
+                gen = int(s.get("gen", 0) or 0) + 1
+                base.update(done=False, ok=True, pid=pid, log=logpath,
+                            gen=gen)
+                TURNS[tid] = base
+                threading.Thread(target=_pump_turn_file,
+                                 args=(tid, logpath, pid, base["provider"]),
+                                 kwargs={"gen": gen},
+                                 daemon=True).start()
+                continue
+            lines, partials, result = [], [], ""
+            if logpath:
+                try:
+                    with open(logpath, encoding="utf-8",
+                              errors="replace") as f:
+                        raw = f.readlines()[-3000:]
+                except OSError:
+                    raw = []
+                TURNS[tid] = dict(base, done=False)
+                for ln in raw:
+                    ln = ln.strip()
+                    if ln:
+                        r = _ingest_turn_line(TURNS[tid], ln, lines,
+                                              partials, base["provider"])
+                        if r:
+                            result = r
+                _finalize_turn(tid, lines, partials, result, cutoff=True)
+                continue
+            TURNS[tid] = dict(
+                base, done=True, ok=False,
+                error="cut off by a restart — send again, same session continues")
+            continue
+        TURNS[tid] = base
+    _turn_save()
+    # loops: crew children orphaned with us — flag interrupted + resumable
+    # (one-tap resume reposts the same prompt; never auto-reruns).
+    for lid, s in _json_load(_state_file("loops.json"), {}).items():
+        if not isinstance(s, dict):
+            continue
+        job = {"done": True, "activity": s.get("activity", ""),
+               "started": s.get("started", time.time()),
+               "steps": s.get("steps", []), "crew": s.get("crew"),
+               "cancel": threading.Event(), "loop": s.get("loop")}
+        if not s.get("done"):
+            job.update(
+                activity="interrupted (bridge restarted)",
+                interrupted=True,
+                resumable={"prompt": s.get("prompt", ""),
+                           "provider": s.get("provider", "opencode"),
+                           "crew": s.get("crew")},
+                loop={"ok": False, "verdict": "interrupted",
+                      "detail": "bridge restarted mid-run — resume to continue the same goal"})
+        LOOPS[lid] = job
+    _loop_save()
+
+
+def stop_loop(lid):
+    """Ask a running loop to stop between steps. Returns True if known."""
+    with LOOPS_LOCK:
+        job = LOOPS.get(lid)
+        if job is None:
+            return False
+        job["cancel"].set()
+        job["activity"] = "stopping…"
+    _loop_save()
+    return True
+
+
+_DOTS_UID = "island"  # single-user local: bridge rows live beside bot rows
+
+
+def _dots_db():
+    """Open the dots sqlite (schema ensured, idempotent). Raises on no pkg."""
+    import sqlite3
+    from steroids.dots import config as _dc, store as _ds
+    conn = sqlite3.connect(_dc.settings.DOTS_DB_PATH)
+    conn.row_factory = sqlite3.Row
+    conn.executescript(_ds.SCHEMA)
+    return conn
+
+
+# --- durable turns + loops: survive bridge restarts (cloud-like) ---
+# Turns run detached (own session, outlive us) with stdout to per-turn
+# log files; both registries persist as JSON. On boot the bridge
+# reattaches to live agents and flags dead loops resumable — the UI
+# poll flow is unchanged, polls simply keep working across restarts.
+
+def _state_file(name):
+    home = os.environ.get("STEROIDS_HOME") or os.path.expanduser("~")
+    d = os.path.join(home, ".config", "steroids")
+    try:
+        os.makedirs(d, exist_ok=True)
+    except OSError:
+        pass
+    return os.path.join(d, name)
+
+
+def _json_load(path, default):
+    try:
+        with open(path, encoding="utf-8") as f:
+            d = json.load(f)
+        return d if isinstance(d, type(default)) else default
+    except (OSError, ValueError):
+        return default
+
+
+def _json_save(path, obj):
+    try:
+        tmp = path + ".tmp"
+        with open(tmp, "w", encoding="utf-8") as f:
+            json.dump(obj, f)
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _proc_alive(pid):
+    """True while the agent process still runs. Zombie-aware: an exited
+    child we never reaped (kill succeeds on zombies) reads state Z."""
+    try:
+        pid = int(pid)
+    except (TypeError, ValueError):
+        return False
+    try:
+        os.kill(pid, 0)
+    except OSError:
+        return False
+    try:
+        with open("/proc/%d/stat" % pid, encoding="utf-8") as f:
+            state = f.read().rsplit(")", 1)[-1].split()[0]
+        return state != "Z"
+    except (OSError, IndexError):
+        return True  # non-Linux: the kill check is all we have
+
+
+def _turn_save():
+    with TURNS_LOCK:
+        snap = {tid: {k: v for k, v in t.items() if k != "proc"}
+                for tid, t in TURNS.items()}
+    _json_save(_state_file("turns.json"), snap)
+
+
+def _loop_save():
+    with LOOPS_LOCK:
+        snap = {lid: {k: v for k, v in j.items() if k != "cancel"}
+                for lid, j in LOOPS.items()}
+    _json_save(_state_file("loops.json"), snap)
 
 
 def _turn_snapshot(t):
@@ -530,26 +803,165 @@ def _turn_sweep():
                 p.terminate()
             except OSError:
                 pass
+        log = TURNS[tid].get("log")
+        if log:
+            try:
+                os.remove(log)
+            except OSError:
+                pass
         del TURNS[tid]
+    return bool(stale)  # callers save outside the lock when True
+
+
+def _ingest_turn_line(t, ln, lines, partials, provider):
+    """Fold one CLI output line into the turn. Returns result text when done."""
+    lines.append(ln)
+    if len(lines) > 600:
+        del lines[:-600]
+    try:
+        j = json.loads(ln)
+    except ValueError:
+        return None
+    if not isinstance(j, dict):
+        return None
+    u = (agentlog.claude_line(j) if provider == "claude"
+         else agentlog.opencode_line(j))
+    if not u:
+        return None
+    with TURNS_LOCK:
+        if u.get("session"):
+            t["session"] = u["session"]
+        if u.get("activity"):
+            t["activity"] = u["activity"]
+        if u.get("text"):
+            partials.append(u["text"])
+            t["partial"] = "\n".join(partials)[-4000:]
+    return u.get("result")
+
+
+def _finalize_turn(tid, lines, partials, result, cutoff=False):
+    """Close the turn from collected output. cutoff=True (died with the
+    bridge/machine) keeps partials as the reply with an honest note."""
+    plain = "\n".join(ln for ln in lines[-12:]
+                      if not ln.lstrip().startswith("{"))
+    text = (result or "\n".join(partials)[-4000:]
+            or plain[-4000:] or "")[:4000]
+    with TURNS_LOCK:
+        t = TURNS.get(tid)
+        if t is None:
+            return
+        log = t.get("log")
+        if text:
+            if cutoff:
+                text = (text + "\n\n[cut off by a restart — send again, "
+                        "it continues the same session.]")[:4000]
+            t.update(done=True, ok=True, text=text)
+        elif cutoff:
+            t.update(done=True, ok=False,
+                     error="cut off by a restart — send again, same session continues")
+        else:
+            t.update(done=True, ok=False,
+                     error="agent stopped silent — send again")
+        if log:
+            try:
+                os.remove(log)
+            except OSError:
+                pass
+    _turn_save()
+
+
+def _pump_turn_file(tid, logpath, pid, provider, proc=None, gen=0):
+    """Tail a detached agent log to completion. Fresh spawns and boot
+    recovery share this — the only difference is who started the proc.
+    gen guards double-pumps (a stale thread never clobbers a reattach)."""
+    t = TURNS.get(tid)
+    if t is None:
+        return
+
+    def _alive():
+        if proc is not None:
+            try:
+                return proc.poll() is None
+            except OSError:
+                return False
+        return _proc_alive(pid)
+
+    lines, partials, result = [], [], ""
+    try:
+        with open(logpath, encoding="utf-8", errors="replace") as f:
+            for ln in f.readlines()[-3000:]:
+                ln = ln.strip()
+                if not ln:
+                    continue
+                r = _ingest_turn_line(t, ln, lines, partials, provider)
+                if r:
+                    result = r
+            while True:
+                ln = f.readline()
+                if ln:
+                    ln = ln.strip()
+                    if ln:
+                        r = _ingest_turn_line(t, ln, lines, partials, provider)
+                        if r:
+                            result = r
+                    continue
+                # EOF: proc gone means finished (checked on the dead read
+                # so a final flush is never missed).
+                if not _alive():
+                    break
+                time.sleep(0.25)
+    except OSError:
+        pass
+    if proc is not None:
+        try:
+            proc.wait(timeout=10)
+        except Exception:
+            pass
+    with TURNS_LOCK:
+        cur = TURNS.get(tid)
+        if cur is None or cur.get("gen", 0) != gen:
+            return  # reattached elsewhere; the new pump owns the close
+    _finalize_turn(tid, lines, partials, result)
 
 
 def _pump_turn(tid, argv, stdin_data, provider):
-    """Read CLI JSON lines as they stream; the UI polls the snapshot."""
+    """Spawn detached (survives us) to a log file, then tail it."""
     t = TURNS.get(tid)
     if t is None:
+        return
+    logdir = os.path.join(os.path.dirname(_state_file("turns.json")), "turns")
+    try:
+        os.makedirs(logdir, exist_ok=True)
+    except OSError:
+        pass
+    logpath = os.path.join(logdir, tid + ".jsonl")
+    try:
+        lf = open(logpath, "w", encoding="utf-8")
+    except OSError:
+        with TURNS_LOCK:
+            t.update(done=True, ok=False, error="no scratch space for turn log")
+        _turn_save()
         return
     try:
         p = subprocess.Popen(
             argv, stdin=subprocess.PIPE if stdin_data else None,
-            stdout=subprocess.PIPE, stderr=subprocess.DEVNULL,
-            text=True, bufsize=1)
+            stdout=lf, stderr=subprocess.DEVNULL,
+            text=True, bufsize=1, start_new_session=True)
     except FileNotFoundError:
+        try:
+            lf.close()
+        except OSError:
+            pass
         with TURNS_LOCK:
             t.update(done=True, ok=False,
                      error="%s CLI not installed" % provider)
+        _turn_save()
         return
     with TURNS_LOCK:
         t["proc"] = p
+        t["pid"] = p.pid
+        t["log"] = logpath
+    _turn_save()
     if stdin_data:
         try:
             assert p.stdin is not None
@@ -557,51 +969,12 @@ def _pump_turn(tid, argv, stdin_data, provider):
             p.stdin.close()
         except (BrokenPipeError, OSError):
             pass
-    lines, partials, result = [], [], ""
     try:
-        assert p.stdout is not None
-        for ln in p.stdout:
-            ln = ln.strip()
-            if not ln:
-                continue
-            lines.append(ln)
-            if len(lines) > 600:
-                del lines[:-600]
-            try:
-                j = json.loads(ln)
-            except ValueError:
-                continue
-            if not isinstance(j, dict):
-                continue
-            u = (agentlog.claude_line(j) if provider == "claude"
-                 else agentlog.opencode_line(j))
-            if not u:
-                continue
-            with TURNS_LOCK:
-                if u.get("session"):
-                    t["session"] = u["session"]
-                if u.get("activity"):
-                    t["activity"] = u["activity"]
-                if u.get("text"):
-                    partials.append(u["text"])
-                    t["partial"] = "\n".join(partials)[-4000:]
-                if u.get("result"):
-                    result = u["result"]
-        rc = p.wait()
-    except Exception as e:
-        with TURNS_LOCK:
-            t.update(done=True, ok=False, error=str(e))
-        return
-    plain = "\n".join(ln for ln in lines[-12:]
-                      if not ln.lstrip().startswith("{"))
-    text = (result or "\n".join(partials)[-4000:]
-            or plain[-4000:] or "…")[:4000]
-    with TURNS_LOCK:
-        if rc != 0 and not (result or partials):
-            t.update(done=True, ok=False,
-                     error="exit %s: %s" % (rc, text[-300:]))
-        else:
-            t.update(done=True, ok=True, text=text)
+        lf.close()  # child holds its own fd; ours is done
+    except OSError:
+        pass
+    _pump_turn_file(tid, logpath, p.pid, provider, proc=p,
+                    gen=t.get("gen", 0))
 
 
 OPENCODE_INSTALL_URL = "https://opencode.ai/install"
@@ -648,21 +1021,30 @@ def start_turn(msg, session_id=None, provider="opencode", model=None):
         _turn_sweep()
         TURNS[tid] = {"done": False, "ok": True, "activity": "starting…",
                       "partial": "", "session": session_id,
+                      "provider": provider, "gen": 1,
                       "started": time.time(), "proc": None}
+    _turn_save()
     th = threading.Thread(target=_pump_turn,
-                          args=(tid, argv, stdin_data, provider), daemon=True)
+                           args=(tid, argv, stdin_data, provider), daemon=True)
     th.start()
-    return {"ok": True, "turn": tid}
+    return {"ok": True, "turn": tid, "boot": _BOOT_ID}
 
 
 def stop_turn(tid):
     with TURNS_LOCK:
         t = TURNS.get(tid)
         p = t.get("proc") if t else None
+        pid = t.get("pid") if t else None
     if p is not None:
         try:
             p.terminate()
         except OSError:
+            pass
+    elif pid is not None:
+        # reattached turn (no Popen handle here): signal the pid directly.
+        try:
+            os.kill(int(pid), signal.SIGTERM)
+        except (OSError, ValueError):
             pass
     return t is not None
 
@@ -689,15 +1071,36 @@ class Handler(SimpleHTTPRequestHandler):
         # agent-session hides: the island history panel gets a delete affordance
         # for terminal sessions too (opencode/claude rows). Hide, don't rm —
         # the provider's own store stays intact.
-        if not self._local():
-            return self._send({"ok": False,
-                               "error": "delete from the PC itself"}, 403)
         parts = urlparse(self.path)
         if parts.path == "/agent-sessions":
+            # hides rewrite this PC's display state: owner-only.
+            if not self._local():
+                return self._send({"ok": False,
+                                   "error": "delete from the PC itself"}, 403)
             sid = (parse_qs(parts.query).get("session") or [""])[0].strip()
             if not sid:
                 return self._send({"ok": False, "error": "session id required"}, 400)
             return self._send({"ok": True, "hidden": agentlog.hide_session(sid)})
+        if parts.path == "/turn":
+            tid = (parse_qs(parts.query).get("id") or [""])[0]
+            if not stop_turn(tid):
+                return self._send({"ok": False, "error": "no such turn"}, 404)
+            return self._send({"ok": True})
+        if parts.path == "/loop":
+            lid = (parse_qs(parts.query).get("id") or [""])[0]
+            if not stop_loop(lid):
+                return self._send({"ok": False, "error": "no such loop"}, 404)
+            return self._send({"ok": True})
+        if parts.path == "/rules":
+            # Custom Rules (Dots/ChatGPT ladder): owner-only, local.
+            if not self._local():
+                return self._send({"ok": False,
+                                   "error": "edit rules from the PC itself"}, 403)
+            tool = (parse_qs(parts.query).get("tool") or [""])[0]
+            kind = (parse_qs(parts.query).get("kind") or ["glob"])[0]
+            if not tool:
+                return self._send({"ok": False, "error": "tool required"}, 400)
+            return self._send({"ok": decisions.remove_allow_rule(tool, kind)})
         return self._send({"ok": False, "error": "unknown endpoint"}, 404)
 
     def do_OPTIONS(self):  # browser preflight for POST /chat
@@ -713,6 +1116,8 @@ class Handler(SimpleHTTPRequestHandler):
             self._send({"ok": True,
                         "opencode": agentlog.opencode_available(),
                         "claude": agentlog.claude_available()})
+        elif parts.path == "/version":
+            self._send({"version": app_version()})
         elif parts.path == "/sessions":
             try:
                 hidden = agentlog.hidden_sessions()
@@ -738,13 +1143,31 @@ class Handler(SimpleHTTPRequestHandler):
                                 key=lambda s: s["ts"] or 0,
                                 reverse=True)
                 # respect UI hides: deleted from the island stays deleted.
-                merged = [s for s in merged if s["session"] not in hidden][:12]
+                # loop/test sessions (e2e-*) hide unless ?showTests=1.
+                show = show_tests(parts)
+                merged = [s for s in merged if s["session"] not in hidden
+                          and (show or not is_test_sid(s["session"]))][:12]
                 self._send({"sessions": merged})
             except Exception as e:
                 self._send({"sessions": [], "error": str(e)})
+        elif parts.path == "/events":
+            # live opencode event feed for the crew (nav Feed tab).
+            try:
+                n = int((parse_qs(parts.query).get("n") or ["60"])[0])
+            except ValueError:
+                n = 60
+            n = max(1, min(n, 300))
+            try:
+                evs = agentlog.read_events(limit=n)
+                self._send({"events": evs[::-1]})
+            except Exception as e:
+                self._send({"events": [], "error": str(e)})
         elif parts.path == "/session":
             # one session's live progress for the team tiles (steps + files).
             sid = (parse_qs(parts.query).get("session") or [""])[0].strip()
+            if not sid:
+                return self._send({"ok": False,
+                                   "error": "session id required"}, 400)
             try:
                 evs = agentlog.read_events(limit=300)
                 self._send({"progress": agentlog.session_progress(evs, sid)})
@@ -819,6 +1242,49 @@ class Handler(SimpleHTTPRequestHandler):
             # island approvals/questions awaiting a tap (act-from-island).
             sid = (parse_qs(parts.query).get("session") or [""])[0]
             self._send({"pending": decisions.pending(sid or None)})
+        elif parts.path == "/rules":
+            # Custom Rules list (allow/ask/block per tool glob).
+            if not self._local():
+                return self._send({"ok": False,
+                                   "error": "read rules from the PC itself"}, 403)
+            self._send({"rules": decisions.allow_rules()})
+        elif parts.path == "/loops":
+            # live team loops for the shelf (chat-started ones included),
+            # plus bridge-restart interrupted ones with one-tap resume.
+            with LOOPS_LOCK:
+                swept = _loop_sweep()
+                out = [{"id": lid,
+                        "activity": v.get("activity", ""),
+                        "elapsed": round(time.time() - v.get("started",
+                                                             time.time()), 1),
+                        "steps": list(v.get("steps", []))[-6:],
+                        "interrupted": bool(v.get("interrupted")),
+                        "resumable": v.get("resumable")}
+                       for lid, v in LOOPS.items()
+                       if not v.get("done") or v.get("interrupted")]
+            if swept:
+                _loop_save()
+            self._send({"loops": out})
+        elif parts.path == "/schedules":
+            # dots automations (Manus-style): list + last runs each.
+            try:
+                from steroids.dots import schedules as _dsched, store as _dstore
+                conn = _dots_db()
+                rows = _dsched.list_schedules(conn, _DOTS_UID)
+                scheds = []
+                for s in rows:
+                    try:
+                        runs = _dsched.list_schedule_runs(conn, s["id"], _DOTS_UID)[:3]
+                    except Exception:
+                        runs = []
+                    d = dict(s)
+                    d["runs"] = [{"status": r.get("status"), "result": str(r.get("result") or "")[:200],
+                                  "at": r.get("created_at") or r.get("updated_at")} for r in runs]
+                    scheds.append(d)
+                conn.close()
+                self._send({"schedules": scheds})
+            except Exception as e:
+                self._send({"schedules": [], "error": "dots unavailable: %s" % e})
         elif parts.path == "/usage":
             # token totals for a Claude transcript (?path=...jsonl).
             p = (parse_qs(parts.query).get("path") or [""])[0]
@@ -837,8 +1303,10 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 hidden = agentlog.hidden_sessions()
                 evs = agentlog.read_events(limit=300)
+                show = show_tests(parts)
                 sess = [s for s in agentlog.sessions(evs)
-                        if s["session"] not in hidden][:9]
+                        if s["session"] not in hidden
+                        and (show or not is_test_sid(s["session"]))][:9]
                 states = {}
                 for e in evs:
                     sid = e.get("session")
@@ -867,8 +1335,10 @@ class Handler(SimpleHTTPRequestHandler):
             try:
                 hidden = agentlog.hidden_sessions()
                 evs = agentlog.read_events(limit=300)
+                show = show_tests(parts)
                 sess = [s for s in agentlog.sessions(evs)
-                        if s["session"] not in hidden][:12]
+                        if s["session"] not in hidden
+                        and (show or not is_test_sid(s["session"]))][:12]
                 over = _fleet.overlap(
                     [dict(s, cwd=(next(
                         (x.get("cwd", "") for x in evs
@@ -904,6 +1374,12 @@ class Handler(SimpleHTTPRequestHandler):
             except OSError:
                 pass
             self._send(info)
+        elif parts.path == "/echo":              # command echo for the chat live-strip. volume via
+            # pactl, brightness via sysfs — Nones mean "no row".
+            try:
+                self._send(_echo.levels())
+            except Exception:
+                self._send({"volume": None, "muted": False, "brightness": None})
         elif parts.path == "/np-art":
             # Chromium-family art thumbs (file:///tmp/…). Served so the
             # island can <img> them; nothing outside /tmp ever reads.
@@ -964,12 +1440,57 @@ class Handler(SimpleHTTPRequestHandler):
             # live agent turn snapshot (polled while it streams).
             tid = (parse_qs(parts.query).get("id") or [""])[0]
             with TURNS_LOCK:
-                _turn_sweep()
+                swept = _turn_sweep()
                 t = TURNS.get(tid)
+                if t is not None and not t["done"]:
+                    # heartbeat: an actively-polled turn is by definition
+                    # not abandoned — the 900s sweep must not kill it.
+                    t["started"] = time.time()
                 snap = _turn_snapshot(t) if t else None
+            if swept:
+                _turn_save()
             if snap is None:
-                return self._send({"ok": False, "error": "no such turn"}, 404)
+                return self._send({"ok": False, "error": "no such turn",
+                                   "boot": _BOOT_ID}, 404)
             self._send(snap)
+        elif parts.path == "/loop":
+            # team-loop job snapshot (polled while it runs, minutes long).
+            lid = (parse_qs(parts.query).get("id") or [""])[0]
+            with LOOPS_LOCK:
+                swept = _loop_sweep()
+                j = LOOPS.get(lid)
+                snap = None if j is None else {
+                    "done": j["done"], "activity": j["activity"],
+                    "steps": list(j.get("steps", [])),
+                    "elapsed": round(time.time() - j["started"], 1)}
+                if j is not None and j["done"]:
+                    snap["ok"] = (j["loop"] or {}).get("ok", False)
+                    snap["loop"] = j["loop"]
+            if swept:
+                _loop_save()
+            if snap is None:
+                return self._send({"ok": False, "error": "no such loop"}, 404)
+            self._send(snap)
+        elif parts.path == "/hive":
+            # team floor: ledger + board + roster + recent feed, one call.
+            try:
+                self._send({"tasks": _hive.list_tasks()[-20:],
+                            "board": _hive.read_board(),
+                            "roster": _hive.roster(),
+                            "log": _hive.read_log(20)})
+            except Exception as e:
+                self._send({"tasks": [], "board": "", "roster": [],
+                            "log": [], "error": str(e)})
+        elif parts.path == "/hive/inbox":
+            # one mate's unread mail (Stop-hook drains read the same way).
+            aid = (parse_qs(parts.query).get("agent") or [""])[0].strip()[:40]
+            if not aid:
+                return self._send({"ok": False,
+                                    "error": "agent required"}, 400)
+            try:
+                self._send({"messages": _hive.unread(aid)})
+            except Exception as e:
+                self._send({"messages": [], "error": str(e)})
         elif parts.path == "/shots":
             # live lens feed: newest-first shot cards from the watch dir.
             try:
@@ -1080,6 +1601,33 @@ class Handler(SimpleHTTPRequestHandler):
         if parts.path == "/profile/unlink":
             return self._send({"ok": True,
                                "profile": profile.unlink()})
+        if parts.path == "/events":
+            # HTTP clone of the hook relay (hook_relay.py stdin path):
+            # opencode/claude hook payloads in, ledger lines out. Same
+            # normalize → append → attention-note pipeline, so nicki and
+            # the team see remote senders exactly like local hooks.
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            try:
+                agent = str(req.pop("agent", "") or "").strip().lower() or "opencode"
+                ev = agentlog.normalize(req, agent=agent)
+                if ev is None:
+                    return self._send({"ok": False, "error": "unknown event"}, 400)
+                agentlog.append_event(ev)
+                if ev.get("attention") or req.get("hook_event_name") in (
+                        "PermissionRequest", "Notification"):
+                    try:
+                        decisions.note(ev.get("session"), ev.get("tool"),
+                                       str(req.get("tool_use_id")
+                                           or req.get("request_id") or ""),
+                                       kind="approval",
+                                       text=ev.get("text") or ev.get("tool"))
+                    except Exception:
+                        pass
+                return self._send({"ok": True})
+            except Exception as e:
+                return self._send({"ok": False, "error": str(e)}, 500)
         if parts.path == "/decide":
             req = self._read_json()
             if req is None:
@@ -1088,10 +1636,88 @@ class Handler(SimpleHTTPRequestHandler):
                 decisions.set_auto_approve(req.get("session") or "",
                                            bool(req.get("auto_approve")))
                 return self._send({"ok": True})
-            ok = decisions.decide(req.get("key") or "",
-                                  req.get("verdict") or "",
+            # UI vocabulary (Allow/Always/Deny) maps to hook vocabulary
+            # (approve/deny); Always also writes a standing allow-rule.
+            verdict = str(req.get("verdict") or "")
+            if verdict == "Always":
+                verdict = "approve"
+            elif verdict == "Allow":
+                verdict = "approve"
+            elif verdict == "Deny":
+                verdict = "deny"
+            ok = decisions.decide(req.get("key") or "", verdict,
                                   req.get("answer") or "")
+            if ok and req.get("verdict") == "Always" and req.get("tool"):
+                decisions.add_allow_rule(req.get("tool"), "allow")
             return self._send({"ok": ok})
+        if parts.path == "/rules":
+            # add one Custom Rule {tool, action: allow|deny, kind?, workspace?}.
+            if not self._local():
+                return self._send({"ok": False,
+                                   "error": "edit rules from the PC itself"}, 403)
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            rule = decisions.add_allow_rule(str(req.get("tool") or ""),
+                                            str(req.get("action") or ""),
+                                            str(req.get("kind") or "glob"),
+                                            str(req.get("workspace") or ""))
+            if rule is None:
+                return self._send({"ok": False,
+                                   "error": "need tool + action allow|deny"}, 400)
+            return self._send({"ok": True, "rule": rule})
+        if parts.path == "/schedules":
+            # dots automations: {op: create|pause|resume|delete|run, ...}.
+            # Rows fire when the dots runner is up (bot/serve); the island
+            # owns create/edit/delete + run-cards, same as /schedule chat.
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            try:
+                from steroids.dots import schedules as _dsched
+                conn = _dots_db()
+                op = str(req.get("op") or "")
+                try:
+                    if op == "create":
+                        freq = str(req.get("freq") or "daily").lower()
+                        prompt = str(req.get("prompt") or "").strip()
+                        if not prompt:
+                            raise ValueError("prompt required")
+                        args = [freq]
+                        if freq == "weekly":
+                            args.append(str(req.get("day") or "mon"))
+                        if freq in ("daily", "weekdays", "weekly"):
+                            args.append(str(req.get("time") or "09:00"))
+                        args.append(prompt)
+                        from steroids.dots import bot as _dbot
+                        cron, text = _dbot.parse_schedule_args(args)
+                        row = _dsched.create_schedule(
+                            conn, user_id=_DOTS_UID, provider="claude",
+                            box_id="", prompt_text=text, cron_expression=cron)
+                        out = {"ok": True, "schedule": dict(row)}
+                    elif op in ("pause", "resume", "delete", "run"):
+                        sid = int(req.get("id") or 0)
+                        fn = {"pause": _dsched.pause_schedule,
+                              "resume": _dsched.resume_schedule,
+                              "delete": _dsched.delete_schedule,
+                              "run": _dsched.run_schedule_now}[op]
+                        res = fn(conn, sid, _DOTS_UID)
+                        out = {"ok": True,
+                               "schedule": dict(res) if res else None}
+                    else:
+                        out = {"ok": False, "error": "op create|pause|resume|delete|run"}
+                finally:
+                    conn.close()
+            except ValueError as e:
+                out = {"ok": False, "error": str(e)[:200]}
+            except Exception as e:
+                # ScheduleInactiveError str() is just the id — say why.
+                if type(e).__name__ == "ScheduleInactiveError":
+                    out = {"ok": False, "error": "schedule is paused — resume first"}
+                else:
+                    out = {"ok": False, "error": str(e)[:200]}
+            code = 200 if out.get("ok") else 400
+            return self._send(out, code)
         if parts.path == "/focus":
             req = self._read_json()
             if req is None:
@@ -1110,7 +1736,14 @@ class Handler(SimpleHTTPRequestHandler):
                 return self._send({"ok": False, "error": "bad json"}, 400)
             hit = relay.verify_pin(req.get("pin"))
             if hit is None:
+                # PINs are 6 digits on a 2-min TTL: throttle blind guessing
+                # per source IP (growing delay, capped; resets on success).
+                ip = self.client_address[0]
+                n = _VERIFY_FAILS.get(ip, (0, 0.0))[0] + 1
+                _VERIFY_FAILS[ip] = (n, time.time())
+                time.sleep(min(0.25 * (2 ** min(n, 4)), 4.0))
                 return self._send({"ok": False, "error": "bad pin"}, 404)
+            _VERIFY_FAILS.pop(self.client_address[0], None)
             return self._send({"ok": True, **hit})
         if parts.path == "/relay/link-request":
             req = self._read_json()
@@ -1168,6 +1801,17 @@ class Handler(SimpleHTTPRequestHandler):
             updir = os.path.join(live_dir(), "uploads")
             try:
                 os.makedirs(updir, exist_ok=True)
+                try:  # retention: uploads older than 7 days sweep on arrival
+                    now = time.time()
+                    for fn in os.listdir(updir):
+                        fp = os.path.join(updir, fn)
+                        try:
+                            if os.path.isfile(fp) and now - os.path.getmtime(fp) > 7 * 86400:
+                                os.remove(fp)
+                        except OSError:
+                            pass
+                except OSError:
+                    pass
                 stamp = "%d-%s-%s" % (int(time.time()),
                                       os.urandom(4).hex(), name)
                 p = os.path.join(updir, stamp)
@@ -1192,6 +1836,86 @@ class Handler(SimpleHTTPRequestHandler):
             threading.Thread(target=install_opencode_bg, daemon=True).start()
             return self._send({"ok": True, "started": True,
                                "manual": OPENCODE_INSTALL_CMD})
+        if parts.path == "/handoff":
+            # crew relay: mate A's latest work becomes mate B's turn.
+            # {from_sid, to_text?, provider?} -> start_turn(shared brief).
+            try:
+                n = int(self.headers.get("Content-Length") or 0)
+            except ValueError:
+                n = 0
+            if n <= 0 or n > BODY_LIMIT:
+                return self._send({"ok": False, "error": "bad body"}, 400)
+            try:
+                req = json.loads(self.rfile.read(n) or b"{}")
+            except ValueError:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            from_sid = str(req.get("from_sid") or "").strip()
+            if not from_sid:
+                return self._send({"ok": False,
+                                   "error": "from_sid required"}, 400)
+            try:
+                evs = agentlog.read_events(limit=2000)
+                brief = agentlog.build_handoff_brief(
+                    evs, from_sid, str(req.get("to_text") or ""))
+            except Exception:
+                brief = ""
+            if not brief:
+                return self._send({"ok": False,
+                                   "error": "no handoff data — session has "
+                                            "no hook events yet"}, 404)
+            out = start_turn(brief, None,
+                             req.get("provider") or "opencode",
+                             req.get("model"))
+            self._send(out, out.pop("code", 200) if not out.get("ok") else 200)
+            return
+        if parts.path == "/loop":
+            # team loop runs minutes — async job, shelf polls GET /loop?id=.
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            prompt = str(req.get("prompt") or "").strip()[:4000]
+            if not prompt:
+                return self._send({"ok": False, "error": "empty prompt"}, 400)
+            return self._send(start_loop(
+                prompt, req.get("provider") or "opencode",
+                req.get("crew")))
+        if parts.path == "/hive/send":
+            # one mate handing work to another (or to nicki).
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            try:
+                row = _hive.send_msg(str(req.get("from") or "")[:40],
+                                     str(req.get("to") or "")[:40],
+                                     str(req.get("act") or "inform"),
+                                     str(req.get("subject") or "")[:200],
+                                     str(req.get("body") or "")[:2000],
+                                     str(req.get("conv") or "")[:60],
+                                     req.get("in_reply_to"))
+                delivered = _hive.drain()
+            except ValueError as e:
+                return self._send({"ok": False, "error": str(e)}, 400)
+            return self._send({"ok": True, "id": row["id"],
+                               "delivered": delivered})
+        if parts.path == "/hive/ack":
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            ok = _hive.ack(str(req.get("agent") or "")[:40],
+                           str(req.get("id") or ""))
+            return self._send({"ok": ok})
+        if parts.path == "/hive/task":
+            # hand-written todo on the floor board (crew runs file their own).
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            title = str(req.get("title") or "").strip()[:200]
+            if not title:
+                return self._send({"ok": False, "error": "title required"},
+                                  400)
+            row = _hive.add_task(title, str(req.get("spec") or "")[:1000],
+                                 str(req.get("assignee") or "nicki")[:40])
+            return self._send({"ok": True, "task": row})
         if parts.path != "/chat":
             return self._send({"ok": False, "error": "use POST /chat"}, 404)
         try:
@@ -1207,19 +1931,22 @@ class Handler(SimpleHTTPRequestHandler):
         msg = str(req.get("message") or "").strip()[:4000]
         if not msg:
             return self._send({"ok": False, "error": "empty message"}, 400)
+        try:
+            # the floor keeps moving on every chat: outboxes drain first.
+            _hive.drain()
+            # Nicki turns (anything not already addressed as a mate lane
+            # [name·role]) ride with the god brief: roster + open tasks +
+            # her inbox + the escalate-if-critical policy.
+            if not re.match(r"^\[[^[\]]+[·\-][^[\]]+\]", msg):
+                brief = _hive.god_brief()
+                if brief:
+                    msg = "%s\n\n%s" % (brief, msg)
+        except Exception:
+            pass
         out = start_turn(msg, req.get("session_id"),
                          req.get("provider") or "opencode",
                          req.get("model"))
         self._send(out, out.pop("code", 200) if not out.get("ok") else 200)
-
-    def do_DELETE(self):
-        parts = urlparse(self.path)
-        if parts.path == "/turn":
-            tid = (parse_qs(parts.query).get("id") or [""])[0]
-            if not stop_turn(tid):
-                return self._send({"ok": False, "error": "no such turn"}, 404)
-            return self._send({"ok": True})
-        return self._send({"ok": False, "error": "nope"}, 404)
 
     def log_message(self, *a):  # quiet unless asked
         if os.environ.get("BRIDGE_VERBOSE"):
@@ -1265,7 +1992,12 @@ def main(argv):
     def handler(*a, **k):
         return Handler(*a, directory=serve_dir, **k)
 
-    srv = ThreadingHTTPServer((host, port), handler)
+    try:
+        srv = ThreadingHTTPServer((host, port), handler)
+    except OSError:
+        sys.exit("port %s on %s is busy — another island is already up "
+                 "(or a stale one holds it: pkill -f island/bridge.py, "
+                 "then retry)" % (port, host))
     srv.serve_dir = serve_dir
     srv.lens_watch = lens_watch
     srv.hand_proc = None
@@ -1285,6 +2017,7 @@ def main(argv):
                   lan_base(port))
     else:
         print("nicki bridge: http://%s:%s  (API only)" % (host, port))
+    _boot_recover()  # stable boot id + reattach turns + flag loops
     try:
         srv.serve_forever()
     except KeyboardInterrupt:

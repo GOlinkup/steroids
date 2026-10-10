@@ -1,7 +1,7 @@
 import { forwardRef, lazy, Suspense, useEffect, useRef, useState } from "react";
 import Mascot, { type MascotHandle } from "./Mascot";
-import { ApprovalCard, QuestionCard, ChatPanel, ExploreView, SettingsView, type SettingsState, type SettingsPage } from "./Cards";
-import { TeamGrid, useTeam } from "./TeamGrid";
+import { ApprovalCard, QuestionCard, ChatPanel, ExploreView, FeedView, SettingsView, type SettingsState, type SettingsPage } from "./Cards";
+import { TeamGrid, useTeam, hueFor } from "./TeamGrid";
 import Huddle from "./Huddle";
 import { Header } from "./Header";
 // ponytail: lens + daily ride separate chunks — default chat view stays lean,
@@ -10,7 +10,7 @@ const DailyView = lazy(() => import("./Daily").then((m) => ({ default: m.DailyVi
 const LensView = lazy(() => import("./LensView").then((m) => ({ default: m.LensView })));
 import { HomeSkeleton } from "./HomeSkeleton";
 import type { Shot } from "./LensView";
-import type { AgentSession, Approval, Attachment, ChatMessage, ChatSession, ExploreFeed, IslandView, Question, SkillHit } from "../store";
+import type { AgentSession, Approval, Attachment, ChatMessage, ChatSession, ExploreFeed, FeedEvent, IslandView, Question, SkillHit } from "../store";
 import type { IslandState } from "../fsm";
 
 // Edge glow: one fixed strip. Volume/brightness wakes it with a single
@@ -91,11 +91,65 @@ function EdgeGlow() {
   return null;
 }
 
+// Nicki groove: while any player runs, the island mascot bobs on the
+// beat (hop edges kick, --e rides bounce height) — same contract as
+// Daily's dancer. Silent when nothing plays (no parec otherwise).
+function NickiGroove({ mascotRef }: { mascotRef: React.Ref<MascotHandle> }) {
+  useEffect(() => {
+    let alive = true;
+    let energyTimer: ReturnType<typeof setInterval> | null = null;
+    const handle = (): MascotHandle | null => {
+      const r = mascotRef as { current?: MascotHandle | null } | null;
+      return r && typeof r === "object" ? (r.current ?? null) : null;
+    };
+    const energyTick = () => {
+      fetch(`${window.location.origin}/audio-energy`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((j) => {
+          if (!alive) return;
+          const h = handle();
+          if (!h) return;
+          const e = typeof j?.energy === "number" ? Math.max(0, Math.min(1, j.energy)) : 0;
+          h.groove(true, e);
+          if (j?.hop) h.hop();
+        })
+        .catch(() => {});
+    };
+    const slowTick = () => {
+      fetch(`${window.location.origin}/nowplaying`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((j) => {
+          if (!alive) return;
+          if (j?.playing === true && !energyTimer) {
+            energyTick();
+            energyTimer = setInterval(energyTick, 150);
+          } else if (j?.playing !== true && energyTimer) {
+            clearInterval(energyTimer);
+            energyTimer = null;
+            handle()?.groove(false, 0);
+          }
+        })
+        .catch(() => {});
+    };
+    slowTick();
+    const slow = setInterval(slowTick, 3000);
+    return () => {
+      alive = false;
+      clearInterval(slow);
+      if (energyTimer) clearInterval(energyTimer);
+      try { handle()?.groove(false, 0); } catch { /* unmounted */ }
+    };
+  }, [mascotRef]);
+  return null;
+}
+
 interface Props {
   fsmState: IslandState;
   view: IslandView;
   mascotRef: React.Ref<MascotHandle>;
   routeHint: string;
+  /** Command Echo: transient "Copied — …" preview; pill swells, melts back. */
+  echo?: string | null;
   approval: Approval | null;
   question: Question | null;
   messages: ChatMessage[];
@@ -112,7 +166,7 @@ interface Props {
   shots: Shot[];
   onMouseEnter: () => void;
   onMouseLeave: () => void;
-  onIslandClick?: () => void;
+  onIslandClick?: (e: React.MouseEvent) => void;
   onMascotTap: (taps: number) => void;
   onDecide: (d: string) => void;
   onAnswer: (a: string[]) => void;
@@ -133,11 +187,15 @@ interface Props {
   installState?: "idle" | "working" | "error";
   onInstall?: () => void;
   exploreFeed: ExploreFeed | null;
+  feedEvents: FeedEvent[];
   onSearchSkills: (q: string) => Promise<SkillHit[]>;
   settings: SettingsState;
   settingsPage?: SettingsPage;
   onSettingsPage?: (p: SettingsPage) => void;
   zoomShot: string | null;
+  // stepped-glow frame (PC strip only): measured px box + notch half-width.
+  // Renders the glance amber outline tracing the steps — CSS can't do it.
+  frame?: { w: number; h: number; n: number } | null;
   onSettings: (s: SettingsState) => void;
   onTab: (v: IslandView) => void;
   unread: number;
@@ -154,10 +212,14 @@ interface Props {
   onSignOut?: () => void;
 }
 
+// ponytail: neon on — glance light studies (glow trace, halos, level ring).
+// One flag restores the edge ring; off = plain border, no polling, no sweep.
+const NEON_ON = true;
+
 // Island shell — steroids spotter bar. Ranked routes, plate snap.
 const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
   const {
-    fsmState, view, mascotRef, routeHint,
+    fsmState, view, mascotRef, routeHint, echo = null,
     approval, question, messages, thinking, liveActivity, livePartial, turnEngine, attachments,
     onFiles, onRemoveAttachment, shots,
     onMouseEnter, onMouseLeave, onMascotTap,
@@ -165,14 +227,20 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     sessions, activeSessionId, onResumeSession, onDeleteSession, onNewChat,
     histHint = null,
     agentSessions, onResumeAgentSession, onDeleteAgentSession,
-    exploreLive, exploreFeed, onSearchSkills,
+    exploreLive, exploreFeed, feedEvents, onSearchSkills,
     providers = null, installState = "idle", onInstall = () => {},
     settings, onSettings, onTab, unread, zoomShot,
     settingsPage = "general", onSettingsPage = () => {},
     onDropToPhone, onDropFilesToPhone, phoneLinked, pairNode, accountNode, shelfNode,
     staged = [], onAttachStaged,
     accountEmail = null, accountAvatar = null, onSignOut = () => {}, onIslandClick,
+    frame = null,
   } = props;
+  // glance light trace: one thin amber line hugging the closed pill's
+  // bottom edge (the step-notch path crossed the whole panel — read as a bug).
+  const glowD = frame
+    ? `M0 ${Math.max(2, frame.h - 3)} H${frame.w}`
+    : "";
 
   // Avatar menu jumps: everything but Phone lands on the one General
   // page (account section on top); Profile scrolls straight to it.
@@ -181,14 +249,6 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
   // the first message sends; new chat brings it back.
   const team = useTeam();
   const showHuddle = messages.length === 0;
-  const huddleChip = (kind: "bridge" | "agent" | "phone") => {
-    // red phone chip deep-links to pairing; bridge/agent are status only
-    // (the chat setup card below owns the installer).
-    if (kind === "phone") {
-      onSettingsPage("phone");
-      onTab("settings");
-    }
-  };
   const avatarNav = (page: "profile" | "explore" | "settings" | "account" | "phone") => {
     if (page === "explore") {
       onTab("explore");
@@ -205,17 +265,30 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
 
   return (
     <>
-      <EdgeGlow />
+      {NEON_ON && <EdgeGlow />}
+      <NickiGroove mascotRef={mascotRef} />
     <div
       ref={ref}
       id="island"
       data-state={fsmState}
       data-view={view}
-      data-glow={approval || question ? "urgent" : thinking ? "working" : undefined}
+      data-glow={NEON_ON ? (approval || question ? "urgent" : thinking ? "working" : undefined) : undefined}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onClick={onIslandClick}
     >
+      {NEON_ON && frame && fsmState !== "jacked" && (
+        <svg className="notch-frame" viewBox={`0 0 ${frame.w} ${frame.h}`} aria-hidden>
+          <defs>
+            <filter id="notchGlow" x="-30%" y="-30%" width="160%" height="160%">
+              <feGaussianBlur stdDeviation="5" result="b" />
+              <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
+            </filter>
+          </defs>
+          <path d={glowD} fill="none" stroke="rgba(251,146,60,.16)" strokeWidth="4" strokeLinejoin="round" />
+          <path d={glowD} fill="none" stroke="#ffe9b8" strokeWidth="1.4" strokeLinejoin="round" filter="url(#notchGlow)" />
+        </svg>
+      )}
       {fsmState !== "jacked" && <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />}
       {fsmState === "hidden" ? null : fsmState === "jacked" ? (
         <div className="jacked-body">
@@ -241,6 +314,10 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             question={question}
             onSignOut={onSignOut}
           />
+          {/* Command Echo: open panel uses this space for the copy preview. */}
+          {echo ? (
+            <div className="echo-banner" role="status">📋 Copied — {echo}</div>
+          ) : null}
           {view !== "daily" && view !== "chat" && (
             <div className="mascot-top">
               <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />
@@ -259,12 +336,31 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
               onResumeAgent={onResumeAgentSession}
             />
           )}
-          {view === "approval" && approval && (
+          {view === "feed" && (
+            <FeedView events={feedEvents} />
+          )}
+          {view === "approval" && (approval ? (
             <ApprovalCard approval={approval} onDecide={onDecide} />
-          )}
-          {view === "question" && question && (
+          ) : (
+            <div className="card">
+              <div className="card-title">Nothing waiting</div>
+              <div className="card-detail">The request cleared somewhere else.</div>
+              <div className="btn-row">
+                <button className="primary" onClick={() => onTab("chat")}>Back to chat</button>
+              </div>
+            </div>
+          ))}
+          {view === "question" && (question ? (
             <QuestionCard question={question} onAnswer={onAnswer} />
-          )}
+          ) : (
+            <div className="card">
+              <div className="card-title">Nothing waiting</div>
+              <div className="card-detail">The question cleared somewhere else.</div>
+              <div className="btn-row">
+                <button className="primary" onClick={() => onTab("chat")}>Back to chat</button>
+              </div>
+            </div>
+          ))}
           {view === "chat" && (
             <ChatPanel
               messages={messages}
@@ -292,19 +388,12 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
                 <div className="team-mini">
                   {showHuddle && (
                     <Huddle
-                      chips={{
-                        bridge: exploreLive,
-                        agent: providers ? (providers.opencode || providers.claude) : exploreLive,
-                        phone: !!phoneLinked,
-                      }}
                       lite={false}
-                      onChip={huddleChip}
-                      onDone={() => {}}
                     />
                   )}
                   {/* crew rail: the huddle above is nicki's hello (crew ready),
-                      the grid below is the mates — neither lists the other. */}
-                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} detail="none" compact={messages.length > 0} />
+                      the grid below leads with nicki, then the mates. */}
+                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} onPick={onResumeAgentSession} detail="none" compact={messages.length > 0} />
                 </div>
               }
             />
@@ -336,7 +425,20 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
           )}
         </div>
       ) : (
-        <div className="pill"><b>steroids</b> <span>{routeHint}</span></div>
+        <>
+          {/* minimized pill: echo preview swells it, else nicki + mates grid. */}
+          {echo ? (
+            <span className="pill-echo" role="status" aria-live="polite">📋 {echo}</span>
+          ) : (
+          <span className="pill-team mini-grid" title={routeHint} aria-hidden>
+            {team.members.slice(0, 4).map((m) => (
+              <span key={m.id} className="pill-face" title={m.name} style={{ filter: `hue-rotate(${hueFor(m.color)}deg)` }}>
+                <Mascot mood="neutral" />
+              </span>
+            ))}
+          </span>
+          )}
+        </>
       )}
     </div>
     </>

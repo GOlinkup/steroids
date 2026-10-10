@@ -1,0 +1,197 @@
+[
+ [
+  "GET /models",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /trending",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /battery",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /nowplaying",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /audio-energy",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /soundpacks",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /energy",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /quota",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /demo",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /profile",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /usage",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /api/daily/briefing",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /api/daily/today",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /api/daily/work",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /api/daily/usage",
+  1,
+  "shape ok"
+ ],
+ [
+  "GET /display",
+  1,
+  "slots + published file"
+ ],
+ [
+  "GET /relay/dl-qr",
+  1,
+  "QR issued"
+ ],
+ [
+  "link-status unknown",
+  1,
+  "approved:false"
+ ],
+ [
+  "turn unknown GET",
+  1,
+  "404"
+ ],
+ [
+  "turn unknown DELETE",
+  1,
+  "404"
+ ],
+ [
+  "OPTIONS preflight",
+  1,
+  "204 + CORS"
+ ],
+ [
+  "skills n=-5",
+  1,
+  "1 hits"
+ ],
+ [
+  "skills n=999",
+  1,
+  "capped 3"
+ ],
+ [
+  "gigs limit=9999",
+  1,
+  "shape ok"
+ ],
+ [
+  "install bad provider",
+  1,
+  "400"
+ ],
+ [
+  "install opencode",
+  1,
+  "{\"ok\":true,\"already\":true}"
+ ],
+ [
+  "e2e-filter",
+  1,
+  "hidden default, shown ?showTests=1"
+ ],
+ [
+  "focus success",
+  1,
+  "how=cwd"
+ ],
+ [
+  "handoff-brief builds",
+  1,
+  "BRIEF:Relay: continue opencode’s work.\nTask: e2e probe event"
+ ],
+ [
+  "auto_approve set/reset",
+  1,
+  "ok"
+ ],
+ [
+  "double-decide",
+  1,
+  "first wins, second refused"
+ ],
+ [
+  "knock dedup",
+  1,
+  "one row"
+ ],
+ [
+  "hide persists",
+  1,
+  "file-backed"
+ ],
+ [
+  "concurrent turns",
+  1,
+  "two live, both deleted"
+ ],
+ [
+  "loop validation",
+  1,
+  "400s"
+ ],
+ [
+  "loop cancel",
+  1,
+  "stopped pre-step, verdict cancelled"
+ ],
+ [
+  "loop unknown ids",
+  1,
+  "404s"
+ ],
+ [
+  "loop cap",
+  1,
+  "2 live, 3rd refused"
+ ],
+ [
+  "cleanup",
+  1,
+  "injected event removed"
+ ]
+]

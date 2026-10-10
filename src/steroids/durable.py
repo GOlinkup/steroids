@@ -31,6 +31,14 @@ def _effect(db, key, fn):
     return receipt, False
 
 
+def record_step(db, name, status, result):
+    """Single journaled step outside run_workflow (island loop). Additive only."""
+    db.execute("INSERT OR REPLACE INTO steps (name, status, result) VALUES (?, ?, ?)",
+               (name, status, json.dumps(result)))
+    db.commit()
+    return {"name": name, "status": status}
+
+
 def run_workflow(db, steps, emit=None):
     """steps: [(name, fn)]. fn(ctx) may call ctx.effect(key, fn) exactly-once."""
     done, skipped, replayed = [], [], []

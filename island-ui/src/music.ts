@@ -99,8 +99,46 @@ export function seekFrac(track: NowPlaying): number | null {
 }
 
 /** Identity of a track across polls — everything except live pos/playing. */
+/* 0x01 separator: "" joins collide ("ab"+"c" vs "a"+"bc") and stick the card. */
 export function trackKey(t: NowPlaying): string {
   return [t.player ?? "", t.title ?? "", t.artist ?? "", t.album ?? "", String(t.len ?? "")].join("");
+}
+
+// Home music cache: last track paints with the rest on boot (same tick as
+// work/usage/shots) and survives offline. Live pos/playing never cached.
+const MUSIC_KEY = "island.daily.music.v1";
+interface CachedTrack { title: string; artist: string | null; art: string | null; album: string | null; player: string | null; len: number | null }
+export function loadCachedTrack(): NowPlaying | null {
+  try {
+    const raw = localStorage.getItem(MUSIC_KEY);
+    if (!raw) return null;
+    const c = JSON.parse(raw) as Partial<CachedTrack>;
+    if (typeof c.title !== "string" || !c.title) return null;
+    return {
+      ...NO_MUSIC,
+      title: c.title,
+      artist: typeof c.artist === "string" ? c.artist : null,
+      art: typeof c.art === "string" ? c.art : null,
+      album: typeof c.album === "string" ? c.album : null,
+      player: typeof c.player === "string" ? c.player : null,
+      len: typeof c.len === "number" && Number.isFinite(c.len) ? c.len : null,
+    };
+  } catch {
+    return null;
+  }
+}
+export function hasCachedTrack(): boolean {
+  return loadCachedTrack() !== null;
+}
+/** Persist titled tracks; pass-through so it composes in setState. */
+export function cacheTrack(t: NowPlaying | null): NowPlaying | null {
+  if (t?.title) {
+    try {
+      const c: CachedTrack = { title: t.title, artist: t.artist, art: t.art, album: t.album, player: t.player, len: t.len };
+      localStorage.setItem(MUSIC_KEY, JSON.stringify(c));
+    } catch { /* private mode — memory only */ }
+  }
+  return t;
 }
 
 /**

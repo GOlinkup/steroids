@@ -5,7 +5,6 @@
   --huddle-enter: 200ms;
   --huddle-nicki-drop: 220ms;
   --huddle-type: 400ms;
-  --huddle-chip-stagger: 80ms;
   --huddle-idle: 1s;
   display: flex;
   flex-direction: column;
@@ -16,15 +15,17 @@
   animation: huddle-stage-in 350ms var(--huddle-ease-out) backwards;
 }
 
-/* B2: Nicki drops in + squash, then settles to idle bob. */
+/* B2: Nicki drops in + squash. The mascot floats alone — text and chips
+   below stay still. */
 .huddle-nicki {
   display: flex;
   flex-direction: column;
   align-items: center;
   text-align: center;
-  animation:
-    huddle-nicki-drop var(--huddle-nicki-drop) var(--huddle-pop) 100ms backwards,
-    huddle-idle var(--huddle-idle) steps(2) infinite 2400ms;
+  animation: huddle-nicki-drop var(--huddle-nicki-drop) var(--huddle-pop) 100ms backwards;
+}
+.huddle-nicki > .mascot {
+  animation: huddle-idle 2.2s ease-in-out 400ms infinite;
 }
 
 /* B5: leader bubble typewriter. */
@@ -42,19 +43,10 @@
   animation-delay: 1600ms;
 }
 
-/* B6: pills flip in 3×80ms stagger, centered row. */
-.huddle-chips {
-  display: flex;
-  gap: 8px;
-  justify-content: center;
-  align-items: center;
-  text-align: center;
+@keyframes huddle-type {
+  from { width: 0; }
+  to { width: 26ch; }
 }
-.huddle-chips .hpill {
-  animation: huddle-chip-in 180ms var(--huddle-ease-out) backwards;
-  animation-delay: calc(2000ms + var(--i) * var(--huddle-chip-stagger));
-}
-
 @keyframes huddle-stage-in {
   from { opacity: 0; }
   to { opacity: 1; }
@@ -64,17 +56,9 @@
   70% { transform: translateY(2px) scale(1.04, 0.96); }
   100% { transform: none; }
 }
-@keyframes huddle-type {
-  from { width: 0; }
-  to { width: 26ch; }
-}
-@keyframes huddle-chip-in {
-  from { opacity: 0; transform: rotateX(90deg); }
-  to { opacity: 1; transform: none; }
-}
 @keyframes huddle-idle {
-  0%, 100% { transform: translateY(0); }
-  50% { transform: translateY(-3px); }
+  0%, 100% { transform: translateY(4px); }
+  50% { transform: translateY(-4px); }
 }
 
 /* Lite + reduced-motion: instant end-state, opacity only. */

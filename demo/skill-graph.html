@@ -5,31 +5,31 @@
 <meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Steroids Skill Graph</title>
 <style>
-:root{color-scheme:dark}
+:root{color-scheme:dark;--bg:#000;--brand:#ff4d1c;--brand-light:#fb923c;--border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.12)}
 *{box-sizing:border-box}
-::selection{background:rgba(31,111,235,.4)}
-body{margin:0;background:#0b0e14;color:#e6e9f0;font:14px/1.4 system-ui,sans-serif;display:flex;flex-direction:column;height:100vh}
-header{padding:10px 16px;border-bottom:1px solid #1e2430;display:flex;gap:12px;align-items:center}
-header h1{font-size:15px;margin:0;color:#7ee787;white-space:nowrap}
-header .sub{color:#8b949e;font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-#search{margin-left:auto;background:#11161f;border:1px solid #2a3342;color:#e6e9f0;border-radius:6px;padding:6px 10px;width:220px;font:inherit;transition:border-color .15s,box-shadow .15s}
-#search::placeholder{color:#6e7681}
-#search:focus{outline:none;border-color:#1f6feb;box-shadow:0 0 0 2px rgba(31,111,235,.35)}
+::selection{background:rgba(255,77,28,.4)}
+body{margin:0;background:var(--bg);color:#fff;font:14px/1.4 'Outfit',ui-sans-serif,system-ui,sans-serif;display:flex;flex-direction:column;height:100vh}
+header{padding:10px 16px;border-bottom:1px solid var(--border);display:flex;gap:12px;align-items:center}
+header h1{font-size:15px;margin:0;color:var(--brand-light);white-space:nowrap}
+header .sub{color:rgba(255,255,255,.6);font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+#search{margin-left:auto;background:#0b0c0e;border:1px solid var(--border-strong);color:#fff;border-radius:6px;padding:6px 10px;width:220px;font:inherit;transition:border-color .15s,box-shadow .15s}
+#search::placeholder{color:rgba(255,255,255,.45)}
+#search:focus{outline:none;border-color:var(--brand);box-shadow:0 0 0 2px rgba(255,77,28,.35)}
 #wrap{flex:1;display:flex;min-height:0}
 #canvas{flex:1;display:block;cursor:grab;min-width:0}
-#details{width:260px;flex-shrink:0;border-left:1px solid #1e2430;padding:12px 14px;overflow:auto;scrollbar-width:thin;scrollbar-color:#2a3342 transparent}
-#details h2{font-size:15px;font-weight:600;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid #1e2430;color:#7ee787;word-break:break-word}
+#details{width:260px;flex-shrink:0;border-left:1px solid var(--border);padding:12px 14px;overflow:auto;scrollbar-width:thin;scrollbar-color:#2a3342 transparent}
+#details h2{font-size:15px;font-weight:600;margin:0 0 10px;padding-bottom:8px;border-bottom:1px solid var(--border);color:var(--brand-light);word-break:break-word}
 #details p{margin:8px 0}
-#details p:first-of-type{color:#8b949e}
-#details b{color:#e6e9f0;font-weight:600}
-#details .kw{display:inline-block;background:#1a2230;border:1px solid #2a3342;border-radius:5px;padding:2px 8px;margin:2px;font-size:12px;line-height:1.5}
-#details .kw:hover{border-color:#3b4763}
-#details .dim{color:#8b949e;line-height:1.5}
-#details .load{display:block;width:100%;margin:10px 0;padding:8px;border-radius:6px;border:1px solid #1f6feb;background:#12203a;color:#e6e9f0;font:inherit;cursor:pointer}
-#details .load:hover{background:#1a2c4f}
-#details .nb{color:#8b949e;font-size:12px}
-#mascot{width:100%;height:104px;display:block;border-bottom:1px solid #1e2430;cursor:grab;touch-action:none;image-rendering:pixelated}
-footer{padding:6px 16px;border-top:1px solid #1e2430;color:#8b949e;font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+#details p:first-of-type{color:rgba(255,255,255,.6)}
+#details b{color:#fff;font-weight:600}
+#details .kw{display:inline-block;background:rgba(255,255,255,.06);border:1px solid var(--border-strong);border-radius:5px;padding:2px 8px;margin:2px;font-size:12px;line-height:1.5}
+#details .kw:hover{border-color:rgba(255,77,28,.45)}
+#details .dim{color:rgba(255,255,255,.45);line-height:1.5}
+#details .load{display:block;width:100%;margin:10px 0;padding:8px;border-radius:6px;border:1px solid var(--brand);background:var(--brand);color:#fff;font:inherit;cursor:pointer}
+#details .load:hover{background:var(--brand-light)}
+#details .nb{color:rgba(255,255,255,.6);font-size:12px}
+#mascot{width:100%;height:104px;display:block;border-bottom:1px solid var(--border);cursor:grab;touch-action:none;image-rendering:pixelated}
+footer{padding:6px 16px;border-top:1px solid var(--border);color:rgba(255,255,255,.45);font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
 @media (max-width:700px){
 header{flex-wrap:wrap;padding:8px 12px;gap:8px}
 #search{order:3;flex:1 1 100%;width:auto;margin-left:0}
@@ -40,14 +40,14 @@ header{flex-wrap:wrap;padding:8px 12px;gap:8px}
 footer{font-size:11px;padding:5px 12px}
 }
 #zoom{position:fixed;right:288px;bottom:44px;display:flex;flex-direction:column;gap:6px;z-index:5}
-#zoom button{width:34px;height:34px;border-radius:8px;border:1px solid #2a3342;background:#11161f;color:#e6e9f0;font-size:18px;line-height:1;cursor:pointer}
-#zoom button:hover{border-color:#1f6feb}
+#zoom button{width:34px;height:34px;border-radius:8px;border:1px solid var(--border-strong);background:#17181c;color:#fff;font-size:18px;line-height:1;cursor:pointer}
+#zoom button:hover{border-color:var(--brand)}
 #zoom button:active{transform:scale(.94)}
 @media (max-width:700px){#zoom{right:12px;bottom:auto;top:200px}}
 </style>
 </head>
 <body>
-<header><h1>Steroids Skill Graph</h1><span class="sub" id="headline"></span><input id="search" placeholder="search skills…"><input id="scrub" type="range" min="0" max="1000" value="1000" title="Scrub routing history" style="width:110px"><button id="mic" title="Voice in: speak to equip" style="background:#11161f;border:1px solid #2a3342;color:#e6e9f0;border-radius:6px;padding:6px 10px;cursor:pointer">🎙</button><span class="sub" id="scrublabel"></span></header>
+<header><h1>Steroids Skill Graph</h1><span class="sub" id="headline"></span><input id="search" placeholder="search skills…"><input id="scrub" type="range" min="0" max="1000" value="1000" title="Scrub routing history" style="width:110px"><button id="mic" title="Voice in: speak to equip" style="background:#17181c;border:1px solid rgba(255,255,255,.12);color:#fff;border-radius:6px;padding:6px 10px;cursor:pointer">🎙</button><span class="sub" id="scrublabel"></span></header>
 <canvas id="mascot"></canvas>
 <div id="wrap"><canvas id="canvas"></canvas><aside id="details"><p class="dim">Click a node for details.</p></aside></div>
 <div id="zoom"><button id="zin" title="Zoom in">+</button><button id="zout" title="Zoom out">−</button></div>
@@ -126,20 +126,20 @@ function draw(){
   ctx.clearRect(0,0,W,H);
   data.links.forEach(function(l){var a=byId(l.source),b=byId(l.target);if(!a||!b)return;
     var p=w2s([a.x,a.y]),s=w2s([b.x,b.y]);
-    ctx.strokeStyle="rgba(126,231,135,"+(0.12+0.1*l.weight)+")";ctx.lineWidth=1;
+    ctx.strokeStyle="rgba(255,77,28,"+(0.12+0.1*l.weight)+")";ctx.lineWidth=1;
     ctx.beginPath();ctx.moveTo(p[0],p[1]);ctx.lineTo(s[0],s[1]);ctx.stroke();});
   nodes.forEach(function(n){var p=w2s([n.x,n.y]),r=(5+deg(n.id)*1.5)*view.k,m=match(n)&&(!replayOn||replaySet[n.id]);
     ctx.globalAlpha=m?1:0.25;
-    ctx.fillStyle=n===sel?"#7ee787":fireColor(n.id);
+    ctx.fillStyle=n===sel?"#ff4d1c":fireColor(n.id);
     ctx.beginPath();ctx.arc(p[0],p[1],r,0,6.283);ctx.fill();
-    ctx.fillStyle=m?"#e6e9f0":"#6e7681";ctx.font="11px system-ui,sans-serif";
+    ctx.fillStyle=m?"#fff":"rgba(255,255,255,.45)";ctx.font="11px Outfit,system-ui,sans-serif";
     if((view.k>=0.8&&view.k<=1.6)||n===sel)ctx.fillText(n.id,p[0]+r+4,p[1]+4);ctx.globalAlpha=1;});
 }
 var FIRE=null;
-function fireColor(id){var c=FIRE?FIRE[id]:0;if(!c)return "#1f6feb";
+function fireColor(id){var c=FIRE?FIRE[id]:0;if(!c)return "#3d3e45";
   // ponytail: F55 served-driven heat — log scale over ~3 decades to orange.
   var t=Math.min(1,Math.log10(1+c)/3);
-  return "rgb("+Math.round(31+t*224)+","+Math.round(111+t*11)+","+Math.round(235-t*209)+")";}
+  return "rgb("+Math.round(61+t*194)+","+Math.round(62+t*15)+","+Math.round(69-t*41)+")";}
 function headline(){document.getElementById("headline").textContent=
   "generated from your live index — "+data.nodes.length+" skills";}
 function show(n){
@@ -201,7 +201,7 @@ function ripple(rows){var t0=performance.now();
   sel=rows.length?rows[0].n:null;if(sel)show(sel);
   (function frame(){var now=performance.now(),live=false;draw();
     ripples.forEach(function(r){var pr=(now-r.t0)/1200;if(pr>=1)return;live=true;
-      var q=w2s([r.n.x,r.n.y]);ctx.globalAlpha=1-pr;ctx.strokeStyle="#7ee787";ctx.lineWidth=2;
+      var q=w2s([r.n.x,r.n.y]);ctx.globalAlpha=1-pr;ctx.strokeStyle="#fb923c";ctx.lineWidth=2;
       ctx.beginPath();ctx.arc(q[0],q[1],8+pr*46,0,6.283);ctx.stroke();ctx.globalAlpha=1;});
     if(live)requestAnimationFrame(frame);else{ripples=[];draw();}})();}
 cv.addEventListener("dragover",function(e){e.preventDefault();});

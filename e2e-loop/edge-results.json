@@ -1,0 +1,112 @@
+[
+ [
+  "pin-single-use",
+  1,
+  "first ok, replay rejected"
+ ],
+ [
+  "pin-bad",
+  1,
+  "rejected"
+ ],
+ [
+  "upload-nasty",
+  1,
+  "all sanitized"
+ ],
+ [
+  "link-knock",
+  1,
+  "visible"
+ ],
+ [
+  "link-approve-once",
+  1,
+  "key pops single-read"
+ ],
+ [
+  "turn DELETE from LAN",
+  1,
+  "200, phone can stop turns"
+ ],
+ [
+  "link-approve-local-only",
+  1,
+  "403 from LAN"
+ ],
+ [
+  "badbody POST /chat",
+  1,
+  "400"
+ ],
+ [
+  "badbody POST /decide",
+  1,
+  "400"
+ ],
+ [
+  "badbody POST /upload",
+  1,
+  "400"
+ ],
+ [
+  "badbody POST /handoff",
+  1,
+  "400"
+ ],
+ [
+  "session-unknown",
+  1,
+  "idle, no leak"
+ ],
+ [
+  "session-empty",
+  1,
+  "400, no leak"
+ ],
+ [
+  "chat-oversize",
+  1,
+  "400"
+ ],
+ [
+  "chat-unknown-provider",
+  1,
+  "refused"
+ ],
+ [
+  "chat-empty",
+  1,
+  "400"
+ ],
+ [
+  "decisions-ttl",
+  1,
+  "expired swept"
+ ],
+ [
+  "concurrency-20",
+  1,
+  "all 200"
+ ],
+ [
+  "gigs-invalid",
+  1,
+  "400"
+ ],
+ [
+  "gigs-add",
+  1,
+  "id n1791508577"
+ ],
+ [
+  "gigs-cleanup",
+  1,
+  "0 rows left"
+ ],
+ [
+  "focus-unknown",
+  1,
+  "404"
+ ]
+]

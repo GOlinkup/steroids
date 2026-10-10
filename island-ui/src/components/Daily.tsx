@@ -1,9 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 import { Card } from "./Cards";
 import { NextIcon, PauseIcon, PlayIcon, PrevIcon } from "./icons";
-import { fetchNowPlaying, fmtClock, mergeTrack, resolveArt, sendPlayerCmd, trackKey, type NowPlaying } from "../music";
+import { cacheTrack, fetchNowPlaying, fmtClock, loadCachedTrack, mergeTrack, resolveArt, sendPlayerCmd, trackKey, type NowPlaying } from "../music";
 import Mascot, { type MascotMood } from "./Mascot";
-import { TeamGrid, MemberDetail, SegBar, StepGlyph, LensBlock, useTeam, useSessionProgress, type AgentMini, type Lens } from "./TeamGrid";
+import { TeamGrid, MemberDetail, SegBar, StepsList, slotSession, useTeam, useSessionProgress, type AgentMini, type Lens } from "./TeamGrid";
+import { MusicBones, WorkBones } from "./HomeSkeleton";
 
 // React daily — work + tokens + day loop + music, zero keys anywhere.
 // All data rides the island bridge itself (same-origin /api/daily/*):
@@ -94,41 +95,170 @@ function coverAccent(url: string): Promise<string> {
 // bars. Poses hold ~1 s, then melt back into the groove.
 const GROOVE_LOOP = ["groove", "groove", "pose-up", "groove", "groove", "pose-up"];
 
+// Home offline cache: last-good work/usage survive reloads with no
+// internet (bridge polls revalidate when live). Same keys live in the SW
+// runtime cache (public/sw.js CACHED_API) — belt and suspenders.
+const WORK_KEY = "island.daily.work.v1";
+const USAGE_KEY = "island.daily.usage.v1";
+function loadCached<T>(key: string): T | null {
+  try {
+    const raw = localStorage.getItem(key);
+    if (!raw) return null;
+    return JSON.parse(raw) as T;
+  } catch {
+    return null;
+  }
+}
+function saveCached(key: string, val: unknown) {
+  try {
+    localStorage.setItem(key, JSON.stringify(val));
+  } catch { /* private mode — memory only */ }
+}
 // Slim track bar (korus-minimal): art + title + clock + transport.
 // No Up-Next rail — history isn't playable over MPRIS, so it stays out.
-export function DailyView({ agentSessions = [], onResumeAgent }: { agentSessions?: AgentMini[]; onResumeAgent?: (sid: string, first: string) => void } = {}) {
-  const [work, setWork] = useState<Work | null>(null);
-  const [usage, setUsage] = useState<Usage | null>(null);
+export function DailyView({ agentSessions = [], onResumeAgent, onGoChat, onRefreshSessions }: { agentSessions?: AgentMini[]; onResumeAgent?: (sid: string, first: string) => void; onGoChat?: () => void; onRefreshSessions?: () => void } = {}) {
+  const [work, setWork] = useState<Work | null>(() => loadCached<Work>(WORK_KEY));
+  const [usage, setUsage] = useState<Usage | null>(() => loadCached<Usage>(USAGE_KEY));
   // tapped mate drives the left card: his live session replaces the
   // global work view (no bottom pop-up). Shared with the grid below.
   const team = useTeam();
   const live = useSessionProgress(agentSessions);
   const [sel, setSel] = useState<string | null>(null);
   const selIdx = team.members.findIndex((m) => m.id === sel);
-  const selSession = selIdx >= 0 ? agentSessions[selIdx] : undefined;
+  const selSession = selIdx >= 0 ? slotSession(team.members, agentSessions, selIdx) : undefined;
+  // Quiet turn poll for crew dispatch (assign/relay run in the
+  // background — no chat UX, the tile lights up instead).
+  const pollTurn = async (turn: string): Promise<{ ok: boolean; session?: string; error?: string }> => {
+    const t0 = Date.now();
+    for (;;) {
+      await new Promise((r) => setTimeout(r, 2000));
+      if (Date.now() - t0 > 600000) return { ok: false, error: "timed out after 10m" };
+      try {
+        const r = await fetch(`${API}/turn?id=${encodeURIComponent(turn)}`);
+        const s = await r.json();
+        if (!s.done) continue;
+        if (!s.ok) return { ok: false, error: s.error || "agent failed" };
+        return { ok: true, session: s.session };
+      } catch { /* transient blip — keep polling */ }
+    }
+  };
+  // Give-a-task: real turn as the mate (`[name·role] task`), new live
+  // session pins to their slot so the tile tracks it.
+  const assignTask = async (targetId: string, text: string) => {
+    const m = team.members.find((x) => x.id === targetId);
+    if (!m) return { ok: false, error: "no such mate" };
+    try {
+      const r = await fetch(`${API}/chat`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message: `[${m.name}·${m.role}] ${text}`.slice(0, 4000) }),
+      });
+      const j = await r.json();
+      if (!j.ok || !j.turn) return { ok: false, error: j.error || "bridge refused" };
+      const s = await pollTurn(j.turn);
+      if (!s.ok) return s;
+      if (s.session) {
+        team.setSid(targetId, s.session);
+        live.refresh(s.session);
+        onRefreshSessions?.();
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "bridge unreachable" };
+    }
+  };
+  // Crew relay: this mate's latest work becomes the target's turn
+  // (bridge packs the shared brief from the event ledger).
+  const relayTask = async (fromId: string, targetId: string, text: string) => {
+    const fi = team.members.findIndex((x) => x.id === fromId);
+    const tm = team.members.find((x) => x.id === targetId);
+    const fs = fi >= 0 ? slotSession(team.members, agentSessions, fi) : undefined;
+    if (!fs) return { ok: false, error: "mate has no live session yet" };
+    if (!tm) return { ok: false, error: "no such mate" };
+    try {
+      const r = await fetch(`${API}/handoff`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          from_sid: fs.session,
+          to_text: `[${tm.name}·${tm.role}] ${text || "carry this work forward"}`.slice(0, 4000),
+        }),
+      });
+      const j = await r.json();
+      if (!j.ok || !j.turn) return { ok: false, error: j.error || "bridge refused" };
+      const s = await pollTurn(j.turn);
+      if (!s.ok) return s;
+      if (s.session) {
+        team.setSid(targetId, s.session);
+        live.refresh(s.session);
+        onRefreshSessions?.();
+      }
+      return { ok: true };
+    } catch {
+      return { ok: false, error: "bridge unreachable" };
+    }
+  };
   // tapped tile with a live session takes over the left card.
   const mateOn = selIdx >= 0 && !!selSession;
+  // session progress goes stale (single fetch on mount): re-pull every
+  // mate on the work rhythm so the mid lens tracks the working loop.
+  useEffect(() => {
+    if (!agentSessions.length) return;
+    const tick = () => {
+      for (const s of agentSessions) live.refresh(s.session);
+    };
+    const t = setInterval(tick, 10000);
+    return () => clearInterval(t);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [agentSessions.map((s) => s.session).join(",")]);
+  const [online, setOnline] = useState(() => typeof navigator === "undefined" || navigator.onLine);
+  useEffect(() => {
+    const on = () => setOnline(true);
+    const off = () => setOnline(false);
+    window.addEventListener("online", on);
+    window.addEventListener("offline", off);
+    return () => {
+      window.removeEventListener("online", on);
+      window.removeEventListener("offline", off);
+    };
+  }, []);
 
-  // Live lens frame: newest watch-dir shot, refreshed with work.
-  // Proves the capsule is live — same feed the lens tab watches.
-  const [frame, setFrame] = useState<{ src: string; label: string } | null>(null);
+  // Last track paints with the rest on boot (same tick below) and survives
+  // offline; live pos/playing revalidate over it.
+  const [local, setLocal] = useState<NowPlaying | null>(() => loadCachedTrack());
+  // music pending until the first nowplaying attempt settles (or cache
+  // exists) — bones hold the capsule's grid area so the card never pops
+  // the layout when it resolves. Honest flag, never a timed delay.
+  const [musicSettled, setMusicSettled] = useState(() => loadCachedTrack() !== null);
   useEffect(() => {
     const pullWork = () => {
       fetch(`${API}/api/daily/work`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((w) => w && setWork(w))
+        .then((w) => {
+          if (w) {
+            setWork(w);
+            saveCached(WORK_KEY, w);
+          }
+        })
         .catch(() => {});
       fetch(`${API}/api/daily/usage`)
         .then((r) => (r.ok ? r.json() : null))
-        .then((u) => u && setUsage(u))
-        .catch(() => {});
-      fetch(`${API}/shots`)
-        .then((r) => (r.ok ? r.json() : null))
-        .then((j) => {
-          const s = Array.isArray(j?.shots) ? j.shots[0] : null;
-          setFrame(s ? { src: `${API}${s.url}`, label: s.label || s.name } : null);
+        .then((u) => {
+          if (u) {
+            setUsage(u);
+            saveCached(USAGE_KEY, u);
+          }
         })
         .catch(() => {});
+      // music rides the same first tick so the capsule paints with the rest,
+      // never pops in a beat late. Offline the fetch fails and the cached
+      // track (if any) simply stays; either way bones retire on settle.
+      fetchNowPlaying(window.location.origin, fetch)
+        .then((t) => {
+          setLocal((prev) => cacheTrack(mergeTrack(prev, t)));
+          setMusicSettled(true);
+        })
+        .catch(() => setMusicSettled(true));
     };
     pullWork();
     const timer = setInterval(pullWork, 10000);
@@ -136,21 +266,20 @@ export function DailyView({ agentSessions = [], onResumeAgent }: { agentSessions
   }, []);
 
   // Local playback (bridge /nowplaying, playerctl/MPRIS): what's actually
-  // playing on this PC right now. Same 3s loop as lens shots, but idle
-  // polls are no-ops: mergeTrack keeps the ref when a paused track re-polls
-  // identically, so the home card never churns when nothing is audible.
-  const [local, setLocal] = useState<NowPlaying | null>(null);
+  // playing on this PC right now. pullWork covers the first tick — this
+  // 3s loop only refreshes. Idle polls are no-ops: mergeTrack keeps the
+  // ref when a paused track re-polls identically, so the home card never
+  // churns when nothing is audible.
   useEffect(() => {
     let dead = false;
     const pull = () => {
       fetchNowPlaying(window.location.origin, fetch)
         .then((t) => {
           if (dead) return;
-          setLocal((prev) => mergeTrack(prev, t));
+          setLocal((prev) => cacheTrack(mergeTrack(prev, t)));
         })
         .catch(() => {});
     };
-    pull();
     const timer = setInterval(pull, 3000);
     // background tabs throttle intervals: a song changed while away
     // paints the moment we're seen again, not a minute later.
@@ -170,7 +299,7 @@ export function DailyView({ agentSessions = [], onResumeAgent }: { agentSessions
     const refresh = () => {
       fetchNowPlaying(window.location.origin, fetch)
         .then((t) => {
-          setLocal((prev) => mergeTrack(prev, t));
+          setLocal((prev) => cacheTrack(mergeTrack(prev, t)));
         })
         .catch(() => {});
     };
@@ -343,17 +472,23 @@ export function DailyView({ agentSessions = [], onResumeAgent }: { agentSessions
               </span>
             </span>
             <div className="live-body">
+              {!online && <span className="offline-badge">offline · cached</span>}
               {mateOn && selSession ? (
                 <MemberDetail
                   member={team.members[selIdx]}
                   session={selSession}
                   progress={live.prog[selSession.session]}
-                  onResume={onResumeAgent}
                   manage={false}
                   onClose={() => setSel(null)}
+                  team={team.members}
+                  onAssign={assignTask}
+                  onRelay={relayTask}
                 />
               ) : work === null ? (
-                <div className="live-mono">Checking work…</div>
+                <div className="bone-stack">
+                  <WorkBones />
+                  {!online && <span className="offline-badge">offline · waiting for bridge</span>}
+                </div>
               ) : work.asks === 0 ? (
                 <div className="live-top">
                   <span className="live-hero">calm</span>
@@ -374,12 +509,6 @@ export function DailyView({ agentSessions = [], onResumeAgent }: { agentSessions
                     <span className="live-side">{work.done}/{work.asks}</span>
                   </div>
                   <SegBar ratio={work.pct / 100} n={20} />
-                  {frame && (
-                    <div className="live-frame">
-                      <img src={frame.src} alt={frame.label} loading="lazy" />
-                      <span>{frame.label}</span>
-                    </div>
-                  )}
                   <div className="live-dim">
                     {work.activity.replace(/^· /, "") || work.state}
                     {(work.added > 0 || work.removed > 0) && ` +${work.added} −${work.removed}`}
@@ -387,22 +516,8 @@ export function DailyView({ agentSessions = [], onResumeAgent }: { agentSessions
                       ` · 📄 ${(work.project?.docs ?? []).slice(0, 2).map((d) => d.name).join(" · ")}`}
                   </div>
                   {work.steps.length > 0 && (
-                    <div className="live-steps">
-                      {work.steps.slice(-5).map((s, i) => (
-                        <div
-                          key={i}
-                          className={s.status === "done" ? "st-done" : s.status === "error" ? "st-error" : s.status === "active" ? "st-active" : "st-todo"}
-                        >
-                          <span className="ln">{String(i + 1).padStart(2, "0")}</span>
-                          <span className={`st-ic ${s.status === "done" ? "st-done" : s.status === "error" ? "st-error" : s.status === "active" ? "st-active" : ""}`}>
-                            <StepGlyph label={s.label} status={s.status} />
-                          </span>
-                          {s.label}
-                        </div>
-                      ))}
-                    </div>
+                    <StepsList steps={work.steps} />
                   )}
-                  <LensBlock lens={work.lens} />
                   <div className="live-tokens">
                     <span>
                       {usage ? (
@@ -428,13 +543,16 @@ export function DailyView({ agentSessions = [], onResumeAgent }: { agentSessions
           </div>
         </div>
 
+        <div className="hm-right">
         {/* Team capsule (right top, where tokens was): 2x2 crew grid. */}
         <div className="hm-team">
-          <TeamGrid sessions={agentSessions} onResume={onResumeAgent} sel={sel} onSel={setSel} detail="none" team={team} live={live} />
+          <TeamGrid sessions={agentSessions} onResume={onResumeAgent} onGoChat={onGoChat} sel={sel} onSel={setSel} detail="none" team={team} live={live} />
         </div>
 
-        {/* Sugar capsule (right, full height): cover-blend glow, add, seek, transport. */}
-        {local?.title && (
+        {/* Sugar capsule (right, full height): cover-blend glow, add, seek, transport.
+            Bones hold the grid area while the first nowplaying is pending so
+            the card paints with the rest instead of popping the layout. */}
+        {local?.title ? (
           <div className="live music combo" style={{ ["--live-accent" as string]: accent }}>
             {!!art && (
               <>
@@ -493,7 +611,12 @@ export function DailyView({ agentSessions = [], onResumeAgent }: { agentSessions
               </button>
             </div>
           </div>
-        )}
+        ) : !musicSettled ? (
+          <div className="live music combo" aria-hidden>
+            <MusicBones />
+          </div>
+        ) : null}
+        </div>
       </div>
     </Card>
   );

@@ -282,7 +282,7 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
     <div className="member-detail" style={{ ["--live-accent" as string]: member.color }}>
       <div className="live-top">
         <span className="live-hero">{member.name}</span>
-        <span className="live-sub">{session ? `nicki · ${session.agent}` : `${member.role} · no session yet`}</span>
+        <span className="live-sub">{session ? `${member.name} · ${session.agent}` : `${member.role} · no session yet`}</span>
         {total > 0 && <span className="live-side">{done}/{total}</span>}
         {onClose && <button className="team-x" aria-label="Back to work" onClick={onClose}>×</button>}
       </div>
@@ -479,16 +479,31 @@ export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel
   const [shut, setShut] = useState<boolean | null>(null);
   const collapsed = shut ?? false;
   void compact;
+  // nicki leads the grid visually (this chat is hers). Visual-only: she
+  // takes no session slot, so slotSession indexing below is untouched.
+  const nickiOn = !cur;
+  const nickiClick = () => {
+    // chat pick mode: already talking to her — focus the composer.
+    if (onPick) {
+      document.querySelector<HTMLTextAreaElement>(".composer-input")?.focus();
+      return;
+    }
+    if (onGoChat) {
+      onGoChat();
+      return;
+    }
+    pick(null);
+  };
   return (
     <div className="team-wrap">
       <div className="team-head">
         <button
           className="team-title team-toggle"
           aria-expanded={!collapsed}
-          title={collapsed ? `Show crew (${members.length})` : "Hide crew while chatting"}
+          title={collapsed ? `Show crew (${members.length + 1})` : "Hide crew while chatting"}
           onClick={() => setShut(!collapsed)}
         >
-          TEAM {members.length} {collapsed ? "▸" : "▾"}
+          TEAM {members.length + 1} {collapsed ? "▸" : "▾"}
         </button>
         <button className="effort-pill team-add" onClick={add} title={members.length >= 8 ? "Team is full (8)" : "Add a mate"}>
           {collapsed ? "+" : "+ Add mate"}
@@ -514,6 +529,25 @@ export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel
       </div>
       {!collapsed && (
       <div className="team-grid">
+        <div key="nicki" className="team-cellwrap">
+          <button
+            className={nickiOn ? "team-cell on" : "team-cell"}
+            title="nicki — main · this chat is hers · tap to talk"
+            aria-pressed={nickiOn}
+            onClick={nickiClick}
+          >
+            <span className="team-face" aria-hidden>
+              <Mascot
+                ref={(h) => { faces.current.set("nicki", h); }}
+                mood={nickiOn ? "happy" : "neutral"}
+              />
+            </span>
+            <span className="team-meta">
+              <span className="team-name">nicki</span>
+              <span className="team-sub">main</span>
+            </span>
+          </button>
+        </div>
         {members.map((m, i) => {
           const s = slotSession(members, sessions, i);
           const p = s ? prog[s.session] : undefined;
@@ -593,7 +627,7 @@ export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel
                       className="team-prov"
                       role="button"
                       tabIndex={0}
-                      title={`nicki · ${s.agent} — open provider in chat`}
+                      title={`${m.name} · ${s.agent} — open provider in chat`}
                       onClick={(e) => {
                         e.stopPropagation();
                         onGoChat();
@@ -605,10 +639,10 @@ export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel
                         }
                       }}
                     >
-                      nicki · {s.agent}
+                      {m.name} · {s.agent}
                     </span>
                   ) : (
-                    <span className="team-sub team-wide">nicki · {s.agent}</span>
+                    <span className="team-sub team-wide">{m.name} · {s.agent}</span>
                   )
                 )}
               </button>

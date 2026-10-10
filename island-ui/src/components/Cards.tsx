@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon, PhoneIcon, BoltIcon, StopIcon } from "./icons";
 import { EffortPicker, PillButton, ProviderPicker, useDismiss, useEngines, ENGINES, displayModel } from "./pickers";
 export { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
@@ -15,6 +15,7 @@ import {
   type Attachment,
   type ChatMessage,
   type ExploreFeed,
+  type FeedEvent,
   type IslandView,
   type Question,
   type SkillHit,
@@ -154,8 +155,43 @@ export function ExploreView({
   );
 }
 
-function age(ts: number): string {
-  const s = Math.max(1, Math.floor(Date.now() / 1000 - ts));
+// Feed view — live opencode/claude event ledger for nicki + the crew.
+// Same rows as history; bridge GET /events (newest first). Read-only:
+// the crew acts from sessions/approvals, this is the shared sightline.
+export function FeedView({ events }: { events: FeedEvent[] }) {
+  return (
+    <div className="card">
+      <div className="card-title">Crew feed</div>
+      <div className="card-detail">live opencode + claude events · newest first</div>
+      {!events.length && <div className="empty">quiet — no agent events yet</div>}
+      {events.slice(0, 60).map((e, i) => (
+        <div key={`${e.ts ?? 0}-${i}`} className="hist-row">
+          <div className="hist-title" style={{ cursor: "default" }}>
+            <b className="kind-tag">{e.agent || "opencode"}</b>
+            <span className="hist-label">{feedLabel(e)}</span>
+            <span className="hist-meta">{e.ts ? age(e.ts) : ""}</span>
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+function feedLabel(e: FeedEvent): string {
+  const ev = e.event || "";
+  if (ev === "UserPromptSubmit") return e.text || "prompt";
+  if (ev === "PreToolUse" || ev === "PostToolUse") {
+    const f = e.file ? ` ${e.file.split("/").pop()}` : "";
+    return `${e.tool || "tool"}${f}`;
+  }
+  if (ev === "Stop") return e.ok === false ? "failed ✗" : "finished ✓";
+  if (ev === "Notification") return e.text || "notification";
+  if (ev === "SessionStart") return "session started";
+  if (ev === "SessionEnd") return "session ended";
+  return e.text || ev || "event";
+}
+
+function age(ts: number): string {  const s = Math.max(1, Math.floor(Date.now() / 1000 - ts));
   if (s < 60) return `${s}s`;
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
@@ -396,12 +432,20 @@ export function ChatPanel({
   const logRef = useRef<HTMLDivElement>(null);
 
   // newest reply always visible: pin the log to the bottom as turns stream.
-  useEffect(() => {
+  // layout effect, not passive: passive fires after paint, flashing the
+  // log top for one frame on every open with history (chat-open flash).
+  useLayoutEffect(() => {
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [messages, thinking, livePartial]);
   const fileRef = useRef<HTMLInputElement>(null);
   const snapRef = useRef<HTMLInputElement>(null);
+  // desktop has no camera to capture from: keep capture=environment on
+  // touch phones only, otherwise the snap row opens the file picker.
+  const snapIsMobile =
+    typeof window !== "undefined" &&
+    (window.matchMedia?.("(pointer: coarse)").matches ||
+      /Android|iPhone|iPad|Mobile/i.test(navigator.userAgent ?? ""));
   const boxRef = useRef<HTMLTextAreaElement>(null);
   const recRef = useRef<{ rec: MediaRecorder; chunks: Blob[]; timer: ReturnType<typeof setInterval> } | null>(null);
   const pickProvider = (id: string) => {
@@ -812,7 +856,7 @@ export function ChatPanel({
           ref={snapRef}
           type="file"
           accept="image/*"
-          capture="environment"
+          {...(snapIsMobile ? { capture: "environment" as const } : {})}
           style={{ display: "none" }}
           onChange={(e) => {
             onFiles(Array.from(e.target.files ?? []));

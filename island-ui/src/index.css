@@ -11,22 +11,21 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
    full-bleed black on every browser, PC and phone. */
 
 /* island shell widths: hidden 184 / flex+pump 248 / jacked 960 (2-col home: work + right rail) */
-#island{background:var(--ink);border-radius:22px;border:1px solid rgba(251,146,60,.30);box-shadow:0 0 14px 1px rgba(251,146,60,.12);transition:width .18s cubic-bezier(.2,.9,.25,1);overflow:hidden;display:flex;align-items:center;gap:14px;padding:10px 18px;min-height:64px}
+#island{background:var(--ink);border-radius:22px;border:0;box-shadow:none;transition:width .34s cubic-bezier(.45,0,.2,1);overflow:hidden;display:flex;align-items:center;gap:14px;padding:10px 18px;min-height:64px}
 #island[data-state="hidden"]{width:184px}
-#island[data-state="flex"]{width:248px}
+/* Human order (loop3 scope replacement): the island-with-mascot carries the
+   SAME shell as hidden — mascots shown, geometry identical. Pump transient. */
+#island[data-state="flex"],#island[data-state="pump"]{width:184px}
 #island[data-state="pump"]{width:248px}
-#island[data-state="jacked"]{width:min(960px,94vw);overflow:visible;flex-direction:column;align-items:stretch;gap:.34rem;padding:6px 8px}
+#island[data-state="jacked"]{width:min(960px,94vw);overflow:visible;flex-direction:column;align-items:stretch;gap:.34rem;padding:6px 8px;transition:width .52s cubic-bezier(.32,1.22,.42,1)}
 .mascot-top{display:flex;justify-content:center;padding:0}
 .mascot-top .mascot{width:56px;height:56px}
 .mascot{width:56px;height:56px;image-rendering:pixelated;flex:none;cursor:pointer}
 #island[data-state="hidden"] .mascot{visibility:hidden}
-#island[data-state="hidden"] .pill{visibility:hidden}
-.pill{background:var(--surface);border:1px solid var(--border);border-radius:14px;padding:.55rem .8rem;font-family:var(--font-mono);font-size:.8rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
-.pill b{color:var(--brand);font-weight:var(--weight-em)}
-/* minimized crew strip: mates line up from the left of the small pill;
-   the full list lives in the open views. Hidden state drops the big
-   mascot to make room (it was invisible-but-spaced). */
+/* minimized pill: nicki left alone, mates 2x2 on the right (text retired).
+   Hidden state drops the big mascot to make room (it was invisible-but-spaced). */
 .pill-team{display:flex;align-items:center;gap:3px;flex:none}
+#island .pill-team.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-left:16px}
 .pill-face{width:20px;height:20px;display:grid;place-items:center}
 .pill-face .mascot{width:20px;height:20px;cursor:default}
 .pill-face .m-fx svg{width:20px;height:20px}
@@ -67,7 +66,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .card{background:var(--card,var(--surface));border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 28px rgba(0,0,0,.45);padding:.7rem;display:flex;flex-direction:column;gap:.55rem}
 .card-title{font-weight:var(--weight-em);font-size:.85rem;letter-spacing:-.02em}
 .card-detail{opacity:.6;font-size:.78rem;font-family:var(--font-ui)}
-.btn-row{display:flex;gap:.45rem}
+.btn-row{display:flex;gap:.45rem;align-items:center;flex-wrap:wrap}
+.btn-row>input.team-edit{flex:1 1 200px;min-width:0}
+.btn-row>label{flex:none;white-space:nowrap}
 /* daily: stacked sections with hairline split; compact link lists */
 .card-row{display:flex;flex-direction:column;gap:.4rem;padding:.55rem 0;border-top:1px solid var(--border)}
 .card-row:first-child{border-top:none;padding-top:0}
@@ -119,7 +120,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .team-pack{height:26px;font-size:.7rem;background:rgba(255,255,255,.07);color:var(--text-dim);border:0;border-radius:99px;padding:0 .5rem;cursor:pointer;max-width:92px}
 .team-hearts{font-size:.62rem;color:var(--brand-light);margin-left:.25rem}
 .team-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem}
-.team-cell{display:flex;align-items:center;gap:.5rem;background:var(--surface);border:1px solid transparent;border-radius:14px;padding:.45rem .6rem;min-width:0;min-height:44px;cursor:pointer;color:#fff;text-align:left;flex:1}
+.team-cell{display:flex;align-items:center;gap:.5rem;background:var(--field);border:1px solid transparent;border-radius:14px;padding:.45rem .6rem;min-width:0;min-height:44px;cursor:pointer;color:#fff;text-align:left;flex:1}
 .team-cellwrap{position:relative;display:flex;min-width:0}
 .team-cell{padding-right:1.7rem}
 .team-dots{position:absolute;right:.3rem;top:50%;transform:translateY(-50%);background:transparent;border:none;color:rgba(255,255,255,.45);font-size:.95rem;line-height:1;padding:.3rem .25rem;cursor:pointer;border-radius:8px}
@@ -387,8 +388,16 @@ button:disabled{opacity:.4;cursor:default}
 .chat-log{display:flex;flex-direction:column;gap:.65rem;max-height:400px;overflow:auto;padding:.1rem;scrollbar-width:thin}
 .chat-row{display:flex;padding:0}
 .chat-row.user{justify-content:flex-end}
-.bubble{box-shadow:none;color:var(--text);font-size:.92rem;line-height:1.55;letter-spacing:-.01em;max-width:85%;text-align:left;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:12px 4px 12px 12px;padding:.55rem .8rem;overflow-wrap:break-word;white-space:pre-wrap}
-.reply{font-size:.92rem;line-height:1.6;letter-spacing:-.01em;color:var(--text);max-width:100%;background:var(--surface-2);border:1px solid var(--border-strong);border-radius:4px 12px 12px 12px;padding:.6rem .85rem;overflow-wrap:break-word;white-space:pre-wrap}
+/* motion (un-held loop3): rows land 35ms apart (keys stable, animation runs
+   on mount only — view switches replay the cascade, never mid-chat). */
+.chat-log > .chat-row{animation:viewIn .3s ease-out both}
+.chat-log > .chat-row:nth-child(2){animation-delay:.035s}
+.chat-log > .chat-row:nth-child(3){animation-delay:.07s}
+.chat-log > .chat-row:nth-child(4){animation-delay:.105s}
+.chat-log > .chat-row:nth-child(5){animation-delay:.14s}
+.chat-log > .chat-row:nth-child(n+6){animation-delay:.175s}
+.bubble{box-shadow:none;color:var(--text);font-size:.92rem;line-height:1.55;letter-spacing:-.01em;max-width:85%;text-align:left;background:var(--field);border:1px solid transparent;border-radius:12px 4px 12px 12px;padding:.55rem .8rem;overflow-wrap:break-word;white-space:pre-wrap}
+.reply{font-size:.92rem;line-height:1.6;letter-spacing:-.01em;color:var(--text);max-width:100%;background:var(--field);border:1px solid transparent;border-radius:4px 12px 12px 12px;padding:.6rem .85rem;overflow-wrap:break-word;white-space:pre-wrap}
 .reply .inline-code{overflow-wrap:break-word;white-space:pre-wrap}
 /* chatting = text owns the space: mascot + team shrink, log grows.
    Empty chat keeps everything full size. */
@@ -416,7 +425,7 @@ button:disabled{opacity:.4;cursor:default}
 .bubble-textarea{background:rgba(0,0,0,.3);border:1px solid var(--brand);border-radius:8px;color:var(--text);font-size:.92rem;font-family:var(--font-ui);line-height:1.55;letter-spacing:-.01em;padding:.55rem .8rem;resize:vertical;outline:none;min-height:3.2em;width:100%;box-sizing:border-box}
 .edit-row{display:flex;gap:.4rem;justify-content:flex-end}
 
-.reply.working{display:flex;flex-direction:row;align-items:flex-start;gap:.6rem;max-width:100%;background:var(--surface-2);border:1px solid var(--border)}
+.reply.working{display:flex;flex-direction:row;align-items:flex-start;gap:.6rem;max-width:100%;background:var(--field);border:1px solid transparent}
 .reply.working>.spin{flex:none;margin-top:.25rem}
 .work-pulse{width:14px;height:14px;flex:none;border-radius:50%;background:var(--brand);animation:work-ping 1s ease-in-out infinite}
 @keyframes work-ping{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.55}}
@@ -461,12 +470,16 @@ button:disabled{opacity:.4;cursor:default}
 .bone.shimmer{background:linear-gradient(90deg,var(--surface-2) 25%,rgba(255,255,255,.14) 50%,var(--surface-2) 75%);background-size:200% 100%;animation:bone-shimmer 1.8s linear infinite}
 @keyframes bone-shimmer{to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){.bone.shimmer{animation:none;background:var(--surface-2)}}
-.typing{display:flex;gap:5px;background:var(--surface-2);border:1px solid var(--border);border-radius:12px;padding:.6rem .8rem}
+.typing{display:flex;gap:5px;background:var(--field);border:1px solid transparent;border-radius:12px;padding:.6rem .8rem}
 .typing i{width:6px;height:6px;border-radius:50%;background:var(--brand);animation:blink 1s infinite}
 .typing i:nth-child(2){animation-delay:.2s}
 .typing i:nth-child(3){animation-delay:.4s}
 @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
 .composer-box{background:var(--field);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;min-width:0;overflow:visible;position:relative}
+/* chat-open visibility: long histories push the panel past the fold — the
+   composer sticks to the panel bottom so the text field is always in reach
+   while the log scrolls behind it. */
+.chat-card .composer-box{position:sticky;bottom:0;z-index:2}
 .composer-box:focus-within{border-color:rgba(255,255,255,.25)}
 .composer-box.dragover{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-chip)}
 .composer-drop-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:var(--weight-em);color:var(--text);z-index:5;pointer-events:none;background:radial-gradient(220px 120px at 50% 100%,color-mix(in srgb,var(--text) 8%,transparent),transparent 70%)}
@@ -485,8 +498,11 @@ button:disabled{opacity:.4;cursor:default}
 .log div{opacity:.85;padding:.1rem 0}
 p.hint{opacity:.6;font-size:.78rem;margin:0;text-align:center;letter-spacing:.01em;color:var(--text-mute)}
 
-/* view transitions — plate snap, no overshoot */
-.jacked-body > *{animation:viewIn .18s ease-out}
+/* view transitions — coucou rule: opacity-only, no slide. Content swaps
+   in place on the same black card; nothing rises, nothing shifts. */
+/* motion (un-held loop3): content in 300ms with 160ms delay after the
+   container starts. (Content-out rides unmount — no CSS can fade it.) */
+.jacked-body > *{animation:viewIn .3s ease-out .16s both}
 @keyframes viewIn{from{opacity:0;transform:translateY(6px)}to{opacity:1;transform:none}}
 .empty{opacity:.6;font-size:.8rem;padding:.5rem}
 .activity-orb{display:flex;flex-direction:column;align-items:center;gap:.3rem;padding:.8rem 0}
@@ -542,10 +558,8 @@ button.live-pill:hover{border-color:var(--brand)}
 .up-fill{height:100%;background:linear-gradient(90deg,var(--brand),var(--brand-light));border-radius:99px;transition:width .09s linear}
 
 /* navbar — 3-zone grid: left / middle centered / right. Perfectly aligned.
-   Own dark pill surface: page bg can be white (screenshots, light UA
-   style) — transparent tabs wash out there. Icons ride --text-dim so
-   they stay legible even if the surface fails to paint. */
-.navbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:.25rem .5rem;position:relative;gap:.5rem;background:rgba(23,24,28,.92);border:1px solid var(--border-strong);border-radius:16px}
+   Icons-only, no pill surface — dropdowns keep their own card bg. */
+.navbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:.25rem .5rem;position:relative;gap:.5rem;background:transparent;border:none;border-radius:0}
 .tabs{display:flex;gap:.5rem;justify-self:start;align-items:center}
 .tab{background:transparent;border:1px solid transparent;border-radius:12px;width:40px;height:40px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;padding:0}
 .tab:hover{background:transparent;border-color:transparent;color:var(--text)}
@@ -718,7 +732,7 @@ button.hpill:hover{border-color:var(--brand)}
 .card.finished{border-top:2px solid var(--success)}
 
 @media (prefers-reduced-motion: reduce){
-  .jacked-body > *, .lens-live, .chip, .mascot, .ticker, .work-pulse{animation:none !important}
+  .jacked-body > *, .lens-live, .chip, .mascot, .ticker, .work-pulse, .chat-log > .chat-row{animation:none !important}
   #island[data-glow]{animation:none !important;box-shadow:0 0 0 1px var(--brand)}
   #island[data-edge]{animation:none !important;transition:none !important}
   .drop-frame rect{animation:none !important}
@@ -948,8 +962,10 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
 /* our black: panel + cards pure black (coucou, not gray gradients).
    Tiles/pills keep their dark surfaces so the 4-grid still reads. */
 .stage.app.pc{--card:#000}
-/* PC strip (coucou frame-0000): full-width top bar, always — closed,
-   small or open. Phone keeps the floating pill. */
+/* PC notch (Glance idiom): small centered pill at the top in every
+   state — closed, small or open. Never full-width (the old 100% strip
+   painted a giant bar across 4k screens). Base per-state widths size
+   it; max-width only caps the open panel. Phone keeps the floating pill. */
 .stage.app.pc{padding-left:0;padding-right:0;padding-top:0;max-width:none}
 /* stepped glow outline: real SVG stroke (Island renders .notch-frame from
    measured px — CSS drop-shadow can't trace a clip-path in this renderer,
@@ -957,27 +973,75 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
 .notch-frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
 /* stays absolute behind content (the pc >* rule lifts siblings to z-1) */
 .stage.app.pc #island>.notch-frame{position:absolute;inset:0;z-index:0}
-.stage.app.pc #island{width:100%;justify-content:center;position:relative;overflow:visible;background:transparent;border-color:transparent;box-shadow:none;border-radius:0;padding:60px 18px 12px}
-/* stepped notch silhouette (glance frame): full-width strip up top, the
-   center drops below it with square ledges each side. One clipped layer
+.stage.app.pc #island{width:auto;max-width:min(1020px,calc(100vw - 16px));margin:0 auto;justify-content:center;position:relative;overflow:visible;background:transparent;border-color:transparent;box-shadow:none;border-radius:0 0 18px 18px;padding:12px 18px;transition:none}
+/* stepped notch silhouette (glance frame): the center drops below a
+   short top lip with square ledges each side. One clipped layer
    paints the black; the amber step-glow is a real SVG stroke (.notch-frame,
    measured px from the shell) — CSS drop-shadow can't trace a clip-path
    in this renderer (verified black-only), and rectangular border/shadow
    can never follow steps, so all three stay off here. */
-.stage.app.pc #island::before{content:"";position:absolute;inset:0;background:#000;pointer-events:none;--notch:min(520px,44%);clip-path:polygon(0 0,100% 0,100% 56px,calc(50% + var(--notch)) 56px,calc(50% + var(--notch)) 100%,calc(50% - var(--notch)) 100%,calc(50% - var(--notch)) 56px,0 56px)}
+.stage.app.pc #island::before{content:"";position:absolute;inset:0;background:#000;pointer-events:none;border-radius:0 0 18px 18px;--notch:min(520px,44%);clip-path:polygon(0 0,100% 0,100% 56px,calc(50% + var(--notch)) 56px,calc(50% + var(--notch)) 100%,calc(50% - var(--notch)) 100%,calc(50% - var(--notch)) 56px,0 56px)}
 .stage.app.pc #island>*{position:relative;z-index:1}
 /* hidden = bare mac-like tab only, never a full-width fill: small centered
    black round, no strip, no glow, no faces. Empty children collapse
    (visibility still reserves space, so they go display:none here). */
-.stage.app.pc #island[data-state="hidden"]{width:200px;min-height:30px;margin:0 auto;background:#000;border-radius:0 0 18px 18px;padding:0 0 14px}
+.stage.app.pc #island[data-state="hidden"]{width:200px;min-height:30px;margin:0 auto;background:#000;border:0;border-radius:0 0 18px 18px;padding:0 0 14px}
+/* fixed footprints: tab switches never resize the window (the leaping
+   panel). Flex/pump pin to the base 248 pill; jacked pins in App.tsx. */
+/* closed pill + hidden tab = ONE pill, one size (200px), one bg.
+   Flex carries the mascots, hidden rides empty — same card either way. */
+.stage.app.pc #island[data-state="flex"],.stage.app.pc #island[data-state="pump"]{width:200px}
+/* loop3 mascot-layout + gridfix: mates 2x2 grid SMALLER on the RIGHT, Nicki
+   left — all inside the 200x30 closed box. Gridfix: buddy 28 = grid block
+   28 (2x12+4), so tops align — grid spacing matches the mascot, symmetric
+   10px side padding. Pump renders identical children: same slim rules, so
+   every steady notch state shares one shell. (Buddy 28 supersedes the 24px
+   eye call — spacing match needs equal heights.) */
+.stage.app.pc #island[data-state="flex"],.stage.app.pc #island[data-state="pump"]{min-height:30px;padding:0 10px}
+.stage.app.pc #island[data-state="flex"] > .mascot.mascot-svg,.stage.app.pc #island[data-state="pump"] > .mascot.mascot-svg{width:28px;height:28px}
+.stage.app.pc #island[data-state="flex"] .pill-team.mini-grid,.stage.app.pc #island[data-state="pump"] .pill-team.mini-grid{grid-template-columns:1fr 1fr;margin-left:auto}
+.stage.app.pc #island[data-state="flex"] .pill-face,.stage.app.pc #island[data-state="pump"] .pill-face{width:12px;height:12px}
+.stage.app.pc #island[data-state="flex"] .pill-face .mascot,.stage.app.pc #island[data-state="flex"] .pill-face .m-fx svg,.stage.app.pc #island[data-state="pump"] .pill-face .mascot,.stage.app.pc #island[data-state="pump"] .pill-face .m-fx svg{width:12px;height:12px}
+/* motion (un-held loop3): app shell moves too — 963's transition:none would
+   freeze it, so these app-scoped twins restore open .52 / close .34. */
+.stage.app.pc #island{transition:width .34s cubic-bezier(.45,0,.2,1)}
+.stage.app.pc #island[data-state="jacked"]{transition:width .52s cubic-bezier(.32,1.22,.42,1)}
+/* flex buddy slims toward the reference notch (faces stay 20px). */
+#island[data-state="flex"] > .mascot.mascot-svg{width:44px;height:44px}
+/* closed pill = same solid black card as the open panel (no strip layer,
+   no transparency tricks): one bg in every state, Mac-tab silhouette. */
+.stage.app.pc #island[data-state="flex"],.stage.app.pc #island[data-state="pump"]{background:#000;border:0;border-radius:0 0 18px 18px;box-shadow:none}
+.stage.app.pc #island[data-state="flex"]::before,.stage.app.pc #island[data-state="pump"]::before{display:none}
 .stage.app.pc #island[data-state="hidden"]::before{display:none}
+/* open panel is a clean centered card — the strip bar belongs to the
+   closed notch only, full-width black behind the panel read as broken. */
+.stage.app.pc #island[data-state="jacked"]::before{display:none}
 .stage.app.pc #island[data-state="hidden"] .mascot,
 .stage.app.pc #island[data-state="hidden"] .pill,
 .stage.app.pc #island[data-state="hidden"] .pill-team{display:none}
-.stage.app.pc #island[data-state="jacked"]{flex-direction:column;align-items:stretch;background:transparent;padding:66px 18px 20px}
-.stage.app.pc #island[data-edge],.stage.app.pc #island[data-edge][data-sweep]{background:transparent;border-color:transparent;box-shadow:none}
+.stage.app.pc #island[data-state="jacked"]{flex-direction:column;align-items:stretch;width:min(960px,calc(100vw - 70px));background:#000;border:0;border-radius:0 0 22px 22px;box-shadow:none;padding:6px 18px 20px}
+/* volume/brightness echo (glance): transient level ring on the black card.
+   Base [data-edge] paints the conic ring + glow; keep our pill radii. */
+.stage.app.pc #island[data-edge]{border-radius:0 0 18px 18px}
+.stage.app.pc #island[data-state="jacked"][data-edge]{border-radius:0 0 22px 22px}
 .stage.app.pc .jacked-body{max-width:980px;margin:0 auto;width:100%}
-.stage.app.pc .navbar{padding:.35rem .8rem}
+/* open card fits its content: the window shrink-wraps (App.tsx) instead of
+   a fixed 680px box. Cap comes from --jacked-cap (screen-based, set in
+   App.tsx): dvh would read the shrink-wrapped window itself and deadlock
+   content at 0px. Tall content clips at the cap (chat-log and other inner
+   views keep their own scroll) — never a page-level scrollbar. */
+.stage.app.pc #island[data-state="jacked"] .jacked-body{max-height:var(--jacked-cap, calc(100dvh - 150px));overflow:hidden}
+.stage.app.pc .navbar{padding:.2rem .8rem;position:sticky;top:0;z-index:5}
+/* Command Echo (glance): transient copy preview. One grey (--field),
+   no border. Pill swells to fit, melts back after ~2.6s. */
+.pill-echo{display:inline-flex;align-items:center;gap:.4rem;color:var(--text);font-size:.78rem;font-weight:600;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis;padding:.3rem .2rem;animation:viewIn .18s ease-out}
+.echo-banner{display:flex;align-items:center;gap:.45rem;background:var(--field);border:1px solid transparent;border-radius:12px;color:var(--text);font-size:.82rem;padding:.5rem .8rem;margin:.1rem 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:viewIn .18s ease-out}
+.echo-banner,.pill-echo{scrollbar-width:none}
+/* no scrollbar chrome anywhere in the island window (both axes, every
+   view/sheet): inner views still wheel/touch-scroll, but no thumb or
+   gutter ever paints or shifts layout. */
+.stage.app.pc *{scrollbar-width:none !important}
+.stage.app.pc *::-webkit-scrollbar{display:none !important;width:0 !important;height:0 !important}
 /* mobile: everything fits a phone, tap targets stay fingers */
 @media (max-width:480px){
   .stage{padding-top:calc(72px + env(safe-area-inset-top));gap:12px}

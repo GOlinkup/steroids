@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%237dffb0'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23ff4d1c'/></svg>">
 <title>Steroids Town — a knowledge town (STEP 01)</title>
 <script type="importmap">
 {"imports":{
@@ -12,8 +12,16 @@
  "three-pathfinding":"https://cdn.jsdelivr.net/npm/three-pathfinding@1.3.0/dist/three-pathfinding.module.js"}}
 </script>
 <style>
-:root{font-family:'DM Sans',Arial,sans-serif;color:#f2f4fa}
-*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#333b49}
+:root{
+ --brand:#ff4d1c;--brand-light:#fb923c;--brand-soft:rgba(255,77,28,.12);
+ --bg:#000;--surface:#17181c;--surface-2:#26272c;
+ --text:#fff;--text-mute:rgba(255,255,255,.6);--text-faint:rgba(255,255,255,.45);
+ --border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.12);
+ --card:radial-gradient(120% 90% at 50% 0%,#2b2d34 0%,#17181c 55%);
+ --radius:20px;
+  --font-ui:'Outfit','Montserrat',ui-sans-serif,system-ui,sans-serif;
+ font-family:var(--font-ui);color:var(--text)}
+*{box-sizing:border-box}body{margin:0;overflow:hidden;background:var(--bg)}
 #app{height:100svh;position:relative;user-select:none}
 #app::after{content:'';position:absolute;inset:0;pointer-events:none;
  background:linear-gradient(180deg,#1a223380,transparent 26%,transparent 76%,#141b2670),
@@ -22,30 +30,32 @@ canvas.webgl{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
 .hud{position:absolute;text-shadow:0 1px 10px #0a0f1899;pointer-events:none}
 #brand{top:26px;left:30px;display:flex;gap:14px;align-items:flex-start}
 .brand-icon{width:44px;height:44px;border-radius:50%;flex:none;margin-top:2px;
- background:radial-gradient(circle at 35% 30%,#7fa2ff,#2f55d4 70%);box-shadow:0 0 26px #5b8cff55;
+  background:linear-gradient(to bottom,#ff4a1a 0%,#ff6a2b 35%,#ffb08a 70%,#ffffff 100%);box-shadow:0 0 26px rgba(255,77,28,.4);
  position:relative}
 .brand-icon::after{content:'✦';position:absolute;inset:0;display:flex;align-items:center;
  justify-content:center;color:#fff;font-size:20px}
 .brand{font-size:40px;font-weight:700;letter-spacing:-.5px;line-height:1}
-.brand small{display:block;font-size:15px;font-weight:400;color:#d6dae2;margin-top:8px;letter-spacing:0}
+.brand small{display:block;font-size:15px;font-weight:400;color:var(--text-mute);margin-top:8px;letter-spacing:0}
 #nav{top:30px;right:30px;display:flex;gap:16px;align-items:center;pointer-events:auto}
-#nav button{border:1px solid #ffffff2c;background:transparent;color:inherit;border-radius:30px;
- padding:13px 26px;font:inherit;font-size:18px;cursor:pointer}
-#nav button:hover{background:#ffffff22}
+#nav button{border:1px solid var(--border-strong);background:#fff;color:#000;border-radius:999px;
+ padding:.55rem 1.1rem;font:inherit;font-size:.88rem;font-weight:600;cursor:pointer}
+#nav button:hover{transform:scale(1.04)}
 #navCount{font-size:17px}
-/* one glass header, shared with docs/benchmarks.html (mint accent = town brand) */
+/* one glass header, shared with docs/benchmarks.html (orange accent = house brand) */
 .glassnav{position:absolute;top:20px;left:50%;transform:translateX(-50%);z-index:6;
- border-radius:99em;overflow:hidden;color:#f2f4fa;isolation:isolate;
+ border-radius:99em;overflow:hidden;color:#fff;isolation:isolate;
  background-color:rgba(187,187,188,.12);
  backdrop-filter:blur(8px) saturate(150%);-webkit-backdrop-filter:blur(8px) saturate(150%);
  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 6px 16px rgba(0,0,0,.16)}
-.glassnav nav{display:flex;align-items:center;gap:6px;padding:6px 10px}
-.glassnav a{color:#f2f4fa;text-decoration:none;font-size:.85rem;font-weight:500;padding:.5rem .95rem;border-radius:99em;transition:color .16s ease;white-space:nowrap}
-.glassnav a:hover,.glassnav a.active{color:#7dffb0}
+.glassnav nav{display:flex;align-items:center;gap:8px;padding:8px 12px 10px}
+.glassnav .selector{position:absolute;left:0;top:0;width:0;height:0;z-index:2;border-radius:99em;background-color:rgba(187,187,188,.36);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);opacity:0;transition:translate 400ms cubic-bezier(1,0,.4,1),width 400ms cubic-bezier(1,0,.4,1),opacity .2s ease;pointer-events:none}
+.glassnav .selector.on{opacity:1}
+.glassnav a{color:#fff;text-decoration:none;font-size:.85rem;font-weight:500;padding:.5rem .95rem;border-radius:99em;transition:color .16s ease;white-space:nowrap}
+.glassnav a:hover,.glassnav a.active{color:var(--brand-light)}
 @media(max-width:900px){.glassnav{display:none}}
-#card{left:0;top:0;width:480px;max-width:calc(100vw - 60px);padding:20px 22px 14px;
- border:1px solid #d2dcf033;border-radius:20px;background:linear-gradient(135deg,#2a3240b8,#3c4250a0);
- backdrop-filter:blur(12px);pointer-events:none;will-change:transform;
+#card{left:0;top:0;width:480px;max-width:calc(100vw - 60px);padding:24px 24px 20px;
+  border:1px solid var(--border);border-radius:var(--radius);background:var(--card);
+  backdrop-filter:blur(12px);pointer-events:none;will-change:transform;backface-visibility:hidden;
  transition:opacity .18s ease}
 #card.out{opacity:0;transition-duration:.12s;transition-delay:0s}
 #card.side{box-shadow:0 14px 44px rgba(0,0,0,.45)}
@@ -54,34 +64,43 @@ canvas.webgl{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
 body.embed .glassnav,body.embed #brand,body.embed #nav,body.embed #foot,
 body.embed #street{display:none!important}
 body.embed canvas.webgl{touch-action:pan-y}
-#card .row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:26px}
+#card .row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 #avatar{width:44px;height:44px;border-radius:50%;background:#fbf7f1;flex:none}
-#latestPill{font-size:13px;border:1px solid #ffffff2c;border-radius:20px;padding:5px 14px;color:#d6dae2}
-#card h1{font-size:19px;margin:0 0 4px}#card p{font-size:12.5px;color:#c6cede;margin:6px 0 0;line-height:1.55}
-#card canvas{margin-top:8px;max-width:100%;height:auto;display:block}
+#latestPill{font-size:12px;font-weight:600;border:1px solid rgba(255,77,28,.4);border-radius:20px;padding:5px 14px;color:var(--brand-light)}
+#card h1{font-size:20px;margin:0}
+#biglabel{font-size:11px;font-weight:600;letter-spacing:1.5px;color:var(--text-faint);margin:14px 0 0}
+#bignum{font-size:52px;font-weight:700;letter-spacing:-1.5px;line-height:1.05;color:var(--brand-light);font-variant-numeric:tabular-nums;margin-top:2px}
+#bignum small{font-size:13px;font-weight:400;letter-spacing:0;color:var(--text-mute);margin-left:8px}
+#shopmeta{display:none}#card p{font-size:13px;color:var(--text-mute);margin:6px 0 0;line-height:1.55}
+#delta{display:inline-block;font-weight:700;font-size:12px;color:var(--brand-light);background:var(--brand-soft);border-radius:999px;padding:2px 10px;margin-right:6px}
+#delta.dn{color:#ff9d7d;background:rgba(255,157,125,.12)}
+#card .rule{height:1px;background:var(--border-strong);border-radius:1px;margin:14px 0 12px}
+#card canvas{max-width:100%;height:auto;display:block}
 #tabs{display:none}
 #tl{display:none}
+/* showcase mode (?showcase=1): canvas + rotating card only — gated, never global */
+body.showcase #brand,body.showcase .glassnav,body.showcase #nav,body.showcase #street,body.showcase #foot,body.showcase #help,body.showcase #info,body.showcase #global,body.showcase #livelearns,body.showcase #card{display:none!important}
 #help{left:50%;top:50%;transform:translate(-50%,-50%);width:440px;max-width:92vw;padding:20px 22px;
- border:1px solid #ffffff2a;border-radius:16px;background:#141b29f2;display:none;pointer-events:auto;font-size:13px}
-#help.on{display:block}#help td{padding:2px 10px 2px 0;color:#c6cede}
+ border:1px solid var(--border-strong);border-radius:var(--radius);background:#17181cf2;display:none;pointer-events:auto;font-size:13px}
+#help.on{display:block}#help td{padding:2px 10px 2px 0;color:var(--text-mute)}
 #help .tlier{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;font-size:12px}
-#help .tlier button{border:1px solid #ffffff2c;background:#ffffff10;color:inherit;border-radius:10px;
+#help .tlier button{border:1px solid var(--border-strong);background:#ffffff10;color:inherit;border-radius:10px;
  padding:6px 12px;font:inherit;font-size:12px;cursor:pointer}
-#help .tlier input{width:110px;accent-color:#7dffb0}
+#help .tlier input{width:110px;accent-color:var(--brand)}
 #help .tlier label{display:flex;gap:6px;align-items:center}
 #info{left:50%;top:50%;transform:translate(-50%,-50%);width:520px;max-width:92vw;max-height:84svh;overflow:auto;padding:20px 22px;
- border:1px solid #ffffff2a;border-radius:16px;background:#141b29f2;display:none;pointer-events:auto;font-size:13px;line-height:1.6}
+ border:1px solid var(--border-strong);border-radius:var(--radius);background:#17181cf2;display:none;pointer-events:auto;font-size:13px;line-height:1.6}
 #info.on{display:block}#info h3{margin:0 0 8px}#info table{border-collapse:collapse;margin:8px 0}
-#info th{font-weight:600;color:#8fc2ff;text-align:left;padding:1px 12px 1px 0;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
-#info td{padding:1px 12px 1px 0;color:#c6cede}#info td.n{text-align:right;color:#7dffb0}#info th.n{text-align:right}
-#info .fine{font-size:11.5px;color:#8b93a3}
-#foot{left:30px;bottom:22px;font-size:10px;letter-spacing:1.5px;color:#8b93a3;text-transform:uppercase;max-width:60vw}
+#info th{font-weight:600;color:var(--brand-light);text-align:left;padding:1px 12px 1px 0;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+#info td{padding:1px 12px 1px 0;color:var(--text-mute)}#info td.n{text-align:right;color:var(--brand-light)}#info th.n{text-align:right}
+#info .fine{font-size:11.5px;color:var(--text-faint)}
+#foot{left:30px;bottom:22px;font-size:10px;letter-spacing:1.5px;color:var(--text-faint);text-transform:uppercase;max-width:60vw}
 #street{right:30px;bottom:64px;text-align:right}
 #street .l1{font-size:19px}#street .l2{font-size:19px;margin-top:2px}
-#street button{display:block;margin:14px 0 0 auto;border:none;background:none;color:#c6cede;
+#street button{display:block;margin:14px 0 0 auto;border:none;background:none;color:var(--text-mute);
  font:inherit;font-size:13px;cursor:pointer;pointer-events:auto}
 #street button:hover{color:#fff}
-#street .credits{font-size:10px;letter-spacing:1.5px;color:#8b93a3;text-transform:uppercase;margin-top:10px}
+#street .credits{font-size:10px;letter-spacing:1.5px;color:var(--text-faint);text-transform:uppercase;margin-top:10px}
 @media(max-width:650px){.brand{font-size:26px}#brand{left:18px;right:18px;max-width:calc(100vw - 36px)}.brand small{font-size:11px}#card{max-width:calc(100vw - 32px)}#street{display:none}#foot{display:none}
  #nav{top:92px;left:16px;right:16px;justify-content:space-between;gap:8px}
  #nav button{padding:11px 16px;font-size:14px}#navCount{font-size:13px}}
@@ -90,23 +109,23 @@ body.embed canvas.webgl{touch-action:pan-y}
 </head>
 <body>
 <div id="app">
-<!-- one glass header, shared with benchmarks.html · Live first, Home = benchmarks page -->
-<div class="glassnav"><nav>
- <a href="http://127.0.0.1:8095/docs/benchmarks.html" class="active">Live</a>
- <a href="http://127.0.0.1:8095/docs/benchmarks.html#our-bench">Benchmark</a>
- <a href="http://127.0.0.1:8095/docs/benchmarks.html#their-bench">Their benchmark</a>
- <a href="http://127.0.0.1:8095/docs/benchmarks.html#headtohead">Head to head</a>
- <a href="http://127.0.0.1:8095/docs/benchmarks.html#table">Full data</a>
- <a href="http://127.0.0.1:8095/step01-evolution.html">Town</a>
+<!-- one glass header, shared with home (index.html) · Live first, Home = index page -->
+<div class="glassnav"><span class="selector" aria-hidden="true"></span><nav>
+ <a href="../index.html" class="active">Live</a>
+ <a href="../index.html#our-bench">Benchmark</a>
+ <a href="../index.html#their-bench">Their benchmark</a>
+ <a href="../index.html#headtohead">Head to head</a>
+ <a href="../index.html#table">Full data</a>
+ <a href="step01-evolution.html">Town</a>
 </nav></div>
 <div class="hud" id="brand"><span class="brand-icon"></span><span class="brand">Steroids Town<small>A KNOWLEDGE TOWN · WHAT THE SYSTEM LEARNS</small></span></div>
 <div class="hud" id="nav"><button id="prev">← Previous</button><span id="navCount">1 / 12</span><button id="next">Next →</button></div>
-<div class="hud" id="card"><div class="row1"><span id="avatar"></span><span id="latestPill">Latest</span></div><h1 id="shop">Harness</h1><p id="shopdesc"></p><canvas id="spark" width="360" height="44"></canvas><p id="shopmeta" style="color:#8fc2ff"></p></div>
+<div class="hud" id="card"><div class="row1"><span id="avatar"></span><span id="latestPill">● Live</span></div><h1 id="shop">Harness</h1><div id="biglabel">TOTAL LEARNS</div><div id="bignum">–</div><p id="shopdesc"></p><div class="rule"></div><canvas id="spark" width="432" height="120"></canvas><p id="shopmeta" style="color:var(--brand-light)"></p></div>
 <div class="hud" id="tabs"></div>
 <div class="hud" id="foot">LEARNING COUNTS: SNAPSHOT 2026-09-24 (served log 09-20…09-23) · corrections live-count · 23% long-tail skills unmapped — see card</div>
 <div class="hud" id="global" style="top:26px;left:50%;transform:translateX(-50%);text-align:center;display:none">
- <div style="font-size:34px;font-weight:700;letter-spacing:-.5px;color:#7dffb0" id="globalNum">0</div>
- <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#8b93a3" id="globalLabel">LEARNERS WORLDWIDE · LIVE</div>
+  <div style="font-size:34px;font-weight:700;letter-spacing:-.5px;color:var(--brand-light)" id="globalNum">0</div>
+  <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-faint)" id="globalLabel">LEARNERS WORLDWIDE · LIVE</div>
 </div>
 <div class="hud" id="street"><div class="l1">Different system.</div><div class="l2">A More Open Town.</div><button id="about">About this town —</button><div class="credits" id="credits">Data: served-log counts · Scene: voxel procedural, no models</div></div>
 <div class="hud" id="help"><h3 style="margin:0 0 8px">Keyboard map</h3><table>
@@ -133,7 +152,7 @@ body.embed canvas.webgl{touch-action:pan-y}
 setTimeout(function(){
   if(window.__townBooted) return;
   var d=document.createElement('div');
-  d.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#141b29;color:#f2f4fa;font:15px/1.6 sans-serif;z-index:99;text-align:center;padding:20px';
+  d.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#17181c;color:#fff;font:15px/1.6 sans-serif;z-index:99;text-align:center;padding:20px';
   d.textContent='Steroids Town could not start: the three.js CDN did not load. Check your connection and reload — your snapshot data is safe.';
   document.getElementById('app').appendChild(d);
 },15000);
@@ -153,8 +172,8 @@ import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 // learns = routed-skill rows per domain, 1670 impressions 09-20…09-23 (77% mapped, long tail unmapped).
 // corrections = 0 live (D-2 door proven, unused). daily = learns per day for the sparkline.
 const FALLBACK={date:'2026-09-24',corrections:0,domains:[
- {name:'Harness', learns:919, color:0x7dffb0, daily:[354,81,261,223]},
- {name:'Comms', learns:821, color:0x8fc2ff, daily:[135,7,217,462]},
+  {name:'Harness', learns:919, color:0xff4d1c, daily:[354,81,261,223]},
+  {name:'Comms', learns:821, color:0xfb923c, daily:[135,7,217,462]},
  {name:'Mobile', learns:425, color:0x3f6fe0, daily:[87,62,19,257]},
  {name:'Fixes', learns:359, color:0xffb07d, daily:[116,22,186,35]},
  {name:'Design', learns:286, color:0xd88ff2, daily:[134,50,40,62]},
@@ -228,8 +247,8 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;
 app.prepend(renderer.domElement);
 renderer.domElement.classList.add('webgl');
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x333b49);
-scene.fog=new THREE.FogExp2(0x454d5d,0.0028);
+scene.background=new THREE.Color(0x000000);
+scene.fog=new THREE.FogExp2(0x101114,0.0028);
 const camera=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,0.5,3000);
 camera.position.set(0,120,340); // intro start; first flyTo settles to hero
 const controls=new OrbitControls(camera,renderer.domElement);
@@ -332,8 +351,11 @@ const hemi=scene.children[0];
 // ---------- ground + road ----------
 const townG=new THREE.Group();scene.add(townG);
 const groundMat=new THREE.MeshStandardMaterial({color:0x454a51,roughness:1});
-const ground=new THREE.Mesh(new THREE.BoxGeometry(420,2,380),groundMat);
+const ground=new THREE.Mesh(new THREE.BoxGeometry(1600,2,1600),groundMat);
 ground.position.y=-1;ground.receiveShadow=true;townG.add(ground);
+// same grid across the whole city, lines running till infinity (fog melts the far end)
+const grid=new THREE.GridHelper(1600,80,0x6b7686,0x4a525f);
+grid.position.y=0.03;grid.material.transparent=true;grid.material.opacity=0.35;townG.add(grid);
 const roadMat=new THREE.MeshStandardMaterial({color:0x33373d,roughness:0.9});
 const road=new THREE.Mesh(new THREE.BoxGeometry(170,0.2,14),roadMat);
 road.position.y=0.12;road.receiveShadow=true;townG.add(road);
@@ -367,9 +389,9 @@ atlasC.width=ATLAS_COLS*ATLAS_RW;atlasC.height=3*ATLAS_RH;
 {const c=atlasC.getContext('2d');
  SNAPSHOT.domains.forEach((d,i)=>{
   const ox=(i%ATLAS_COLS)*ATLAS_RW,oy=((i/ATLAS_COLS)|0)*ATLAS_RH;
-  c.fillStyle='#14181f';c.fillRect(ox,oy,ATLAS_RW,ATLAS_RH);
+  c.fillStyle='#17181c';c.fillRect(ox,oy,ATLAS_RW,ATLAS_RH);
   c.fillStyle='#'+d.color.toString(16).padStart(6,'0');c.fillRect(ox,oy+ATLAS_RH-10,ATLAS_RW,10);
-  c.fillStyle='#f2f4fa';c.font='700 34px "DM Sans",Arial,sans-serif';
+   c.fillStyle='#fff';c.font='700 34px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
   c.textAlign='center';c.textBaseline='middle';
   c.fillText(d.name.toUpperCase(),ox+ATLAS_RW/2,oy+ATLAS_RH/2-4);});}
 const atlasTex=new THREE.CanvasTexture(atlasC);
@@ -465,9 +487,9 @@ function buildHeroPage(page){
   const d=SNAPSHOT.domains[page*HERO_N+s];
   const x=HERO_P[s][0],z=HERO_P[s][1];
   const hv=(typeof d.depth==='number'?d.depth:d.learns)+(d.live||0);
-  // flat-top floor stack: discrete floors from real learns + live learns, 1 lit window row per floor
-  const floors=Math.max(1,Math.round(hv/FLOOR_UNIT));
-  const h=floors*FLOOR_H;
+   // flat-top floor stack: all 4 heroes stay 1-floor landmarks; backs carry the height
+   const floors=1;
+   const h=floors*FLOOR_H;
   const hex=d.color;
   const front=z<0?1:-1,fry=z<0?0:Math.PI;
   // main block + roof cap — ground floor split open (piers + header), lobby inside
@@ -530,31 +552,7 @@ function buildHeroPage(page){
    const tip=new THREE.Mesh(new THREE.BoxGeometry(0.42,0.42,0.42),
     new THREE.MeshBasicMaterial({color:hex}));
    tip.position.set(x+3.5,h+0.7+2.2+0.3,z);townG.add(tip);
-   fixtures.push({m:tip,mat:tip.material,beacon:true,shop});
-   // landmark portal (with-vs-without test 2026-09-25: skill-guided build won
-   // over emissive-only — a scene needs real lights): Harness doorway gets an
-   // emissive surround (pulses live) + warm PointLight spilling onto the queue.
-   if(d.name==='Harness'){const pz=z+front*4.1;
-    for(const px of [x-2.0,x+2.0]){
-     const bar=new THREE.Mesh(new THREE.BoxGeometry(0.18,3.0,0.18),
-      new THREE.MeshBasicMaterial({color:hex}));
-     bar.position.set(px,1.5,pz);townG.add(bar);
-     fixtures.push({m:bar,mat:bar.material,beacon:true,shop});}
-    const lin=new THREE.Mesh(new THREE.BoxGeometry(4.2,0.18,0.18),
-     new THREE.MeshBasicMaterial({color:hex}));
-    lin.position.set(x,3.0,pz);townG.add(lin);
-    fixtures.push({m:lin,mat:lin.material,beacon:true,shop});
-    const glow=new THREE.PointLight(0xffd9a6,40,25,2);
-    glow.position.set(x,2.0,z+front*5.5);townG.add(glow);}
-   // ponytail: landmark cap — Harness is the #1 tower; a glowing roof slab
-   // in domain color so it reads from the wide intro frame. Unlit basic
-   // material = glow day and night. STATIC: the pulsing beacon tween made
-   // the whole roof visibly breathe (scale 1+0.3·sin+live bonus) — glow
-   // belongs to the beacon tip and doorway, the building must hold still.
-   if(d.name==='Harness'){
-    const cap=new THREE.Mesh(new THREE.BoxGeometry(10.4,0.45,8.4),
-     new THREE.MeshBasicMaterial({color:hex}));
-    cap.position.set(x,h+0.62,z);townG.add(cap);}
+    fixtures.push({m:tip,mat:tip.material,beacon:true,shop});
    const cv=document.createElement('canvas');cv.width=256;cv.height=96;
    const tex=new THREE.CanvasTexture(cv);tex.colorSpace=THREE.SRGBColorSpace;
    drawBoard(cv,d);
@@ -578,28 +576,127 @@ function updateHeroMeshes(){
  townG.add(winMesh);
  signMesh=new THREE.Mesh(mergeGeometries(signGeos),signMat);
  townG.add(signMesh);
- if(glassGeos.length){glassMesh=new THREE.Mesh(mergeGeometries(glassGeos),glassMat);
-  glassMesh.renderOrder=5;townG.add(glassMesh);}
+  if(glassGeos.length){glassMesh=new THREE.Mesh(mergeGeometries(glassGeos),glassMat);
+   glassMesh.renderOrder=5;townG.add(glassMesh);}
 }
-// ---------- blurred backdrop town: dark silhouette blocks, DOF + fog do the blur ----------
+// ---------- floating card-board: a duplicated rooftop sign, floating, no DOM ----------
+// Same construction as the per-hero live boards (canvas texture on a plane),
+// carrying the card's glass + info. It IS a board, so it behaves exactly like
+// the boards on the buildings — zero card animation to destroy.
+const floatCv=document.createElement('canvas');floatCv.width=640;floatCv.height=280;
+const floatTex=new THREE.CanvasTexture(floatCv);floatTex.colorSpace=THREE.SRGBColorSpace;floatTex.anisotropy=4;
+const floatMesh=new THREE.Mesh(new THREE.PlaneGeometry(5.0,2.19),
+  new THREE.MeshBasicMaterial({map:floatTex,transparent:true}));
+floatMesh.renderOrder=4;townG.add(floatMesh);
+function drawFloat(){
+  // town scoreboard: worldwide totals no single shop board can show
+  const total=LEARN_BASE+sessionLearns+((GLOBAL&&GLOBAL.totals)?((GLOBAL.totals.serves||0)+(GLOBAL.totals.accepts||0)):0);
+  const live=!!(GLOBAL&&GLOBAL.totals);
+  const shared=GLOBAL?(GLOBAL.shared_rules||[]).length:SNAPSHOT.domains.reduce((a,d)=>a+(d.shared||0),0);
+  const c=floatCv.getContext('2d'),W=floatCv.width,H=floatCv.height;
+  c.clearRect(0,0,W,H);
+  // dense frost: solid enough to read on, feathered edge, never cut
+  c.save();c.shadowColor='rgba(0,0,0,.9)';c.shadowBlur=34;
+  c.fillStyle='rgba(23,24,28,.88)';
+  if(c.roundRect){c.beginPath();c.roundRect(0,0,W,H,40);c.fill();}
+  else c.fillRect(0,0,W,H);
+  c.restore();
+  c.strokeStyle='rgba(255,255,255,.15)';c.lineWidth=1.5;
+  c.beginPath();c.moveTo(44,3);c.lineTo(W-44,3);c.stroke();
+  // left: source eyebrow + worldwide total + session line
+  c.textAlign='left';
+   c.font='600 24px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
+  const lab=live?'LIVE WORLDWIDE':'LOCAL SNAPSHOT';
+  const lw=c.measureText(lab).width;
+  c.fillStyle=live?'#34d399':'rgba(255,255,255,.45)';c.beginPath();c.arc(52,64,9,0,7);c.fill();
+   c.fillStyle=live?'rgba(251,146,60,.85)':'rgba(255,255,255,.65)';
+   c.fillText(lab,72,72);
+   c.fillStyle='#fff';c.font='300 88px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
+  c.fillText(total.toLocaleString('en-US'),44,178);
+  const lt=sessionLearns+' this session · '+shared+' shared rules';
+  c.fillStyle='#34d399';c.beginPath();c.arc(52,208,7,0,7);c.fill();
+   c.fillStyle='rgba(255,255,255,.75)';c.font='400 25px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
+  c.fillText(lt,70,217);
+  // right: town totals per day
+  const days=[0,1,2,3].map(i=>SNAPSHOT.domains.reduce((a,d)=>a+((d.daily&&d.daily[i])||0),0));
+  const mx=Math.max(...days,1),n=days.length;
+  const zx=400,zw=W-44-zx,slot=zw/n,bw=Math.min(slot-14,34);
+  days.forEach((v,i)=>{const h=Math.max(6,(v/mx)*110),x=zx+i*slot+(slot-bw)/2,y=H-36-h;
+   const g=c.createLinearGradient(0,y+h,0,y);
+   g.addColorStop(0,'rgba(255,74,26,.8)');g.addColorStop(1,'rgba(255,176,138,.8)');
+   c.fillStyle=g;
+   if(c.roundRect){c.beginPath();c.roundRect(x,y,bw,h,bw/2);c.fill();}
+   else c.fillRect(x,y,bw,h);
+    c.fillStyle='rgba(255,255,255,.45)';c.font='400 19px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';c.textAlign='center';
+   c.fillText(String(v),x+bw/2,y-8);});
+  floatTex.needsUpdate=true;}
+function placeFloat(){const S=shops[sel];if(!S)return;
+  floatMesh.position.set(S.x,S.h+5.0,S.z);
+  floatMesh.rotation.y=S.front>0?0:Math.PI;}
+// ---------- backdrop town: SAME buildings as heroes, one look, scattered ----------
+// Same construction as the 4 heroes (piers + block + fascia + awning + window
+// grid + rims). All backs share one height (h=18, 6 floors) and one color so
+// they read as a single rival district; occupancy is scattered by a SEEDED
+// prng (same town every load). Only Harness heroes stay 1 floor.
+// ponytail: seeded scatter, one shared mesh each.
 {
- const bg=[],bgw=[];
- const rnd=(a,b)=>a+Math.random()*(b-a);
- for(let i=0;i<40;i++){
-  const side=i%2?1:-1;
-  const x=rnd(-150,150),z=side>0?rnd(48,130):rnd(-130,-48);
-  const w=rnd(8,18),h=rnd(8,34),dp=rnd(9,14);
-  boxAt(bg,VOX,0x232b3a,x,h/2,z,w,h,dp);
-  if(Math.random()<0.6){const wy=rnd(3,Math.max(4,h-2));
-   boxAt(bgw,VOX,0x3a4356,x,wy,z-(dp/2+0.1),w*0.7,1.2,0.15);
-   boxAt(bgw,VOX,0x3a4356,x,wy,z+(dp/2+0.1),w*0.7,1.2,0.15);}
- }
- const bgMesh=new THREE.Mesh(mergeGeometries(bg),
-  new THREE.MeshStandardMaterial({vertexColors:true,roughness:1}));
- townG.add(bgMesh);
- if(bgw.length){const bgwMesh=new THREE.Mesh(mergeGeometries(bgw),
-  new THREE.MeshBasicMaterial({vertexColors:true}));
-  townG.add(bgwMesh);}
+  const bg=[],bgw=[],bgRoad=[],bgDash=[];
+  const cols=[-85,-51,-17,17,51,85],rows=[-120,-86,-52,52,86,120];
+  let seed=7;const rnd=()=>{seed=(seed*1664525+1013904223)>>>0;return seed/4294967296;};
+  const hex=0x2e3a4f,w=14,dp=12;
+  const fr=rnd(),floors=fr<0.35?2:fr<0.6?3:fr<0.75?4:fr<0.88?5:fr<0.96?6:8; // mostly low
+  const h=floors*3;
+  for(const z of rows)for(const x of cols){
+    // keep the perimeter loop + central cross clear: skip cells touching them
+    if(Math.abs(Math.abs(x)-70)<10&&Math.abs(Math.abs(z)-34)<6)continue;
+    if(Math.abs(x)<8||Math.abs(z)<8)continue;
+    if(rnd()<0.3)continue; // scattered gaps, stable per seed
+    const front=z<0?1:-1;
+    // ground floor split open (piers + header) + colored block above, hero-style
+    boxAt(bg,VOX,0x2b3138,x-w/2+1.65,0.5,z,3.3,1,dp+0.6);
+    boxAt(bg,VOX,0x2b3138,x+w/2-1.65,0.5,z,3.3,1,dp+0.6);
+    boxAt(bg,VOX,hex,x,h/2,z,w,h,dp);
+    boxAt(bg,VOX,0x14181f,x,3.2,z+front*(dp/2),w-2.6,1.5,0.15); // fascia
+    for(let q=0;q<8;q++) // striped awning
+      boxAt(bg,VOX,q%2?0xf3eee8:hex,x-w/2+1+q*(w-2)/8,4.4,z+front*(dp/2+0.9),(w-2)/8,0.18,2.2);
+    boxAt(bg,VOX,0xd8d3c8,x,0.12,z+front*(dp/2+0.9),2.6,0.24,1.8); // entry step
+    const oh=0.2+rnd()*0.6,ph=0.25+rnd()*0.5; // random flat-roof sizing per block
+    boxAt(bg,VOX,hex,x,h+0.1,z,w+oh,0.5,dp+oh); // cornice rim
+    boxAt(bg,VOX,hex,x,h+0.3+ph/2,z,w+oh*0.6,ph,dp+oh*0.6); // parapet rim
+    boxAt(bg,VOX,0x1a2029,x,h+0.15,z,w+oh*0.6,0.3,dp+oh*0.6); // cap slab
+    if(rnd()<0.4)boxAt(bg,VOX,hex,x-w/4+rnd()*w/2,h+0.8+rnd()*0.6,z-dp/4+rnd()*dp/2,2+rnd()*2,1.6+rnd(),2+rnd()*2); // bulkhead
+    if(rnd()<0.3){boxAt(bg,VOX,0x2b3138,x+w/4,h+1.6,z,0.14,2.4,0.14); // pole
+      boxAt(bgw,VOX,0xffd9a6,x+w/4,h+2.9,z,0.42,0.42,0.42);}
+    for(let r2=0;r2<floors;r2++)for(let c2=0;c2<5;c2++){ // voxel window grid, a row a floor
+      const wx=x-w/2+1.6+c2*((w-3.2)/4),wy=2.0+r2*3.0;
+      if(wy>h-0.8)continue;
+      boxAt(bg,VOX,0xf3eee8,wx,wy,z+dp/2-0.03,1.7,1.9,0.1);
+      boxAt(bg,VOX,0xf3eee8,wx,wy,z-dp/2+0.03,1.7,1.9,0.1);
+      boxAt(bgw,VOX,(c2+r2)%3?0xffd9a6:0x9fc4d8,wx,wy,z+dp/2+0.05,1.4,1.6,0.15);
+      boxAt(bgw,VOX,0xffd9a6,wx,wy,z-dp/2-0.05,1.4,1.6,0.15);}
+  }
+  // back streets run BETWEEN blocks (never through them): building cols span ±7
+  // around [-85,-51,-17,17,51,85], so avenues sit in the gaps at x=±34,±62;
+  // rows span ±6 around [52,86,120], so streets sit at z=±41,±69,±103.
+  // All colinear with the hero grid, same 4-wide asphalt + dashes.
+  for(const bz of [-103,-69,-41,41,69,103]){boxAt(bgRoad,VOX,0x33373d,0,0.12,bz,180,0.2,4);
+    for(let dx=-88;dx<=88;dx+=6)boxAt(bgDash,VOX,0xd8d3c8,dx,0.24,bz,2.2,0.06,0.5);}
+  // full-length avenues at x=±34,±62 (clear of the 4 heroes) join the loop +
+  // central cross at grade — intersections only, no building crossings.
+  for(const bx of [-62,-34,34,62]){boxAt(bgRoad,VOX,0x33373d,bx,0.12,0,4,0.2,244);
+    for(let dz=-120;dz<=120;dz+=6)boxAt(bgDash,VOX,0xd8d3c8,bx,0.24,dz,0.5,0.06,2.2);}
+  const bgMesh=new THREE.Mesh(mergeGeometries(bg),
+   new THREE.MeshStandardMaterial({vertexColors:true,roughness:1}));
+  townG.add(bgMesh);
+  if(bgw.length){const bgwMesh=new THREE.Mesh(mergeGeometries(bgw),
+   new THREE.MeshBasicMaterial({vertexColors:true}));
+   townG.add(bgwMesh);}
+  const bgRoadMesh=new THREE.Mesh(mergeGeometries(bgRoad),
+   new THREE.MeshStandardMaterial({vertexColors:true,roughness:0.9}));
+  bgRoadMesh.receiveShadow=true;townG.add(bgRoadMesh);
+  if(bgDash.length){const bgDashMesh=new THREE.Mesh(mergeGeometries(bgDash),
+   new THREE.MeshBasicMaterial({vertexColors:true}));
+   townG.add(bgDashMesh);}
 }
 
 // ---------- street lights: dedicated static mesh (hero rebuilds must not wipe them) ----------
@@ -886,7 +983,7 @@ const sstep=(d,a,b)=>{const t=Math.min(1,Math.max(0,(d-a)/(b-a)));return t*t*(3-
 const loopV=(s,base)=>base*(0.45+0.55*sstep(loopPose(s).dEnd,1.5,8));
 // ---------- loop-road visuals: grid perimeter, sharp corners, free flow ----------
 const cars=[];
-const carCols=[0x3f6fe0,0xd84a4a,0x7dffb0,0xffd24a];
+const carCols=[0x3f6fe0,0xd84a4a,0xff4d1c,0xffd24a];
 const wheelMat=new THREE.MeshStandardMaterial({color:0x1a1d22,roughness:0.9});
 const headLampMat=new THREE.MeshBasicMaterial({color:0xfff6dd});
 const lampG=new THREE.BoxGeometry(0.14,0.16,0.3);
@@ -910,7 +1007,8 @@ for(let i=0;i<10;i++){const g=new THREE.Group();
  townG.add(g);
   cars.push({g,tailMat,dir,s:s0,base:7+Math.random()*5,hist:[],held:false,wheels:wh,line:0});}
 // through-traffic between heroes: straight runs on the central road + cross streets
-for(const ld of [{line:'x',lz:-1.8,dir:1},{line:'x',lz:1.8,dir:-1},{line:'x',lz:-1.8,dir:1},{line:'z',lx:-48,dir:1},{line:'z',lx:48,dir:-1},{line:'z',lx:-2,dir:1},{line:'z',lx:2,dir:-1}]){
+// + back-grid runs: same cars, same rules, on the aligned back streets (lz/lx match bgRoad)
+for(const ld of [{line:'x',lz:-1.8,dir:1},{line:'x',lz:1.8,dir:-1},{line:'x',lz:-1.8,dir:1},{line:'z',lx:-48,dir:1},{line:'z',lx:48,dir:-1},{line:'z',lx:-2,dir:1},{line:'z',lx:2,dir:-1},{line:'x',lz:-69,dir:1},{line:'x',lz:69,dir:-1},{line:'x',lz:-103,dir:-1},{line:'x',lz:103,dir:1},{line:'z',lx:-34,dir:1,sz:122},{line:'z',lx:34,dir:-1,sz:122}]){
  const g=new THREE.Group();
  const mat=new THREE.MeshStandardMaterial({color:carCols[(Math.random()*4)|0],roughness:0.5,metalness:0.4});
  const b=new THREE.Mesh(new THREE.BoxGeometry(3.6,0.7,1.7),mat);
@@ -927,7 +1025,7 @@ for(const ld of [{line:'x',lz:-1.8,dir:1},{line:'x',lz:1.8,dir:-1},{line:'x',lz:
  for(const lz of [-0.55,0.55]){
   const tl=new THREE.Mesh(lampG,tailMat2);tl.position.set(-1.85,0.75,lz);g.add(tl);}
  townG.add(g);
- cars.push({g,tailMat:tailMat2,dir:ld.dir,s:Math.random()*160-80,base:6+Math.random()*4,hist:[],held:false,wheels:wh2,line:ld.line,lz:ld.lz||0,lx:ld.lx||0});}
+  cars.push({g,tailMat:tailMat2,dir:ld.dir,s:Math.random()*160-80,base:6+Math.random()*4,hist:[],held:false,wheels:wh2,line:ld.line,lz:ld.lz||0,lx:ld.lx||0,sx:ld.sx||0,sz:ld.sz||0});}
 // ribbon trails: 4 lamp ribbons per car (2 head white + 2 tail red, brake-boosted), own code
 const TRAIL_S=20,LAMPS=[{lx:1.85,lz:-0.55,head:true},{lx:1.85,lz:0.55,head:true},
  {lx:-1.85,lz:-0.55,head:false},{lx:-1.85,lz:0.55,head:false}];
@@ -996,8 +1094,8 @@ function updateTraffic(dt,night){
    c.pv=v;
    c.s+=c.dir*v*dt*(1+SPEEDS[speedIdx]*0.15);
    let px,pz,yaw;
-   if(c.line==='x'){if(c.s>85)c.s=-85;if(c.s<-85)c.s=85;px=c.s;pz=c.lz;yaw=c.dir>0?0:Math.PI;}
-   else if(c.line==='z'){if(c.s>40)c.s=-40;if(c.s<-40)c.s=40;px=c.lx;pz=c.s;yaw=c.dir>0?-Math.PI/2:Math.PI/2;}
+    if(c.line==='x'){const SX=c.sx||85;if(c.s>SX)c.s=-SX;if(c.s<-SX)c.s=SX;px=c.s;pz=c.lz;yaw=c.dir>0?0:Math.PI;}
+    else if(c.line==='z'){const SZ=c.sz||40;if(c.s>SZ)c.s=-SZ;if(c.s<-SZ)c.s=SZ;px=c.lx;pz=c.s;yaw=c.dir>0?-Math.PI/2:Math.PI/2;}
    else{const p=loopPose(c.s);yaw=p.h+(c.dir<0?Math.PI:0);
     const fx=Math.cos(yaw),fz2=-Math.sin(yaw);px=p.x+(-fz2)*1.8;pz=p.z+fx*1.8;}
    c.g.position.set(px,0.2,pz);c.g.rotation.y=yaw;
@@ -1026,18 +1124,20 @@ function updateTraffic(dt,night){
 let sessionLearns=0;
 const liveEl=document.createElement('div');
 liveEl.className='hud';liveEl.id='livelearns';
-liveEl.style.cssText='right:30px;top:96px;text-align:right;font-size:15px;color:#7dffb0';
+liveEl.style.cssText='right:30px;top:96px;text-align:right;font-size:15px;color:var(--brand-light)';
 app.appendChild(liveEl);
 const LEARN_BASE=SNAPSHOT.domains.reduce((a,d)=>a+d.learns,0);
 function fmtLive(){return 'LIVE LEARNS '+sessionLearns.toLocaleString()+' · TOTAL '+(LEARN_BASE+sessionLearns).toLocaleString();}
 function drawBoard(cv,d){
  const c=cv.getContext('2d');
- c.fillStyle='#141b29';c.fillRect(0,0,256,96);
- c.fillStyle='#'+d.color.toString(16).padStart(6,'0');c.fillRect(0,0,256,10);
- c.fillStyle='#f2f4fa';c.font='700 30px "DM Sans",Arial,sans-serif';c.textAlign='center';
- c.fillText(d.name.toUpperCase().slice(0,12),128,46);
- c.fillStyle='#7dffb0';c.font='700 26px "DM Sans",Arial,sans-serif';
- c.fillText('LIVE '+(d.live||0),128,80);}
+  c.fillStyle='#17181c';c.fillRect(0,0,256,96);
+  c.fillStyle='#'+d.color.toString(16).padStart(6,'0');c.fillRect(0,0,256,10);
+    c.fillStyle='#fff';c.font='700 28px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';c.textAlign='center';
+   c.fillText(d.name.toUpperCase().slice(0,12),128,38);
+   c.fillStyle='#fb923c';c.font='700 30px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
+   c.fillText(d.learns.toLocaleString('en-US'),128,70);
+   c.fillStyle='rgba(255,255,255,.45)';c.font='400 19px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
+  c.fillText('LIVE '+(d.live||0),128,92);}
 let boardLive=-1;
 function syncLive(){liveEl.textContent=fmtLive();syncCard();
  if(sessionLearns!==boardLive){boardLive=sessionLearns;
@@ -1049,7 +1149,7 @@ function syncLive(){liveEl.textContent=fmtLive();syncCard();
 let sel=0,hour=21,shutter=1,speedIdx=3,playing=!reduceMotion,macro=true;
 const SPEEDS=[2,16,48,96];
 const navCount=document.getElementById('navCount'),avatarEl=document.getElementById('avatar'),
- shopEl=document.getElementById('shop'),descEl=document.getElementById('shopdesc'),
+  shopEl=document.getElementById('shop'),bignumEl=document.getElementById('bignum'),descEl=document.getElementById('shopdesc'),
   metaEl=document.getElementById('shopmeta'),spark=document.getElementById('spark'),
   cardEl=document.getElementById('card'),
  hourEl=document.getElementById('hour'),shutEl=document.getElementById('shutter'),
@@ -1057,60 +1157,43 @@ const navCount=document.getElementById('navCount'),avatarEl=document.getElementB
    pauseBtn=document.getElementById('pause');
 speedEl.value=3;shutEl.value=1; // defaults: max speed, full shutter, all adjustable
 if(reduceMotion){playing=false;pauseBtn.textContent='Play';}
-// ---------- floating card: anchored above the selected building ----------
-// ponytail: the HUD follows the 3D selection — the roof anchor is projected to
-// screen space every frame, so the card rides the camera angle while it orbits
-// (macro rotation, user drag). During a flight to/between buildings the card
-// disappears — it fades back in the moment the camera settles on the target.
+// ---------- floating card is 3D now: the DOM #card is hidden, sync/paint below ----------
+// feed the floating board (count-up ticks live on the board itself)
 let cardW=480,cardH=180;
 function measureCard(){cardW=cardEl.offsetWidth;cardH=cardEl.offsetHeight;}
-const cardAnchor=new THREE.Vector3();
-function placeCard(){
- const S=shops[sel];
- if(!S||camAnim){cardEl.style.opacity='0';return;} // in transit between buildings: hidden
- cardAnchor.set(S.x,S.h+2.6,S.z).project(camera);
- if(cardAnchor.z>1||!isFinite(cardAnchor.x)){cardEl.style.opacity='0';return;} // behind camera
- cardEl.style.opacity='';
- const sx=(cardAnchor.x*0.5+0.5)*innerWidth,sy=(-cardAnchor.y*0.5+0.5)*innerHeight;
- const M=12,TOP=96; // margins; TOP keeps the card clear of the brand/nav strip
- let x,y;
- if(sy-cardH-M>=TOP){ // headroom: float on top of the building
-  x=sx-cardW/2;y=sy-cardH-M;cardEl.classList.remove('side');
- }else{ // no headroom: float beside the building, never covering it
-  cardEl.classList.add('side');
-  y=Math.max(TOP,Math.min(sy-cardH/2,innerHeight-cardH-M));
-  x=(sx<=innerWidth/2)?sx+M:sx-cardW-M; // building on the left half → card to its right
- }
- x=Math.max(M,Math.min(x,innerWidth-cardW-M));
- cardEl.style.transform=`translate(${x|0}px,${y|0}px)`;
-}
-function sparkline(){const c=spark.getContext('2d'),W=spark.width,H=spark.height;
- c.clearRect(0,0,W,H);const d=SNAPSHOT.domains[infoIdx].daily,mx=Math.max(...d,1);
- // bar chart (not a line): one column per day, domain color, gap between bars
- const n=d.length,gap=Math.min(8,W*0.04),bw=(W-16-gap*(n-1))/n;
- const col='#'+SNAPSHOT.domains[infoIdx].color.toString(16).padStart(6,'0');
- d.forEach((v,i)=>{const h=Math.max(2,(v/mx)*(H-12)),x=8+i*(bw+gap),y=H-6-h;
-  c.fillStyle=col;c.globalAlpha=0.85;c.fillRect(x,y,bw,h);
-  c.globalAlpha=1;c.fillStyle='#f2f4fa';c.fillRect(x,y-1,bw,2); // light cap on top
-  c.fillStyle='rgba(255,255,255,.55)';
-  c.font='9px DM Sans,Arial';c.textAlign='center';c.fillText(String(v),x+bw/2,y-4);});}
+let sparkAnim=0;
+function drawTotal(v,live){bignumEl.innerHTML=v.toLocaleString()+'<small>learns · '+live+' live here</small>';
+  drawFloat();}
+let shownTotal=null,numAnim=0;
+function paintTotal(live){ // best-cards count-up: hero numeral eases to the total
+  const target=LEARN_BASE+sessionLearns;
+  cancelAnimationFrame(numAnim);
+  if(reduceMotion){shownTotal=target;drawTotal(target,live);return;}
+  if(shownTotal===null)shownTotal=0;
+  if(shownTotal===target){drawTotal(target,live);return;}
+  const from=shownTotal,t0=performance.now();
+  const step=(t)=>{const p=Math.min(1,(t-t0)/650);
+   shownTotal=Math.round(from+(target-from)*(1-Math.pow(1-p,3)));
+   drawTotal(shownTotal,live);
+   if(p<1)numAnim=requestAnimationFrame(step);};
+  numAnim=requestAnimationFrame(step);}
 function growth(d){const a=d.daily,d4=a[a.length-1],d3=a[a.length-2];
  if(!d3)return 'n/a';const g=(d4-d3)/d3*100;return (g>=0?'+':'')+g.toFixed(0)+'%';}
 function syncCard(){const d=SNAPSHOT.domains[infoIdx];
   navCount.textContent=(infoIdx+1)+' / '+SNAPSHOT.domains.length+' · '+showWindow();
  avatarEl.style.background='#'+d.color.toString(16).padStart(6,'0');
- shopEl.textContent=(infoIdx+1)+'. '+d.name;
-  descEl.textContent=d.learns.toLocaleString()+' learns served · snapshot '+SNAPSHOT.date+'. '+
-   (typeof d.depth==='number'?'Depth '+d.depth+' sizes this tower and its crowd. ':
-   'Flat-top floor stack, 1 floor ~ '+FLOOR_UNIT+' learns · 1 walker ~ '+WALKER_UNIT+' learns; long-tail skills unmapped.');
+  shopEl.textContent=d.name;
+  paintTotal(d.live||0);
+  const gr=growth(d);
+  descEl.innerHTML=gr==='n/a'?('snapshot '+SNAPSHOT.date+'. Daily on the rail.')
+   :('<span id="delta" class="'+(gr[0]==='-'?'dn':'')+'">'+(gr[0]==='-'?'▼ ':'▲ ')+gr+'</span> today · snapshot '+SNAPSHOT.date+'.');
   document.getElementById('foot').textContent=
    'SHOWCASE '+showWindow()+': '+SNAPSHOT.date+' (served log 09-20…09-23) · corrections live-count · flat tops grow floors with learns';  metaEl.textContent='corrections '+(d.corrections===null||d.corrections===undefined?'—':d.corrections)+' · shared rules '+(d.shared===null||d.shared===undefined?'—':d.shared)+' · depth '+(d.depth===null||d.depth===undefined?'—':d.depth)+' · floors '+shops[sel].floors+' (~'+FLOOR_UNIT+'/floor) · learns live '+(d.live||0)+' · day growth '+growth(d)+' · daily on the rail';
  liveEl.textContent=fmtLive();
  document.getElementById('credits').textContent=SOURCE==='fallback'
   ?'Data: served-log counts · 4 heroes carry 12 infos · Scene: voxel procedural, no models'
   :'Data: live served-log · '+SNAPSHOT.date+' · 4 heroes carry 12 infos · Scene: voxel procedural, no models';
- measureCard();placeCard();
- sparkline();
+  drawFloat();placeFloat();
  [...document.querySelectorAll('#tabs button')].forEach((b,i)=>b.classList.toggle('on',i===sel));}
 const tabsEl=document.getElementById('tabs');
 SNAPSHOT.domains.forEach((d,i)=>{const b=document.createElement('button');
@@ -1125,16 +1208,12 @@ let infoIdx=0;
 function showIds(){return [0,1,2,3].map(k=>heroPage*4+k);}
 function showWindow(){const a=heroPage*4+1;return a+'–'+(a+3)+' of '+SNAPSHOT.domains.length;}
 function select(i,user){const ni=(i+SNAPSHOT.domains.length)%SNAPSHOT.domains.length;
- cardEl.classList.add('out');
  setTimeout(()=>{
   infoIdx=ni;
   const pg=(infoIdx/4)|0;
   if(pg!==heroPage){buildHeroPage(pg);remapCrowd();}
-  sel=infoIdx%4;syncCard();
-  flyTo(frameShop(shops[sel]),shops[sel].focus.clone(),user?1.4:1.8);
-  // reveal is owned by placeCard: the card stays hidden through the flight and
-  // fades in only when the camera settles on the building.
-  cardEl.classList.remove('out');
+   sel=infoIdx%4;syncCard();
+   flyTo(frameShop(shops[sel]),shops[sel].focus.clone(),user?1.4:1.8);
  },user?110:170);}
 function nextInShow(){select(infoIdx+1);}
 document.getElementById('prev').onclick=()=>{tourTimer=0;select(sel-1,true);};
@@ -1145,8 +1224,9 @@ let growT=0; // live floor growth check runs every 2s wall-clock
 const TOUR_RESUME=25; // user click pauses the tour; resumes after 25s idle
 // live growth: a hero gains a floor when its snapshot learns + live learns cross the next unit
 function growCheck(){
- for(const s of shops){const d=s.d;
-  const need=Math.max(1,Math.round(((typeof d.depth==='number'?d.depth:d.learns)+(d.live||0))/FLOOR_UNIT));
+  for(const s of shops){const d=s.d;
+   if(d.name==='Harness')continue; // ours stays flat by design
+   const need=Math.max(1,Math.round(((typeof d.depth==='number'?d.depth:d.learns)+(d.live||0))/FLOOR_UNIT));
   if(need>s.floors){
    buildHeroPage(heroPage);
    for(const w of walkSeed){const ns=shops[w.slot]||shops[0];
@@ -1189,7 +1269,7 @@ if(GLOBAL){
  const sr=(GLOBAL.shared_rules||[]).length;
  if(sr>0){let c=document.getElementById('sharedRules');
   if(!c){c=document.createElement('span');c.id='sharedRules';
-   c.style.cssText='display:block;font-size:12px;color:#8fc2ff;margin-top:2px';
+    c.style.cssText='display:block;font-size:12px;color:var(--brand-light);margin-top:2px';
    wrap.appendChild(c);}
   c.textContent=sr+' SHARED RULE'+(sr===1?'':'S')+' LEARNED WORLDWIDE';}
  const target=(GLOBAL.totals.serves||0)+(GLOBAL.totals.accepts||0);
@@ -1221,7 +1301,7 @@ addEventListener('keydown',e=>{
 
 // ---------- day/night + loop ----------
 const clock=new THREE.Clock();
-const dayBg=new THREE.Color(0x3d4552),nightBg=new THREE.Color(0x333b49);
+const dayBg=new THREE.Color(0x17181c),nightBg=new THREE.Color(0x000000);
 const tmpC=new THREE.Color(),tgt=new THREE.Vector3();
 const tmpV=new THREE.Vector3(),macroOff=new THREE.Vector3(16,9,24);
 let clockMin=21*60;
@@ -1234,7 +1314,7 @@ const DAY=[
  [8.5,'#8aa3c2','#9eafc3','#c6d6ef','#7a6c5c',1.05,'#ffe6c8',2.1,1.02,0,.3,1.4],
  [13,'#9bb4d2','#afbfd2','#d2e2ff','#857563',1.15,'#fff4e4',2.4,1,0,.28,1.45],
  [17,'#8b98b2','#a39fa8','#cdc6d4','#7b6a58',1,'#ffc890',2,1.04,.12,.35,1.3],
- [19,'#333b49','#454d5d','#a3b6da','#564840',.82,'#ffd2a6',1.25,1.12,1,.55,.95],
+ [19,'#000000','#101114','#a3b6da','#564840',.82,'#ffd2a6',1.25,1.12,1,.55,.95],
  [20.5,'#1d2435','#2a3144','#7486b6','#3c3538',.64,'#b4c2ff',.55,1.16,1,.6,.95],
  [22,'#0f1422','#171d2c','#4c5b84','#2a262e',.52,'#94aaff',.34,1.2,1,.62,.95],
  [24,'#0c111d','#141a28','#46557e','#28242c',.5,'#8ea6ff',.32,1.22,1,.62,.95]
@@ -1279,12 +1359,12 @@ function animate(){window.__townBooted=true;requestAnimationFrame(animate);
  applyHour();
  applyHour();
  stepFlight(dt);
- if(!camAnim){tgt.copy(shops[sel].focus);controls.target.lerp(tgt,Math.min(1,dt*2));}
+  if(!camAnim){tgt.copy(shops[sel].focus);if(EMBED)tgt.y-=3.5;controls.target.lerp(tgt,Math.min(1,dt*2));}
   macroT+=dt; // wall-clock: macro keeps a slow front-side orbit even when paused
   if(macro&&!camAnim){ // honest macro: slow orbit of the selected shop, face side only
    const S=shops[sel],base=S.front>0?0:Math.PI;
    const a=base+Math.sin(macroT*0.09)*0.6;
-   tmpV.copy(S.focus);tmpV.x+=Math.sin(a)*30;tmpV.z+=Math.cos(a)*30;tmpV.y=S.focus.y+13;
+    tmpV.copy(S.focus);tmpV.x+=Math.sin(a)*30;tmpV.z+=Math.cos(a)*30;tmpV.y=S.focus.y+10;
    camera.position.lerp(tmpV,Math.min(1,dt*1.6));}
  controls.update();
  // Jim st-24 rig: DOF focus tracks selection (macro only), manual shadows, skip settled frames
@@ -1293,8 +1373,8 @@ function animate(){window.__townBooted=true;requestAnimationFrame(animate);
   dof.u.focus.value+=(fd-dof.u.focus.value)*Math.min(1,dt*3);}
  const hourKey=hour.toFixed(2);
  renderer.shadowMap.needsUpdate=playing||hourKey!==lastHourKey;
- if(playing||camDirty||macro||hourKey!==lastHourKey){composer.render();camDirty=false;}
- placeCard(); // card tracks the selected building every frame
+  if(playing||camDirty||macro||hourKey!==lastHourKey){composer.render();camDirty=false;}
+  floatMesh.visible=!camAnim; // floating board hides mid-flight, back on arrival
  lastHourKey=hourKey;}
  buildHeroPage(0);seedCrowd();syncCard();setMacro(true);tourTimer=TOUR_RESUME;flyTo(HERO_POS,HERO_TGT,3.2);animate();
 

@@ -197,7 +197,7 @@ class LedgerTest(unittest.TestCase):
         self.assertEqual(lens["file"], "invoice.ts")
         self.assertEqual(lens["lines"], [f"line{i}" for i in range(7, 21)])
         self.assertEqual(agentlog.file_lens("/nope/missing.py"),
-                          {"file": "", "lines": []})
+                          {"file": "", "lines": [], "diff": []})
         now = time.time()
         evs = [{"event": "PostToolUse", "tool": "Edit", "file": p,
                 "ts": now, "session": "s", "added": 1, "removed": 0,
@@ -223,7 +223,42 @@ class LedgerTest(unittest.TestCase):
             f.write("v2\n")
         self.assertEqual(agentlog.cwd_lens(d)["lines"], ["v2"])
         self.assertEqual(agentlog.cwd_lens("/nope/missing"),
-                          {"file": "", "lines": []})
+                          {"file": "", "lines": [], "diff": []})
+        # dirty file -> live unified diff rows (- red / + green)
+        dlens = agentlog.file_lens(a)
+        self.assertIn("-v1", dlens["diff"])
+        self.assertIn("+v2", dlens["diff"])
+        # clean file -> honest empty diff
+        subprocess.run(["git", "-C", d, "add", "a.py"], check=True)
+        subprocess.run(["git", "-C", d, "commit", "-qm", "v2"],
+                        check=True)
+        self.assertEqual(agentlog.file_lens(a)["diff"], [])
+
+    def test_build_handoff_brief_packs_task_steps_transcript(self):
+        import time
+        now = time.time()
+        evs = [
+            {"event": "UserPromptSubmit", "text": "fix the grid",
+             "ts": now - 50, "session": "s", "tool": "", "file": "",
+             "added": 0, "removed": 0, "ok": True, "agent": "opencode"},
+            {"event": "PreToolUse", "tool": "Edit", "file": "/r/a.py",
+             "ts": now - 40, "session": "s", "added": 0, "removed": 0,
+             "ok": True, "agent": "opencode"},
+            {"event": "PostToolUse", "tool": "Edit", "file": "/r/a.py",
+             "ts": now - 30, "session": "s", "added": 3, "removed": 1,
+             "ok": True, "agent": "opencode"},
+            {"event": "Stop", "ts": now - 10, "session": "s", "tool": "",
+             "file": "", "added": 0, "removed": 0, "ok": True,
+             "agent": "opencode"},
+        ]
+        brief = agentlog.build_handoff_brief(evs, "s", "review it")
+        self.assertIn("fix the grid", brief)
+        self.assertIn("review it", brief)
+        self.assertIn("a.py", brief)
+        self.assertIn("finished", brief)
+        self.assertEqual(agentlog.build_handoff_brief(evs, "nope", "x"),
+                         "")
+        self.assertEqual(agentlog.build_handoff_brief([], "", ""), "")
 
     def test_session_steps_checklist(self):
         import time
@@ -247,6 +282,20 @@ class LedgerTest(unittest.TestCase):
                          [("fix grid", "done"), ("read a.py", "done"),
                           ("edit a.py", "active")])
         self.assertEqual(agentlog.work_today([], now=now)["steps"], [])
+
+    def test_session_steps_collapse_repeat_tool(self):
+        import time
+        now = time.time()
+        evs = [{"event": "PreToolUse", "tool": "Edit",
+                "file": f"/x/{c}.py", "ts": now - 50 + i,
+                "session": "s", "added": 0, "removed": 0,
+                "ok": True} for i, c in enumerate("abcde")]
+        evs += [{"event": "PostToolUse", "tool": "Edit",
+                 "file": "/x/e.py", "ts": now, "session": "s",
+                 "added": 1, "removed": 0, "ok": True}]
+        steps = agentlog.work_today(evs, now=now)["steps"]
+        self.assertEqual([(s["label"], s["status"]) for s in steps],
+                         [("Edit ×5", "active")])
 
     def test_project_of_cwd_and_docs(self):
         import time

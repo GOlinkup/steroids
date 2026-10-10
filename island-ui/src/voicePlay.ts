@@ -37,7 +37,8 @@ export function embedUrl(videoId: string): string {
 /** Walk a youtubei search response to the first videoRenderer videoId. Pure. */
 export function firstVideoId(json: unknown): string | null {
   try {
-    const contents = (json as Record<string, Record<string, Record<string, Record<string, unknown>>>>)["contents"]?.["twoColumnSearchResultsRenderer"]?.["primaryContents"]?.["sectionListRenderer"]?.["contents"];
+    const root = json as Record<string, any>;
+    const contents = root["contents"]?.["twoColumnSearchResultsRenderer"]?.["primaryContents"]?.["sectionListRenderer"]?.["contents"];
     if (!Array.isArray(contents)) return null;
     for (const section of contents) {
       const items = (section as Record<string, Record<string, unknown>>)?.["itemSectionRenderer"]?.["contents"];

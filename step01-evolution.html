@@ -3,7 +3,7 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%237dffb0'/></svg>">
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'><circle cx='8' cy='8' r='7' fill='%23ff4d1c'/></svg>">
 <title>Steroids Town — a knowledge town (STEP 01)</title>
 <script type="importmap">
 {"imports":{
@@ -12,8 +12,16 @@
  "three-pathfinding":"https://cdn.jsdelivr.net/npm/three-pathfinding@1.3.0/dist/three-pathfinding.module.js"}}
 </script>
 <style>
-:root{font-family:'DM Sans',Arial,sans-serif;color:#f2f4fa}
-*{box-sizing:border-box}body{margin:0;overflow:hidden;background:#333b49}
+:root{
+ --brand:#ff4d1c;--brand-light:#fb923c;--brand-soft:rgba(255,77,28,.12);
+ --bg:#000;--surface:#17181c;--surface-2:#26272c;
+ --text:#fff;--text-mute:rgba(255,255,255,.6);--text-faint:rgba(255,255,255,.45);
+ --border:rgba(255,255,255,.08);--border-strong:rgba(255,255,255,.12);
+ --card:radial-gradient(120% 90% at 50% 0%,#2b2d34 0%,#17181c 55%);
+ --radius:20px;
+  --font-ui:'Outfit','Montserrat',ui-sans-serif,system-ui,sans-serif;
+ font-family:var(--font-ui);color:var(--text)}
+*{box-sizing:border-box}body{margin:0;overflow:hidden;background:var(--bg)}
 #app{height:100svh;position:relative;user-select:none}
 #app::after{content:'';position:absolute;inset:0;pointer-events:none;
  background:linear-gradient(180deg,#1a223380,transparent 26%,transparent 76%,#141b2670),
@@ -22,29 +30,31 @@ canvas.webgl{display:block;width:100%;height:100%;cursor:grab;touch-action:none}
 .hud{position:absolute;text-shadow:0 1px 10px #0a0f1899;pointer-events:none}
 #brand{top:26px;left:30px;display:flex;gap:14px;align-items:flex-start}
 .brand-icon{width:44px;height:44px;border-radius:50%;flex:none;margin-top:2px;
- background:radial-gradient(circle at 35% 30%,#7fa2ff,#2f55d4 70%);box-shadow:0 0 26px #5b8cff55;
+  background:linear-gradient(to bottom,#ff4a1a 0%,#ff6a2b 35%,#ffb08a 70%,#ffffff 100%);box-shadow:0 0 26px rgba(255,77,28,.4);
  position:relative}
 .brand-icon::after{content:'✦';position:absolute;inset:0;display:flex;align-items:center;
  justify-content:center;color:#fff;font-size:20px}
 .brand{font-size:40px;font-weight:700;letter-spacing:-.5px;line-height:1}
-.brand small{display:block;font-size:15px;font-weight:400;color:#d6dae2;margin-top:8px;letter-spacing:0}
+.brand small{display:block;font-size:15px;font-weight:400;color:var(--text-mute);margin-top:8px;letter-spacing:0}
 #nav{top:30px;right:30px;display:flex;gap:16px;align-items:center;pointer-events:auto}
-#nav button{border:1px solid #ffffff2c;background:transparent;color:inherit;border-radius:30px;
- padding:13px 26px;font:inherit;font-size:18px;cursor:pointer}
-#nav button:hover{background:#ffffff22}
+#nav button{border:1px solid var(--border-strong);background:#fff;color:#000;border-radius:999px;
+ padding:.55rem 1.1rem;font:inherit;font-size:.88rem;font-weight:600;cursor:pointer}
+#nav button:hover{transform:scale(1.04)}
 #navCount{font-size:17px}
-/* one glass header, shared with docs/benchmarks.html (mint accent = town brand) */
+/* one glass header, shared with docs/benchmarks.html (orange accent = house brand) */
 .glassnav{position:absolute;top:20px;left:50%;transform:translateX(-50%);z-index:6;
- border-radius:99em;overflow:hidden;color:#f2f4fa;isolation:isolate;
+ border-radius:99em;overflow:hidden;color:#fff;isolation:isolate;
  background-color:rgba(187,187,188,.12);
  backdrop-filter:blur(8px) saturate(150%);-webkit-backdrop-filter:blur(8px) saturate(150%);
  box-shadow:inset 0 0 0 1px rgba(255,255,255,.1),0 6px 16px rgba(0,0,0,.16)}
-.glassnav nav{display:flex;align-items:center;gap:6px;padding:6px 10px}
-.glassnav a{color:#f2f4fa;text-decoration:none;font-size:.85rem;font-weight:500;padding:.5rem .95rem;border-radius:99em;transition:color .16s ease;white-space:nowrap}
-.glassnav a:hover,.glassnav a.active{color:#7dffb0}
+.glassnav nav{display:flex;align-items:center;gap:8px;padding:8px 12px 10px}
+.glassnav .selector{position:absolute;left:0;top:0;width:0;height:0;z-index:2;border-radius:99em;background-color:rgba(187,187,188,.36);box-shadow:inset 0 0 0 1px rgba(255,255,255,.1);opacity:0;transition:translate 400ms cubic-bezier(1,0,.4,1),width 400ms cubic-bezier(1,0,.4,1),opacity .2s ease;pointer-events:none}
+.glassnav .selector.on{opacity:1}
+.glassnav a{color:#fff;text-decoration:none;font-size:.85rem;font-weight:500;padding:.5rem .95rem;border-radius:99em;transition:color .16s ease;white-space:nowrap}
+.glassnav a:hover,.glassnav a.active{color:var(--brand-light)}
 @media(max-width:900px){.glassnav{display:none}}
 #card{left:0;top:0;width:480px;max-width:calc(100vw - 60px);padding:24px 24px 20px;
- border:1px solid #d2dcf033;border-radius:20px;background:linear-gradient(135deg,#2a3240b8,#3c4250a0);
+  border:1px solid var(--border);border-radius:var(--radius);background:var(--card);
   backdrop-filter:blur(12px);pointer-events:none;will-change:transform;backface-visibility:hidden;
  transition:opacity .18s ease}
 #card.out{opacity:0;transition-duration:.12s;transition-delay:0s}
@@ -56,41 +66,41 @@ body.embed #street{display:none!important}
 body.embed canvas.webgl{touch-action:pan-y}
 #card .row1{display:flex;align-items:center;justify-content:space-between;margin-bottom:16px}
 #avatar{width:44px;height:44px;border-radius:50%;background:#fbf7f1;flex:none}
-#latestPill{font-size:12px;font-weight:600;border:1px solid #7dffb044;border-radius:20px;padding:5px 14px;color:#7dffb0}
+#latestPill{font-size:12px;font-weight:600;border:1px solid rgba(255,77,28,.4);border-radius:20px;padding:5px 14px;color:var(--brand-light)}
 #card h1{font-size:20px;margin:0}
-#biglabel{font-size:11px;font-weight:600;letter-spacing:1.5px;color:#8b93a3;margin:14px 0 0}
-#bignum{font-size:52px;font-weight:700;letter-spacing:-1.5px;line-height:1.05;color:#7dffb0;font-variant-numeric:tabular-nums;margin-top:2px}
-#bignum small{font-size:13px;font-weight:400;letter-spacing:0;color:#c6cede;margin-left:8px}
-#shopmeta{display:none}#card p{font-size:13px;color:#c6cede;margin:6px 0 0;line-height:1.55}
-#delta{display:inline-block;font-weight:700;font-size:12px;color:#7dffb0;background:rgba(125,255,176,.12);border-radius:999px;padding:2px 10px;margin-right:6px}
+#biglabel{font-size:11px;font-weight:600;letter-spacing:1.5px;color:var(--text-faint);margin:14px 0 0}
+#bignum{font-size:52px;font-weight:700;letter-spacing:-1.5px;line-height:1.05;color:var(--brand-light);font-variant-numeric:tabular-nums;margin-top:2px}
+#bignum small{font-size:13px;font-weight:400;letter-spacing:0;color:var(--text-mute);margin-left:8px}
+#shopmeta{display:none}#card p{font-size:13px;color:var(--text-mute);margin:6px 0 0;line-height:1.55}
+#delta{display:inline-block;font-weight:700;font-size:12px;color:var(--brand-light);background:var(--brand-soft);border-radius:999px;padding:2px 10px;margin-right:6px}
 #delta.dn{color:#ff9d7d;background:rgba(255,157,125,.12)}
-#card .rule{height:1px;background:rgba(255,255,255,.1);border-radius:1px;margin:14px 0 12px}
+#card .rule{height:1px;background:var(--border-strong);border-radius:1px;margin:14px 0 12px}
 #card canvas{max-width:100%;height:auto;display:block}
 #tabs{display:none}
 #tl{display:none}
-/* showcase mode: canvas + rotating card only — all chrome hidden */
-#brand,.glassnav,#nav,#street,#foot,#help,#info,#global,#livelearns,#card{display:none!important}
+/* showcase mode (?showcase=1): canvas + rotating card only — gated, never global */
+body.showcase #brand,body.showcase .glassnav,body.showcase #nav,body.showcase #street,body.showcase #foot,body.showcase #help,body.showcase #info,body.showcase #global,body.showcase #livelearns,body.showcase #card{display:none!important}
 #help{left:50%;top:50%;transform:translate(-50%,-50%);width:440px;max-width:92vw;padding:20px 22px;
- border:1px solid #ffffff2a;border-radius:16px;background:#141b29f2;display:none;pointer-events:auto;font-size:13px}
-#help.on{display:block}#help td{padding:2px 10px 2px 0;color:#c6cede}
+ border:1px solid var(--border-strong);border-radius:var(--radius);background:#17181cf2;display:none;pointer-events:auto;font-size:13px}
+#help.on{display:block}#help td{padding:2px 10px 2px 0;color:var(--text-mute)}
 #help .tlier{display:flex;gap:8px;align-items:center;flex-wrap:wrap;margin-top:12px;font-size:12px}
-#help .tlier button{border:1px solid #ffffff2c;background:#ffffff10;color:inherit;border-radius:10px;
+#help .tlier button{border:1px solid var(--border-strong);background:#ffffff10;color:inherit;border-radius:10px;
  padding:6px 12px;font:inherit;font-size:12px;cursor:pointer}
-#help .tlier input{width:110px;accent-color:#7dffb0}
+#help .tlier input{width:110px;accent-color:var(--brand)}
 #help .tlier label{display:flex;gap:6px;align-items:center}
 #info{left:50%;top:50%;transform:translate(-50%,-50%);width:520px;max-width:92vw;max-height:84svh;overflow:auto;padding:20px 22px;
- border:1px solid #ffffff2a;border-radius:16px;background:#141b29f2;display:none;pointer-events:auto;font-size:13px;line-height:1.6}
+ border:1px solid var(--border-strong);border-radius:var(--radius);background:#17181cf2;display:none;pointer-events:auto;font-size:13px;line-height:1.6}
 #info.on{display:block}#info h3{margin:0 0 8px}#info table{border-collapse:collapse;margin:8px 0}
-#info th{font-weight:600;color:#8fc2ff;text-align:left;padding:1px 12px 1px 0;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
-#info td{padding:1px 12px 1px 0;color:#c6cede}#info td.n{text-align:right;color:#7dffb0}#info th.n{text-align:right}
-#info .fine{font-size:11.5px;color:#8b93a3}
-#foot{left:30px;bottom:22px;font-size:10px;letter-spacing:1.5px;color:#8b93a3;text-transform:uppercase;max-width:60vw}
+#info th{font-weight:600;color:var(--brand-light);text-align:left;padding:1px 12px 1px 0;font-size:11px;text-transform:uppercase;letter-spacing:.4px}
+#info td{padding:1px 12px 1px 0;color:var(--text-mute)}#info td.n{text-align:right;color:var(--brand-light)}#info th.n{text-align:right}
+#info .fine{font-size:11.5px;color:var(--text-faint)}
+#foot{left:30px;bottom:22px;font-size:10px;letter-spacing:1.5px;color:var(--text-faint);text-transform:uppercase;max-width:60vw}
 #street{right:30px;bottom:64px;text-align:right}
 #street .l1{font-size:19px}#street .l2{font-size:19px;margin-top:2px}
-#street button{display:block;margin:14px 0 0 auto;border:none;background:none;color:#c6cede;
+#street button{display:block;margin:14px 0 0 auto;border:none;background:none;color:var(--text-mute);
  font:inherit;font-size:13px;cursor:pointer;pointer-events:auto}
 #street button:hover{color:#fff}
-#street .credits{font-size:10px;letter-spacing:1.5px;color:#8b93a3;text-transform:uppercase;margin-top:10px}
+#street .credits{font-size:10px;letter-spacing:1.5px;color:var(--text-faint);text-transform:uppercase;margin-top:10px}
 @media(max-width:650px){.brand{font-size:26px}#brand{left:18px;right:18px;max-width:calc(100vw - 36px)}.brand small{font-size:11px}#card{max-width:calc(100vw - 32px)}#street{display:none}#foot{display:none}
  #nav{top:92px;left:16px;right:16px;justify-content:space-between;gap:8px}
  #nav button{padding:11px 16px;font-size:14px}#navCount{font-size:13px}}
@@ -99,23 +109,23 @@ body.embed canvas.webgl{touch-action:pan-y}
 </head>
 <body>
 <div id="app">
-<!-- one glass header, shared with benchmarks.html · Live first, Home = benchmarks page -->
-<div class="glassnav"><nav>
- <a href="http://127.0.0.1:8095/docs/benchmarks.html" class="active">Live</a>
- <a href="http://127.0.0.1:8095/docs/benchmarks.html#our-bench">Benchmark</a>
- <a href="http://127.0.0.1:8095/docs/benchmarks.html#their-bench">Their benchmark</a>
- <a href="http://127.0.0.1:8095/docs/benchmarks.html#headtohead">Head to head</a>
- <a href="http://127.0.0.1:8095/docs/benchmarks.html#table">Full data</a>
- <a href="http://127.0.0.1:8095/step01-evolution.html">Town</a>
+<!-- one glass header, shared with home (index.html) · Live first, Home = index page -->
+<div class="glassnav"><span class="selector" aria-hidden="true"></span><nav>
+ <a href="../index.html" class="active">Live</a>
+ <a href="../index.html#our-bench">Benchmark</a>
+ <a href="../index.html#their-bench">Their benchmark</a>
+ <a href="../index.html#headtohead">Head to head</a>
+ <a href="../index.html#table">Full data</a>
+ <a href="step01-evolution.html">Town</a>
 </nav></div>
 <div class="hud" id="brand"><span class="brand-icon"></span><span class="brand">Steroids Town<small>A KNOWLEDGE TOWN · WHAT THE SYSTEM LEARNS</small></span></div>
 <div class="hud" id="nav"><button id="prev">← Previous</button><span id="navCount">1 / 12</span><button id="next">Next →</button></div>
-<div class="hud" id="card"><div class="row1"><span id="avatar"></span><span id="latestPill">● Live</span></div><h1 id="shop">Harness</h1><div id="biglabel">TOTAL LEARNS</div><div id="bignum">–</div><p id="shopdesc"></p><div class="rule"></div><canvas id="spark" width="432" height="120"></canvas><p id="shopmeta" style="color:#8fc2ff"></p></div>
+<div class="hud" id="card"><div class="row1"><span id="avatar"></span><span id="latestPill">● Live</span></div><h1 id="shop">Harness</h1><div id="biglabel">TOTAL LEARNS</div><div id="bignum">–</div><p id="shopdesc"></p><div class="rule"></div><canvas id="spark" width="432" height="120"></canvas><p id="shopmeta" style="color:var(--brand-light)"></p></div>
 <div class="hud" id="tabs"></div>
 <div class="hud" id="foot">LEARNING COUNTS: SNAPSHOT 2026-09-24 (served log 09-20…09-23) · corrections live-count · 23% long-tail skills unmapped — see card</div>
 <div class="hud" id="global" style="top:26px;left:50%;transform:translateX(-50%);text-align:center;display:none">
- <div style="font-size:34px;font-weight:700;letter-spacing:-.5px;color:#7dffb0" id="globalNum">0</div>
- <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:#8b93a3" id="globalLabel">LEARNERS WORLDWIDE · LIVE</div>
+  <div style="font-size:34px;font-weight:700;letter-spacing:-.5px;color:var(--brand-light)" id="globalNum">0</div>
+  <div style="font-size:11px;letter-spacing:1.5px;text-transform:uppercase;color:var(--text-faint)" id="globalLabel">LEARNERS WORLDWIDE · LIVE</div>
 </div>
 <div class="hud" id="street"><div class="l1">Different system.</div><div class="l2">A More Open Town.</div><button id="about">About this town —</button><div class="credits" id="credits">Data: served-log counts · Scene: voxel procedural, no models</div></div>
 <div class="hud" id="help"><h3 style="margin:0 0 8px">Keyboard map</h3><table>
@@ -142,7 +152,7 @@ body.embed canvas.webgl{touch-action:pan-y}
 setTimeout(function(){
   if(window.__townBooted) return;
   var d=document.createElement('div');
-  d.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#141b29;color:#f2f4fa;font:15px/1.6 sans-serif;z-index:99;text-align:center;padding:20px';
+  d.style.cssText='position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#17181c;color:#fff;font:15px/1.6 sans-serif;z-index:99;text-align:center;padding:20px';
   d.textContent='Steroids Town could not start: the three.js CDN did not load. Check your connection and reload — your snapshot data is safe.';
   document.getElementById('app').appendChild(d);
 },15000);
@@ -162,8 +172,8 @@ import {OutputPass} from 'three/addons/postprocessing/OutputPass.js';
 // learns = routed-skill rows per domain, 1670 impressions 09-20…09-23 (77% mapped, long tail unmapped).
 // corrections = 0 live (D-2 door proven, unused). daily = learns per day for the sparkline.
 const FALLBACK={date:'2026-09-24',corrections:0,domains:[
- {name:'Harness', learns:919, color:0x7dffb0, daily:[354,81,261,223]},
- {name:'Comms', learns:821, color:0x8fc2ff, daily:[135,7,217,462]},
+  {name:'Harness', learns:919, color:0xff4d1c, daily:[354,81,261,223]},
+  {name:'Comms', learns:821, color:0xfb923c, daily:[135,7,217,462]},
  {name:'Mobile', learns:425, color:0x3f6fe0, daily:[87,62,19,257]},
  {name:'Fixes', learns:359, color:0xffb07d, daily:[116,22,186,35]},
  {name:'Design', learns:286, color:0xd88ff2, daily:[134,50,40,62]},
@@ -237,8 +247,8 @@ renderer.toneMapping=THREE.ACESFilmicToneMapping;
 app.prepend(renderer.domElement);
 renderer.domElement.classList.add('webgl');
 const scene=new THREE.Scene();
-scene.background=new THREE.Color(0x333b49);
-scene.fog=new THREE.FogExp2(0x454d5d,0.0028);
+scene.background=new THREE.Color(0x000000);
+scene.fog=new THREE.FogExp2(0x101114,0.0028);
 const camera=new THREE.PerspectiveCamera(30,innerWidth/innerHeight,0.5,3000);
 camera.position.set(0,120,340); // intro start; first flyTo settles to hero
 const controls=new OrbitControls(camera,renderer.domElement);
@@ -379,9 +389,9 @@ atlasC.width=ATLAS_COLS*ATLAS_RW;atlasC.height=3*ATLAS_RH;
 {const c=atlasC.getContext('2d');
  SNAPSHOT.domains.forEach((d,i)=>{
   const ox=(i%ATLAS_COLS)*ATLAS_RW,oy=((i/ATLAS_COLS)|0)*ATLAS_RH;
-  c.fillStyle='#14181f';c.fillRect(ox,oy,ATLAS_RW,ATLAS_RH);
+  c.fillStyle='#17181c';c.fillRect(ox,oy,ATLAS_RW,ATLAS_RH);
   c.fillStyle='#'+d.color.toString(16).padStart(6,'0');c.fillRect(ox,oy+ATLAS_RH-10,ATLAS_RW,10);
-  c.fillStyle='#f2f4fa';c.font='700 34px "DM Sans",Arial,sans-serif';
+   c.fillStyle='#fff';c.font='700 34px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
   c.textAlign='center';c.textBaseline='middle';
   c.fillText(d.name.toUpperCase(),ox+ATLAS_RW/2,oy+ATLAS_RH/2-4);});}
 const atlasTex=new THREE.CanvasTexture(atlasC);
@@ -586,8 +596,8 @@ function drawFloat(){
   const c=floatCv.getContext('2d'),W=floatCv.width,H=floatCv.height;
   c.clearRect(0,0,W,H);
   // dense frost: solid enough to read on, feathered edge, never cut
-  c.save();c.shadowColor='rgba(24,28,38,.9)';c.shadowBlur=34;
-  c.fillStyle='rgba(24,28,38,.85)';
+  c.save();c.shadowColor='rgba(0,0,0,.9)';c.shadowBlur=34;
+  c.fillStyle='rgba(23,24,28,.88)';
   if(c.roundRect){c.beginPath();c.roundRect(0,0,W,H,40);c.fill();}
   else c.fillRect(0,0,W,H);
   c.restore();
@@ -595,17 +605,17 @@ function drawFloat(){
   c.beginPath();c.moveTo(44,3);c.lineTo(W-44,3);c.stroke();
   // left: source eyebrow + worldwide total + session line
   c.textAlign='left';
-  c.font='600 24px "DM Sans",Arial,sans-serif';
+   c.font='600 24px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
   const lab=live?'LIVE WORLDWIDE':'LOCAL SNAPSHOT';
   const lw=c.measureText(lab).width;
-  c.fillStyle=live?'#34d17b':'#8b93a3';c.beginPath();c.arc(52,64,9,0,7);c.fill();
-  c.fillStyle=live?'rgba(125,255,176,.85)':'rgba(242,244,250,.65)';
-  c.fillText(lab,72,72);
-  c.fillStyle='#dfe4ec';c.font='300 88px "DM Sans",Arial,sans-serif';
+  c.fillStyle=live?'#34d399':'rgba(255,255,255,.45)';c.beginPath();c.arc(52,64,9,0,7);c.fill();
+   c.fillStyle=live?'rgba(251,146,60,.85)':'rgba(255,255,255,.65)';
+   c.fillText(lab,72,72);
+   c.fillStyle='#fff';c.font='300 88px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
   c.fillText(total.toLocaleString('en-US'),44,178);
   const lt=sessionLearns+' this session · '+shared+' shared rules';
-  c.fillStyle='#34d17b';c.beginPath();c.arc(52,208,7,0,7);c.fill();
-  c.fillStyle='rgba(242,244,250,.7)';c.font='400 25px "DM Sans",Arial,sans-serif';
+  c.fillStyle='#34d399';c.beginPath();c.arc(52,208,7,0,7);c.fill();
+   c.fillStyle='rgba(255,255,255,.75)';c.font='400 25px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
   c.fillText(lt,70,217);
   // right: town totals per day
   const days=[0,1,2,3].map(i=>SNAPSHOT.domains.reduce((a,d)=>a+((d.daily&&d.daily[i])||0),0));
@@ -617,7 +627,7 @@ function drawFloat(){
    c.fillStyle=g;
    if(c.roundRect){c.beginPath();c.roundRect(x,y,bw,h,bw/2);c.fill();}
    else c.fillRect(x,y,bw,h);
-   c.fillStyle='rgba(242,244,250,.5)';c.font='400 19px "DM Sans",Arial,sans-serif';c.textAlign='center';
+    c.fillStyle='rgba(255,255,255,.45)';c.font='400 19px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';c.textAlign='center';
    c.fillText(String(v),x+bw/2,y-8);});
   floatTex.needsUpdate=true;}
 function placeFloat(){const S=shops[sel];if(!S)return;
@@ -973,7 +983,7 @@ const sstep=(d,a,b)=>{const t=Math.min(1,Math.max(0,(d-a)/(b-a)));return t*t*(3-
 const loopV=(s,base)=>base*(0.45+0.55*sstep(loopPose(s).dEnd,1.5,8));
 // ---------- loop-road visuals: grid perimeter, sharp corners, free flow ----------
 const cars=[];
-const carCols=[0x3f6fe0,0xd84a4a,0x7dffb0,0xffd24a];
+const carCols=[0x3f6fe0,0xd84a4a,0xff4d1c,0xffd24a];
 const wheelMat=new THREE.MeshStandardMaterial({color:0x1a1d22,roughness:0.9});
 const headLampMat=new THREE.MeshBasicMaterial({color:0xfff6dd});
 const lampG=new THREE.BoxGeometry(0.14,0.16,0.3);
@@ -1114,19 +1124,19 @@ function updateTraffic(dt,night){
 let sessionLearns=0;
 const liveEl=document.createElement('div');
 liveEl.className='hud';liveEl.id='livelearns';
-liveEl.style.cssText='right:30px;top:96px;text-align:right;font-size:15px;color:#7dffb0';
+liveEl.style.cssText='right:30px;top:96px;text-align:right;font-size:15px;color:var(--brand-light)';
 app.appendChild(liveEl);
 const LEARN_BASE=SNAPSHOT.domains.reduce((a,d)=>a+d.learns,0);
 function fmtLive(){return 'LIVE LEARNS '+sessionLearns.toLocaleString()+' · TOTAL '+(LEARN_BASE+sessionLearns).toLocaleString();}
 function drawBoard(cv,d){
  const c=cv.getContext('2d');
- c.fillStyle='#141b29';c.fillRect(0,0,256,96);
- c.fillStyle='#'+d.color.toString(16).padStart(6,'0');c.fillRect(0,0,256,10);
-  c.fillStyle='#f2f4fa';c.font='700 28px "DM Sans",Arial,sans-serif';c.textAlign='center';
-  c.fillText(d.name.toUpperCase().slice(0,12),128,38);
-  c.fillStyle='#7dffb0';c.font='700 30px "DM Sans",Arial,sans-serif';
-  c.fillText(d.learns.toLocaleString('en-US'),128,70);
-  c.fillStyle='#8b93a3';c.font='400 19px "DM Sans",Arial,sans-serif';
+  c.fillStyle='#17181c';c.fillRect(0,0,256,96);
+  c.fillStyle='#'+d.color.toString(16).padStart(6,'0');c.fillRect(0,0,256,10);
+    c.fillStyle='#fff';c.font='700 28px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';c.textAlign='center';
+   c.fillText(d.name.toUpperCase().slice(0,12),128,38);
+   c.fillStyle='#fb923c';c.font='700 30px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
+   c.fillText(d.learns.toLocaleString('en-US'),128,70);
+   c.fillStyle='rgba(255,255,255,.45)';c.font='400 19px "Montserrat","Outfit",ui-sans-serif,system-ui,sans-serif';
   c.fillText('LIVE '+(d.live||0),128,92);}
 let boardLive=-1;
 function syncLive(){liveEl.textContent=fmtLive();syncCard();
@@ -1259,7 +1269,7 @@ if(GLOBAL){
  const sr=(GLOBAL.shared_rules||[]).length;
  if(sr>0){let c=document.getElementById('sharedRules');
   if(!c){c=document.createElement('span');c.id='sharedRules';
-   c.style.cssText='display:block;font-size:12px;color:#8fc2ff;margin-top:2px';
+    c.style.cssText='display:block;font-size:12px;color:var(--brand-light);margin-top:2px';
    wrap.appendChild(c);}
   c.textContent=sr+' SHARED RULE'+(sr===1?'':'S')+' LEARNED WORLDWIDE';}
  const target=(GLOBAL.totals.serves||0)+(GLOBAL.totals.accepts||0);
@@ -1291,7 +1301,7 @@ addEventListener('keydown',e=>{
 
 // ---------- day/night + loop ----------
 const clock=new THREE.Clock();
-const dayBg=new THREE.Color(0x3d4552),nightBg=new THREE.Color(0x333b49);
+const dayBg=new THREE.Color(0x17181c),nightBg=new THREE.Color(0x000000);
 const tmpC=new THREE.Color(),tgt=new THREE.Vector3();
 const tmpV=new THREE.Vector3(),macroOff=new THREE.Vector3(16,9,24);
 let clockMin=21*60;
@@ -1304,7 +1314,7 @@ const DAY=[
  [8.5,'#8aa3c2','#9eafc3','#c6d6ef','#7a6c5c',1.05,'#ffe6c8',2.1,1.02,0,.3,1.4],
  [13,'#9bb4d2','#afbfd2','#d2e2ff','#857563',1.15,'#fff4e4',2.4,1,0,.28,1.45],
  [17,'#8b98b2','#a39fa8','#cdc6d4','#7b6a58',1,'#ffc890',2,1.04,.12,.35,1.3],
- [19,'#333b49','#454d5d','#a3b6da','#564840',.82,'#ffd2a6',1.25,1.12,1,.55,.95],
+ [19,'#000000','#101114','#a3b6da','#564840',.82,'#ffd2a6',1.25,1.12,1,.55,.95],
  [20.5,'#1d2435','#2a3144','#7486b6','#3c3538',.64,'#b4c2ff',.55,1.16,1,.6,.95],
  [22,'#0f1422','#171d2c','#4c5b84','#2a262e',.52,'#94aaff',.34,1.2,1,.62,.95],
  [24,'#0c111d','#141a28','#46557e','#28242c',.5,'#8ea6ff',.32,1.22,1,.62,.95]

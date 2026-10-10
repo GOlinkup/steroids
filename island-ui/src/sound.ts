@@ -47,6 +47,9 @@ export const Sound = {
   pop: () => playFile("attention") ?? blip(520, 0.06),
   approve: () => { if (!playFile("complete")) { blip(523, 0.08); blip(784, 0.1, 0.09); } },
   deny: () => playFile("error") ?? blip(220, 0.12),
+  huddleConnect: () => blip(660, 0.12),
+  huddlePop: (i: number) => blip(480 + i * 90, 0.06),
+  huddleChime: () => { blip(880, 0.09); blip(1320, 0.09, 0.09); },
 };
 
 function playFile(ev: string): boolean {

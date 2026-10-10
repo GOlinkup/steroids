@@ -2461,8 +2461,41 @@ def main():
     parser.add_argument("--watch", default="shots", help="Lens watch folder (default ./shots)")
     parser.add_argument("--port", type=int, default=8904, help="Lens port (default 8904)")
     parser.add_argument("--open", action="store_true", help="Lens: reuse-or-start the server and open it in a browser (only opens on fresh start, never tab-spam)")
+    parser.add_argument("--dots-serve", action="store_true", help="Serve the dots API (open-dots port: sandboxes, tasks, permissions, schedules) on :8000")
+    parser.add_argument("--dots-bot", action="store_true", help="Run the dots Telegram bot (needs TELEGRAM_BOT_TOKEN)")
 
     args, unknown = parser.parse_known_args()
+
+    if args.dots_serve:
+        # ponytail: same lazy import as lens (installed copy has siblings).
+        try:
+            from .dots import server as _dots_server
+        except ImportError:
+            _dots_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dots", "server.py")
+            if not os.path.isfile(_dots_path):
+                print(json.dumps({"ok": False, "error": "dots not deployed alongside router"}))
+                return
+            import importlib.util as _ilu
+            _spec = _ilu.spec_from_file_location("steroids_dots_server", _dots_path)
+            _dots_server = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_dots_server)
+        _dots_server.serve(8000)
+        return
+
+    if args.dots_bot:
+        try:
+            from .dots import bot as _dots_bot
+        except ImportError:
+            _dots_path = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dots", "bot.py")
+            if not os.path.isfile(_dots_path):
+                print(json.dumps({"ok": False, "error": "dots not deployed alongside router"}))
+                return
+            import importlib.util as _ilu
+            _spec = _ilu.spec_from_file_location("steroids_dots_bot", _dots_path)
+            _dots_bot = _ilu.module_from_spec(_spec)
+            _spec.loader.exec_module(_dots_bot)
+        _dots_bot.main()
+        return
 
     if args.lens:
         # ponytail: same lazy import as share (installed copy has siblings).

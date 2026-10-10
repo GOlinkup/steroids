@@ -383,7 +383,7 @@ def work_today(evs=None, now=None):
                 'asks': 0, 'done': 0, 'left': 0, 'pct': 0,
                 'files': [], 'file': '', 'added': 0, 'removed': 0,
                 'steps': [],
-                'lens': {'file': '', 'lines': []},
+                'lens': {'file': '', 'lines': [], 'diff': []},
                 'project': {'cwd': '', 'name': '', 'docs': []}}
 
 
@@ -405,6 +405,7 @@ def session_steps(evs, day, limit=6):
         if not sess:
             return []
         steps = []
+        kinds = []  # 'prompt' | 'tool' | 'done': only consecutive tools collapse
         for e in evs:
             try:
                 ts = e.get('ts') or 0
@@ -424,11 +425,13 @@ def session_steps(evs, day, limit=6):
                 first = str(e['text']).strip().splitlines()
                 steps.append({'label': (first[0] if first else '')[:60],
                               'status': 'done'})
+                kinds.append('prompt')
             elif ev == 'PreToolUse':
                 tool = e.get('tool') or 'tool'
                 f = os.path.basename(e.get('file') or '')
                 steps.append({'label': ('%s %s' % (tool, f)).strip()[:60],
                               'status': 'pending'})
+                kinds.append('tool')
             elif ev == 'PostToolUse':
                 ok = e.get('ok', True)
                 for s in reversed(steps):
@@ -439,11 +442,30 @@ def session_steps(evs, day, limit=6):
                 steps.append({'label': 'Done',
                               'status': 'done' if e.get('ok', True)
                               else 'error'})
+                kinds.append('done')
         for s in reversed(steps):
             if s['status'] == 'pending':
                 s['status'] = 'active'
                 break
-        return steps[-limit:]
+        # ponytail: 5 straight Edits read as one "Edit ×5" — same tool in a
+        # row merges (worst status wins); prompts and Done never merge.
+        merged, _RANK = [], {'done': 0, 'pending': 1,
+                             'active': 2, 'error': 3}
+        for s, k in zip(steps, kinds):
+            if (merged and k == 'tool' and merged[-1][1] == 'tool'
+                    and s['label'].split(' ')[0]
+                    == merged[-1][0]['label'].split(' ')[0]):
+                prev = merged[-1][0]
+                n = prev.get('n', 1) + 1
+                prev['n'] = n
+                prev['label'] = '%s ×%d' % (
+                    prev['label'].split(' ')[0], n)
+                if _RANK.get(s['status'], 0) > _RANK.get(
+                        prev['status'], 0):
+                    prev['status'] = s['status']
+            else:
+                merged.append((dict(s), k))
+        return [s for s, _ in merged][-limit:]
     except Exception:
         return []
 
@@ -499,34 +521,66 @@ def sessions(evs, limit=12):
 
 LENS_MAX_BYTES = 120_000
 LENS_TAIL_LINES = 14
+LENS_DIFF_LINES = 14
+
+
+def file_diff(path, limit=LENS_DIFF_LINES):
+    """Unified diff of the file the agent is editing (coucou-frames style:
+    `-` red rows / `+` green rows). Dirty git file -> diff body lines
+    (headers stripped); clean/untracked/non-repo -> []. Never throws."""
+    try:
+        import subprocess
+        p = str(path or '').strip()
+        if not p or not os.path.isfile(p):
+            return []
+        ap = os.path.abspath(p)
+        r = subprocess.run(
+            ['git', '-C', os.path.dirname(ap), 'diff', '--no-color',
+             '--no-ext-diff', '-U2', '--', ap],
+            capture_output=True, text=True, timeout=5)
+        if r.returncode != 0 or not (r.stdout or '').strip():
+            return []
+        out = []
+        for ln in r.stdout.splitlines():
+            if ln.startswith(('diff --git', 'index ', '--- ', '+++ ')):
+                continue
+            out.append(ln)
+            if len(out) >= limit:
+                break
+        return out
+    except Exception:
+        return []
 
 
 def file_lens(path):
     """Tail of the file the agent is touching, for the island code lens.
-    Basename + last lines only; missing/binary/huge -> honest empty.
-    Never throws."""
-    empty = {'file': '', 'lines': []}
+    Basename + last lines + live diff only; missing/binary/huge ->
+    honest empty. Never throws."""
+    empty = {'file': '', 'lines': [], 'diff': []}
     try:
         p = str(path or '').strip()
         if not p or not os.path.isfile(p):
             return dict(empty)
         if os.path.getsize(p) > LENS_MAX_BYTES:
-            return {'file': os.path.basename(p), 'lines': []}
+            return {'file': os.path.basename(p), 'lines': [],
+                    'diff': file_diff(p)}
         with open(p, encoding='utf-8', errors='strict') as f:
             text = f.read(LENS_MAX_BYTES + 1)
     except (OSError, ValueError, UnicodeError):
         return dict(empty)
     if '\0' in text[:4096]:
-        return {'file': os.path.basename(p), 'lines': []}
+        return {'file': os.path.basename(p), 'lines': [],
+                'diff': file_diff(p)}
     return {'file': os.path.basename(p),
-            'lines': text.splitlines()[-LENS_TAIL_LINES:]}
+            'lines': text.splitlines()[-LENS_TAIL_LINES:],
+            'diff': file_diff(p)}
 
 
 def cwd_lens(cwd):
     """Newest dirty file under a session cwd, for the island code lens.
     Uncommitted work = what the agent is editing right now. Non-repo or
     clean tree -> honest empty. Never throws."""
-    empty = {'file': '', 'lines': []}
+    empty = {'file': '', 'lines': [], 'diff': []}
     try:
         import subprocess
         c = str(cwd or '').strip()
@@ -568,7 +622,7 @@ def session_progress(evs, sid):
         if not sev:
             return {'task': '', 'state': 'idle', 'activity': '',
                     'steps': [], 'files': [],
-                    'lens': {'file': '', 'lines': []}}
+                    'lens': {'file': '', 'lines': [], 'diff': []}}
         task = ''
         for e in sev:
             if (e.get('event') or '') == 'UserPromptSubmit' and e.get('text'):
@@ -635,7 +689,51 @@ def session_progress(evs, sid):
     except Exception:
         return {'task': '', 'state': 'idle', 'activity': '',
                 'steps': [], 'files': [],
-                'lens': {'file': '', 'lines': []}}
+                'lens': {'file': '', 'lines': [], 'diff': []}}
+
+
+def build_handoff_brief(evs, from_sid, to_text='', max_chars=3000):
+    """Shared-brief for crew handoff: mate A's latest work, packed so mate B
+    can continue it cold. Task + steps + transcript tail, plain text.
+    Unknown session -> ''. Never throws."""
+    try:
+        sid = str(from_sid or '').strip()
+        if not sid:
+            return ''
+        sev = [e for e in (evs or []) if isinstance(e, dict)
+               and (e.get('session') or '') == sid]
+        if not sev:
+            return ''
+        p = session_progress(evs, sid)
+        agent = ''
+        for e in reversed(sev):
+            if e.get('agent'):
+                agent = str(e['agent'])
+                break
+        who = (agent + '’s') if agent else 'teammate'
+        head = ['Relay: continue %s work.' % who]
+        if p.get('task'):
+            head.append('Task: %s' % p['task'])
+        head.append('State: %s — %s' % (p.get('state') or '?',
+                                        p.get('activity') or ''))
+        steps = ['%s %s' % (s.get('status'), s.get('label'))
+                 for s in (p.get('steps') or [])[-8:]]
+        if steps:
+            head.append('Steps: %s' % ' | '.join(steps))
+        files = ['%s +%d -%d' % (f.get('name'), f.get('added') or 0,
+                                 f.get('removed') or 0)
+                 for f in (p.get('files') or [])[:4]]
+        if files:
+            head.append('Touched: %s' % ', '.join(files))
+        now = str(to_text or '').strip()[:500] or 'carry this work forward'
+        head.append('Now: %s' % now)
+        tail = []
+        for it in transcript(sev)[-20:]:
+            role = it.get('role') or 'agent'
+            tail.append('%s: %s' % (role, str(it.get('text') or '')[:200]))
+        return '\n'.join(head + ['--- latest ---'] + tail)[:max_chars]
+    except Exception:
+        return ''
 
 # --- hidden agent sessions (island UI delete) ------------------------------
 

@@ -194,6 +194,15 @@ export function getSyncKey(): string | null {
   }
 }
 
+// Login key rule: mint a fresh secret ONLY when this device holds no key
+// AND the cloud holds nothing sealed (fresh account or legacy plaintext).
+// A second device with sealed rows waiting must paste the old code
+// instead — minting here orphans the real key and strands history behind
+// "need the sync code" with the paste box hidden.
+export function shouldMintSyncKey(hasStoredKey: boolean, skipped: number): boolean {
+  return !hasStoredKey && skipped === 0;
+}
+
 // First login mints the secret (44-char base64). Idempotent — existing key wins.
 export function ensureSyncKey(): string {
   const cur = getSyncKey();
@@ -261,6 +270,7 @@ export interface CloudRow {
   title: string;
   messages: ChatSession["messages"];
   updated_at: string;
+  handoff?: string; // needs the handoff migration; absent on old DBs
 }
 
 // Push: one sealed row per local chat (blob URLs stripped — bytes
@@ -281,18 +291,36 @@ export async function pushChats(rows: ChatSession[]): Promise<number> {
           title: r.title,
           messages: r.messages,
           updated_at: new Date(r.updatedAt).toISOString(),
+          ...(r.handoff ? { handoff: r.handoff } : {}),
         })),
         (k, v) => (k === "url" ? undefined : v),
       ),
-    ).map(async (r: { chat_id: string; title: string; messages: unknown; updated_at: string }) => ({
+    ).map(async (r: { chat_id: string; title: string; messages: unknown; updated_at: string; handoff?: string }) => ({
       ...r,
       messages: await encPayload(r.messages),
     })),
   );
-  const { error } = await s.from("steroid_chats").upsert(clean, {
-    onConflict: "user_id,chat_id",
-  });
-  if (error) throw new Error(error.message);
+  // handoff column may not exist server-side yet (migration pending):
+  // retry stripped rather than failing the whole sync.
+  const attempt = async (payload: typeof clean) => {
+    const { error } = await s.from("steroid_chats").upsert(payload, {
+      onConflict: "user_id,chat_id",
+    });
+    if (error) throw new Error(error.message);
+  };
+  try {
+    await attempt(clean);
+  } catch (e) {
+    if (e instanceof Error && /handoff/i.test(e.message)) {
+      await attempt(clean.map((r) => {
+        const c = { ...r };
+        delete (c as Partial<typeof r>).handoff;
+        return c;
+      }));
+    } else {
+      throw e;
+    }
+  }
   return clean.length;
 }
 
@@ -305,11 +333,16 @@ export interface PullResult {
 export async function pullChats(): Promise<PullResult> {
   const s = supa();
   if (!s) throw new Error("cloud not configured (island-ui/.env missing)");
-  const { data, error } = await s
-    .from("steroid_chats")
-    .select("chat_id,title,messages,updated_at")
-    .order("updated_at", { ascending: false })
-    .limit(20);
+  // dynamic column list defeats the query-builder literal types — the
+  // rows are cast to CloudRow below, same as before.
+  const cols = (withHandoff: boolean) =>
+    s.from("steroid_chats")
+      .select(withHandoff ? "chat_id,title,messages,updated_at,handoff" : "chat_id,title,messages,updated_at")
+      .order("updated_at", { ascending: false })
+      .limit(20) as unknown as Promise<{ data: CloudRow[] | null; error: { message: string } | null }>;
+  let { data, error } = await cols(true);
+  // old DBs lack the handoff column — fall back, never fail the pull.
+  if (error && /handoff|column/i.test(error.message)) ({ data, error } = await cols(false));
   if (error) throw new Error(error.message);
   const rows: CloudRow[] = [];
   let skipped = 0;

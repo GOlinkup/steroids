@@ -27,3 +27,21 @@ export function orbFor(a: IslandActivity): OrbState {
   if (a.searching) return "searching";
   return "breathing";
 }
+
+// Chat working bubble -> orb: each live turn signal owns its design, so
+// the bubble shows more than one animation end-to-end. Order is deliberate
+// (bridge-down honesty first, then the most specific live signal wins).
+// Only real turn signals are read — phases are never invented.
+export function chatOrbFor(opts: {
+  bridgeOn: boolean;
+  activity?: string | null;
+  partial?: string | null;
+  stepsActive?: boolean;
+}): OrbState {
+  if (!opts.bridgeOn) return "breathing";
+  if (/search|read|glob|grep|fetch|web|look|find|scout/i.test(opts.activity ?? ""))
+    return "searching";
+  if (opts.stepsActive) return "solving";
+  if ((opts.partial ?? "").length > 0) return "composing";
+  return "working";
+}

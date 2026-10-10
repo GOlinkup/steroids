@@ -4,11 +4,13 @@
 Claude Code calls:   python3 hook_relay.py claude           (stdin JSON)
 OpenCode plugin calls: python3 hook_relay.py opencode     (stdin JSON)
 
-Exit 0 ALWAYS — hooks must never block an agent. Stdlib only.
+Exit 0 ALWAYS. Only PermissionRequest blocks (bounded 50s island wait,
+then deny) — every other event never blocks an agent. Stdlib only.
 """
 import json
 import os
 import sys
+import time
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agentlog  # noqa: E402
@@ -40,6 +42,17 @@ def _blocking_response(payload, ev):
     hit = _dec.take(key)
     if hit is None and _dec.auto_approve(sid) and ev.get('event') == 'PreToolUse':
         hit = {'verdict': 'approve', 'answer': ''}
+    if hit is None and payload.get('hook_event_name') == 'PermissionRequest':
+        # The one blocking path: island gets 50s (under the 60s hook
+        # timeout), then deny-by-default. Never hangs the agent.
+        deadline = time.time() + 50
+        while time.time() < deadline:
+            time.sleep(0.5)
+            hit = _dec.take(key)
+            if hit is not None:
+                break
+        if hit is None:
+            return {"decision": "block", "reason": "island approval timed out"}
     if hit is None:
         return None
     v = hit.get('verdict')

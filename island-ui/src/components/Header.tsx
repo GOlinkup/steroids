@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { AgentSession, Approval, ChatSession, IslandView, Question } from "../store";
 import type { SettingsPage } from "./Cards";
 import {
-  BellIcon, ChatIcon, ExploreIcon, GearIcon, HistoryIcon, HomeIcon, LensIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ShelfIcon, TrashIcon,
+  BellIcon, BoltIcon, ChatIcon, ExploreIcon, GearIcon, HistoryIcon, HomeIcon, LensIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ShelfIcon, TrashIcon,
 } from "./icons";
 import { useDismiss, MenuRow } from "./pickers";
 
@@ -17,6 +17,7 @@ const TABS: Array<{ view: IslandView; title: string; Icon: ComponentType<IconPro
   { view: "chat", title: "Chat", Icon: ChatIcon },
   { view: "daily", title: "Daily", Icon: HomeIcon },
   { view: "explore", title: "Explore", Icon: ExploreIcon },
+  { view: "feed", title: "Feed", Icon: BoltIcon },
   { view: "lens", title: "Lens", Icon: LensIcon },
   { view: "shelf", title: "Shelf", Icon: ShelfIcon },
 ];

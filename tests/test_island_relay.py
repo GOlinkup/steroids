@@ -135,5 +135,62 @@ class RelayTest(unittest.TestCase):
         a.close()
 
 
+class EventsReceiverTest(unittest.TestCase):
+    """POST /events (HTTP clone of hook_relay.py) + GET /events feed."""
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        cls._tmp = tempfile.mkdtemp(prefix="steroids-events-test-")
+        cls._old_home = os.environ.get("STEROIDS_HOME")
+        os.environ["STEROIDS_HOME"] = cls._tmp
+        cls.srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        cls.port = cls.srv.server_address[1]
+        cls.thread = Thread(target=cls.srv.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown()
+        if cls._old_home is None:
+            del os.environ["STEROIDS_HOME"]
+        else:
+            os.environ["STEROIDS_HOME"] = cls._old_home
+
+    def _post(self, payload):
+        c = HTTPConnection("127.0.0.1", self.port, timeout=5)
+        c.request("POST", "/events", json.dumps(payload),
+                  {"Content-Type": "application/json"})
+        return c.getresponse()
+
+    def test_opencode_kinds_land_in_feed(self):
+        sid = "test-sess-%d" % int(time.time() * 1000)
+        r = self._post({"kind": "prompt", "text": "hello crew",
+                        "session": sid})
+        self.assertEqual(r.status, 200)
+        self.assertTrue(json.loads(r.read())["ok"])
+        r = self._post({"kind": "tool-before", "tool": "Edit",
+                        "file": "/tmp/x.py", "session": sid})
+        self.assertTrue(json.loads(r.read())["ok"])
+        c = HTTPConnection("127.0.0.1", self.port, timeout=5)
+        c.request("GET", "/events?n=10")
+        feed = json.loads(c.getresponse().read())["events"]
+        mine = [e for e in feed if e.get("session") == sid]
+        self.assertEqual([e["event"] for e in mine],
+                         ["PreToolUse", "UserPromptSubmit"])  # newest first
+        self.assertEqual(mine[0]["tool"], "Edit")
+
+    def test_unknown_event_rejected(self):
+        r = self._post({"kind": "nope"})
+        self.assertEqual(r.status, 400)
+        self.assertFalse(json.loads(r.read())["ok"])
+
+    def test_bad_json_rejected(self):
+        c = HTTPConnection("127.0.0.1", self.port, timeout=5)
+        c.request("POST", "/events", "{not json",
+                  {"Content-Type": "application/json"})
+        self.assertEqual(c.getresponse().status, 400)
+
+
 if __name__ == "__main__":
     unittest.main()

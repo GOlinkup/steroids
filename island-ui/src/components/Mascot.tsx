@@ -15,6 +15,8 @@ export interface MascotHandle {
   annoy: () => void;
   dizzy: () => void;
   celebrate: () => void;
+  groove: (on: boolean, energy?: number) => void;
+  hop: () => void;
   setLook: (x: number, y: number) => void;
 }
 
@@ -163,6 +165,22 @@ const Mascot = forwardRef<MascotHandle, Props>(function Mascot({ onTap, mood }, 
     annoy: doAnnoy,
     dizzy: doDizzy,
     celebrate: doCelebrate,
+    // groove: beat-following bounce (hop edges kick, --e rides height).
+    // Same contract as Daily's dancer; silent unless driven.
+    groove: (on: boolean, energy = 0) => {
+      const el = wrapRef.current;
+      if (!el) return;
+      el.style.setProperty("--e", Math.max(0, Math.min(1, energy)).toFixed(2));
+      el.classList.toggle("grooving", on);
+      if (!on) el.classList.remove("hop");
+    },
+    hop: () => {
+      const el = wrapRef.current;
+      if (!el) return;
+      el.classList.remove("hop");
+      void el.offsetWidth;
+      el.classList.add("hop");
+    },
     setLook: (x, y) => {
       const el = wrapRef.current;
       if (!el) return;
