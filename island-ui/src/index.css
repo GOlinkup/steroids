@@ -11,13 +11,13 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
    full-bleed black on every browser, PC and phone. */
 
 /* island shell widths: hidden 184 / flex+pump 248 / jacked 960 (2-col home: work + right rail) */
-#island{background:var(--ink);border-radius:22px;border:0;box-shadow:none;transition:width .34s cubic-bezier(.45,0,.2,1);overflow:hidden;display:flex;align-items:center;gap:14px;padding:10px 18px;min-height:64px}
+#island{background:var(--ink);border-radius:22px;border:0;box-shadow:none;interpolate-size:allow-keywords;transition:width .34s cubic-bezier(.45,0,.2,1),height .34s cubic-bezier(.45,0,.2,1);overflow:hidden;display:flex;align-items:center;gap:14px;padding:10px 18px;min-height:64px}
 #island[data-state="hidden"]{width:184px}
 /* Human order (loop3 scope replacement): the island-with-mascot carries the
    SAME shell as hidden — mascots shown, geometry identical. Pump transient. */
 #island[data-state="flex"],#island[data-state="pump"]{width:184px}
 #island[data-state="pump"]{width:248px}
-#island[data-state="jacked"]{width:min(960px,94vw);overflow:visible;flex-direction:column;align-items:stretch;gap:.34rem;padding:6px 8px;transition:width .52s cubic-bezier(.32,1.22,.42,1)}
+#island[data-state="jacked"]{width:min(960px,94vw);overflow:visible;flex-direction:column;align-items:stretch;gap:.34rem;padding:6px 8px;transition:width .52s cubic-bezier(.32,1.22,.42,1),height .52s cubic-bezier(.32,1.22,.42,1),overflow .01s linear .52s;transition-behavior:allow-discrete}
 .mascot-top{display:flex;justify-content:center;padding:0}
 .mascot-top .mascot{width:56px;height:56px}
 .mascot{width:56px;height:56px;image-rendering:pixelated;flex:none;cursor:pointer}
@@ -110,12 +110,12 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .step-row.error .step-ic{color:var(--danger)}
 .team-wrap{display:flex;flex-direction:column;gap:.4rem;margin-top:.55rem}
 .hm-team .team-wrap{margin-top:0}
-.team-head{display:flex;align-items:center;gap:.5rem}
-.team-title{font-size:.72rem;font-weight:800;letter-spacing:.08em;color:#fff}
+.team-head{display:flex;align-items:center;gap:.5rem;min-width:0}
+.team-title{font-size:.72rem;font-weight:800;letter-spacing:.08em;color:#fff;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 .team-head .explore-label{font-weight:700}
-.team-head .team-add{margin-left:auto}
+.team-head .team-add{margin-left:auto;flex:none}
 .team-head .team-title{margin-left:0}
-.team-add{height:26px;line-height:26px;font-size:.72rem;padding:0 .7rem}
+.team-add{height:26px;line-height:26px;font-size:.72rem;padding:0 .7rem;flex-shrink:0;white-space:nowrap}
 /* crew packs + affection: pack picker rides the header, hearts ride names. */
 .team-pack{height:26px;font-size:.7rem;background:rgba(255,255,255,.07);color:var(--text-dim);border:0;border-radius:99px;padding:0 .5rem;cursor:pointer;max-width:92px}
 .team-hearts{font-size:.62rem;color:var(--brand-light);margin-left:.25rem}
@@ -348,10 +348,6 @@ button:disabled{opacity:.4;cursor:default}
 .pair-join .explore-search{flex:1;min-width:0}
 .composer-innerbar{display:flex;align-items:center;gap:.5rem;padding:0 .4rem .3rem}
 .composer-innerbar .effort{flex:1;min-width:0}
-/* panel buddy: nicki sits bottom-left of the composer row (ref placement). */
-.chat-buddy{width:24px;height:24px;flex:none;display:grid;place-items:center;overflow:visible}
-.chat-buddy .mascot{width:24px;height:24px;cursor:default}
-.chat-buddy .mascot svg{width:24px;height:24px}
 .picker-group{display:flex;align-items:center;gap:.5rem;margin-left:auto}
 .effort-wrap{position:relative;flex:none;display:flex;align-items:center}
 .effort-pill{width:auto;height:32px;display:inline-flex;align-items:center;justify-content:center;gap:.3rem;background:rgba(255,255,255,.07);color:var(--text-dim);border:0;border-radius:99px;padding:0 1rem;font-size:.8rem;font-weight:var(--weight-em);line-height:32px;cursor:pointer;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -398,9 +394,8 @@ button:disabled{opacity:.4;cursor:default}
 .chat-log > .chat-row:nth-child(n+6){animation-delay:.175s}
 .bubble{box-shadow:none;color:var(--text);font-size:.92rem;line-height:1.55;letter-spacing:-.01em;max-width:85%;text-align:left;background:var(--field);border:1px solid transparent;border-radius:12px 4px 12px 12px;padding:.55rem .8rem;overflow-wrap:break-word;white-space:pre-wrap}
 .reply{font-size:.92rem;line-height:1.6;letter-spacing:-.01em;color:var(--text);max-width:100%;background:var(--field);border:1px solid transparent;border-radius:4px 12px 12px 12px;padding:.6rem .85rem;overflow-wrap:break-word;white-space:pre-wrap}
-/* assistant pill: who answered, with a live green dot (ref 79×30). */
-.reply-pill{display:inline-flex;align-items:center;gap:.35rem;min-width:79px;height:30px;padding:0 .7rem;margin-bottom:.35rem;border-radius:99px;background:rgba(255,255,255,.06);font-size:.72rem;font-weight:700;color:var(--text-dim);text-transform:lowercase}
-.pill-dot{width:7px;height:7px;flex:none;border-radius:50%;background:#4ade80;box-shadow:0 0 8px rgba(74,222,128,.8)}
+/* assistant pill: who answered, first in the action row. */
+.reply-pill{display:inline-flex;align-items:center;height:22px;padding:0 .55rem;margin-right:.15rem;border-radius:99px;background:rgba(255,255,255,.06);font-size:.65rem;font-weight:700;color:var(--text-dim);text-transform:lowercase}
 .reply .inline-code{overflow-wrap:break-word;white-space:pre-wrap}
 /* chatting = text owns the space: mascot + team shrink, log grows.
    Empty chat keeps everything full size. */
@@ -473,12 +468,7 @@ button:disabled{opacity:.4;cursor:default}
 .bone.shimmer{background:linear-gradient(90deg,var(--surface-2) 25%,rgba(255,255,255,.14) 50%,var(--surface-2) 75%);background-size:200% 100%;animation:bone-shimmer 1.8s linear infinite}
 @keyframes bone-shimmer{to{background-position:-200% 0}}
 @media (prefers-reduced-motion:reduce){.bone.shimmer{animation:none;background:var(--surface-2)}}
-.typing{display:flex;gap:5px;background:var(--field);border:1px solid transparent;border-radius:12px;padding:.6rem .8rem}
-.typing i{width:6px;height:6px;border-radius:50%;background:var(--brand);animation:blink 1s infinite}
-.typing i:nth-child(2){animation-delay:.2s}
-.typing i:nth-child(3){animation-delay:.4s}
 @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
-@media (prefers-reduced-motion:reduce){.typing i{animation:none;opacity:.7}}
 .composer-box{background:var(--field);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;min-width:0;overflow:visible;position:relative}
 /* chat-open visibility: long histories push the panel past the fold — the
    composer sticks to the panel bottom so the text field is always in reach
@@ -562,6 +552,9 @@ button.live-pill:hover{border-color:var(--brand)}
 /* navbar — 3-zone grid: left / middle centered / right. Perfectly aligned.
    Icons-only, no pill surface — dropdowns keep their own card bg. */
 .navbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:.25rem .5rem;position:relative;gap:.5rem;background:transparent;border:none;border-radius:0}
+/* copy echo owns the bar while it shows: black backdrop hides the tabs
+   behind it so the Copied text reads clear. */
+.navbar.echoing{background:#000;border-radius:14px}
 .tabs{display:flex;gap:.5rem;justify-self:start;align-items:center}
 .tab{background:transparent;border:1px solid transparent;border-radius:18px;width:48px;height:36px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;padding:0}
 .tab:hover{background:transparent;border-color:transparent;color:var(--text)}
@@ -738,7 +731,6 @@ button.hpill:hover{border-color:var(--brand)}
   #island[data-edge]{animation:none !important;transition:none !important}
   .drop-frame rect{animation:none !important}
   .hpill.live .dot{animation:none !important}
-  .typing i{animation:none !important}
   .eq-bars i{animation:none !important}
   #island{transition:none !important}
   .hist-row{transition:none !important}
@@ -972,6 +964,9 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
    measured px — CSS drop-shadow can't trace a clip-path in this renderer,
    verified black-only in screenshots). ::before keeps the black fill. */
 .notch-frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
+/* open panel: urgent parks a full amber hold under the navbar while
+   approval waits. */
+#island[data-glow="urgent"] .jacked-body::after{content:"";height:2px;border-radius:99px;background:rgba(251,146,60,.9);box-shadow:0 0 8px rgba(251,146,60,.6)}
 /* stays absolute behind content (the pc >* rule lifts siblings to z-1) */
 .stage.app.pc #island>.notch-frame{position:absolute;inset:0;z-index:0}
 .stage.app.pc #island{width:auto;max-width:min(1020px,calc(100vw - 16px));margin:0 auto;justify-content:center;position:relative;overflow:visible;background:transparent;border-color:transparent;box-shadow:none;border-radius:0 0 18px 18px;padding:12px 18px;transition:none}
@@ -1032,17 +1027,24 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
    content at 0px. Tall content clips at the cap (chat-log and other inner
    views keep their own scroll) — never a page-level scrollbar. */
 .stage.app.pc #island[data-state="jacked"] .jacked-body{max-height:var(--jacked-cap, calc(100dvh - 150px));overflow:hidden}
-.stage.app.pc .navbar{padding:.2rem .8rem;position:sticky;top:0;z-index:5}
+.stage.app.pc .navbar{padding:.2rem 0;position:sticky;top:0;z-index:5}
 /* Command Echo (glance): transient copy preview. One grey (--field),
    no border. Pill swells to fit, melts back after ~2.6s. */
 .pill-echo{display:inline-flex;align-items:center;gap:.4rem;color:var(--text);font-size:.78rem;font-weight:600;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis;padding:.3rem .2rem;animation:viewIn .18s ease-out}
-.echo-banner{display:flex;align-items:center;gap:.45rem;background:var(--field);border:1px solid transparent;border-radius:12px;color:var(--text);font-size:.82rem;padding:.5rem .8rem;margin:.1rem 0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;animation:viewIn .18s ease-out}
-.echo-banner,.pill-echo{scrollbar-width:none}
+.pill-echo .e-ic,.nav-echo-chip .e-ic{display:inline-flex;align-items:center;gap:.15rem;color:#ff7a45}
+/* Command Echo chip (glance): our own copy icons + Copied on the left,
+   Text on the right. Compact absolute overlay in the empty navbar center —
+   nav icons stay visible around it. White/amber, no grey box. Pops in. */
+.nav-middle:has(.nav-echo-chip){position:relative;overflow:visible}
+.nav-echo-chip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:.5rem;background:#000;border-radius:99px;padding:.32rem 1rem;white-space:nowrap;color:#fff;font-size:.82rem;font-weight:700;pointer-events:none;animation:echo-pop .32s cubic-bezier(.34,1.56,.64,1)}
+.nav-echo-chip .e-t{font-weight:500;color:var(--text-dim)}
+@keyframes echo-pop{from{opacity:0;transform:translate(-50%,-50%) scale(.8)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
 /* no scrollbar chrome anywhere in the island window (both axes, every
-   view/sheet): inner views still wheel/touch-scroll, but no thumb or
-   gutter ever paints or shifts layout. */
-.stage.app.pc *{scrollbar-width:none !important}
-.stage.app.pc *::-webkit-scrollbar{display:none !important;width:0 !important;height:0 !important}
+   view/sheet) — EXCEPT the message log, which keeps its thin styled thumb
+   so long chats stay visibly scrollable. Inner views still wheel/touch-
+   scroll everywhere; only painted chrome is removed. */
+.stage.app.pc *:not(.chat-log){scrollbar-width:none !important}
+.stage.app.pc *:not(.chat-log)::-webkit-scrollbar{display:none !important;width:0 !important;height:0 !important}
 /* mobile: everything fits a phone, tap targets stay fingers */
 @media (max-width:480px){
   .stage{padding-top:calc(72px + env(safe-area-inset-top));gap:12px}

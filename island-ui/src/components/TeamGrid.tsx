@@ -57,13 +57,7 @@ const MATE_QUIPS: Record<string, string> = {
   theo: "reads the docs so you don't",
   wren: "carries drops phone to pc",
 };
-// Crew packs — one-install team shapes (Cowork-plugin spirit at our
-// scale): one tap sets every slot's role, names stay yours.
-export const TEAM_PACKS = [
-  { id: "balanced", label: "Balanced", roles: ["lead", "scout", "coder", "critic"] },
-  { id: "research", label: "Research", roles: ["scout", "sage", "scribe", "critic"] },
-  { id: "ship", label: "Ship it", roles: ["coder", "coder", "runner", "critic"] },
-];
+// Crew packs removed — header is mate-only (roles cycle from the tile menu).
 // Affection — Grok-companion spirit, honest version: drives per mate id,
 // persisted local. Tiles show a heart once driven 3+ times.
 const AFF_KEY = "island.affection.v1";
@@ -151,7 +145,7 @@ export function useSessionProgress(sessions: AgentMini[]) {
   return { prog, refresh };
 }
 
-export function useTeam(): { members: Member[]; rename: (id: string, name: string) => void; remove: (id: string) => void; cycleRole: (id: string) => void; setSid: (id: string, sid: string) => void; add: () => void; applyPack: (roles: string[]) => void } {
+export function useTeam(): { members: Member[]; rename: (id: string, name: string) => void; remove: (id: string) => void; cycleRole: (id: string) => void; setSid: (id: string, sid: string) => void; add: () => void } {
   const [members, setMembers] = useState<Member[]>(loadTeam);
   useEffect(() => {
     try {
@@ -177,9 +171,7 @@ export function useTeam(): { members: Member[]; rename: (id: string, name: strin
       const color = TEAM_COLORS[NAME_POOL.indexOf(name) % TEAM_COLORS.length] ?? TEAM_COLORS[ms.length % TEAM_COLORS.length];
       return [...ms, { id: `m${Date.now()}`, name, color, role: ROLE_POOL[ms.length % ROLE_POOL.length] ?? "mate" }];
     });
-  const applyPack = (roles: string[]) =>
-    setMembers((ms) => ms.map((m, i) => ({ ...m, role: roles[i % roles.length] ?? m.role })));
-  return { members, rename, remove, cycleRole, setSid, add, applyPack };
+  return { members, rename, remove, cycleRole, setSid, add };
 }
 
 // Step glyph — one icon per kind (navbar stroke family), shared by
@@ -421,7 +413,7 @@ export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel
 }) {
   const teamInternal = useTeam();
   const liveInternal = useSessionProgress(sessions);
-  const { members, rename, remove, cycleRole, add, applyPack } = teamProp ?? teamInternal;
+  const { members, rename, remove, cycleRole, add } = teamProp ?? teamInternal;
   const { prog, refresh } = liveProp ?? liveInternal;
   // affection: drives per mate id (see AFF_KEY). Bumped on explicit
   // Resume; tiles show one heart at 3+ drives.
@@ -503,29 +495,11 @@ export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel
           title={collapsed ? `Show crew (${members.length + 1})` : "Hide crew while chatting"}
           onClick={() => setShut(!collapsed)}
         >
-          TEAM {members.length + 1} {collapsed ? "▸" : "▾"}
+          TEAM {members.length + 1}
         </button>
         <button className="effort-pill team-add" onClick={add} title={members.length >= 8 ? "Team is full (8)" : "Add a mate"}>
           {collapsed ? "+" : "+ Add mate"}
         </button>
-        {!collapsed && (
-          <select
-            className="team-pack"
-            aria-label="Crew pack"
-            value=""
-            title="One-tap crew shape — roles only, names stay yours"
-            onChange={(e) => {
-              const p = TEAM_PACKS.find((x) => x.id === e.target.value);
-              if (p) applyPack(p.roles);
-              e.target.value = "";
-            }}
-          >
-            <option value="" disabled>Pack…</option>
-            {TEAM_PACKS.map((p) => (
-              <option key={p.id} value={p.id}>{p.label}</option>
-            ))}
-          </select>
-        )}
       </div>
       {!collapsed && (
       <div className="team-grid">
