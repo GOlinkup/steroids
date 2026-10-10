@@ -30,10 +30,16 @@ export interface GigListing {
 }
 
 /// Exact cents render, or the seed text verbatim. Never a float.
+/// Valid pay_cents always recompute (a stale money string never wins);
+// money/past text only when cents are absent or non-integer.
 export function moneyLine(g: GigListing): string {
-  if (g.money) return g.money;
   if (g.pay_cents !== null && g.pay_cents !== undefined) {
-    return moneyCents(g.pay_cents);
+    try {
+      return moneyCents(g.pay_cents);
+    } catch {
+      /* non-integer cents: fall through to verbatim below */
+    }
   }
+  if (g.money) return g.money;
   return g.pay_text || "Pay on application";
 }

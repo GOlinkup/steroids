@@ -47,4 +47,19 @@ describe("moneyCents", () => {
       "R 0,00",
     );
   });
+
+  it("moneyLine: exact cents win over a stale money string", () => {
+    assert.equal(
+      moneyLine({ id: "d", title: "t", origin: "native", pay_cents: 25000, money: "R 999,00" }),
+      "R 250,00",
+    );
+    assert.equal(
+      moneyLine({ id: "e", title: "t", origin: "native", pay_cents: null, money: "R 5,00" }),
+      "R 5,00",
+    );
+    assert.equal(
+      moneyLine({ id: "f", title: "t", origin: "native", pay_cents: 12.5, money: "R 5,00" }),
+      "R 5,00",
+    );
+  });
 });
