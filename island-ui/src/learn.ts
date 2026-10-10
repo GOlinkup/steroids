@@ -26,9 +26,16 @@ const K_EVENTS = "island_learn_events";
 const K_ASKED = "island_q_asked";
 const K_ANSWERS = "island_q_answers";
 
+/** Event log never grows past this — oldest rows drop first. */
+const MAX_EVENTS = 500;
+
 export class LearnLog {
   private store: KVStore;
   private now: () => Date;
+  // Memory-only fallback: when the store throws (quota-full, private-mode
+  // denial), events land here so the session keeps working. Cleared on the
+  // next successful write.
+  private mem: Array<{ e: string; t: string }> | null = null;
 
   constructor(store: KVStore, now?: () => Date) {
     this.store = store;
@@ -38,7 +45,15 @@ export class LearnLog {
   observe(event: string): void {
     const rows = this.read();
     rows.push({ e: event, t: this.now().toISOString() });
-    this.store.setItem(K_EVENTS, JSON.stringify(rows));
+    // cap: keep the newest rows, drop the oldest.
+    const capped =
+      rows.length > MAX_EVENTS ? rows.slice(rows.length - MAX_EVENTS) : rows;
+    try {
+      this.store.setItem(K_EVENTS, JSON.stringify(capped));
+      this.mem = null;
+    } catch {
+      this.mem = capped;
+    }
   }
 
   /** Every learned datum, viewable. */
@@ -48,9 +63,14 @@ export class LearnLog {
 
   /** Every learned datum, deletable. */
   clear(): void {
-    this.store.removeItem(K_EVENTS);
-    this.store.removeItem(K_ANSWERS);
-    this.store.removeItem(K_ASKED);
+    try {
+      this.store.removeItem(K_EVENTS);
+      this.store.removeItem(K_ANSWERS);
+      this.store.removeItem(K_ASKED);
+    } catch {
+      /* already gone or unreachable — the datum is dropped either way */
+    }
+    this.mem = null;
   }
 
   questionsDone(): boolean {
@@ -63,13 +83,21 @@ export class LearnLog {
     for (const k of Object.keys(answers).slice(0, 3)) {
       take[k] = answers[k];
     }
-    this.store.setItem(K_ANSWERS, JSON.stringify(take));
-    this.store.setItem(K_ASKED, "1");
+    try {
+      this.store.setItem(K_ANSWERS, JSON.stringify(take));
+      this.store.setItem(K_ASKED, "1");
+    } catch {
+      /* quota-full / private-mode: answers stay session-local, no crash */
+    }
   }
 
   /** One tap skips all questions. Observing continues (Q8 default). */
   skipQuestions(): void {
-    this.store.setItem(K_ASKED, "1");
+    try {
+      this.store.setItem(K_ASKED, "1");
+    } catch {
+      /* same as above — skip is a nicety, never a crash */
+    }
   }
 
   daysObserved(): number {
@@ -116,9 +144,9 @@ export class LearnLog {
     try {
       raw = this.store.getItem(K_EVENTS);
     } catch {
-      return [];
+      return this.mem ?? [];
     }
-    if (!raw) return [];
+    if (!raw) return this.mem ?? [];
     try {
       const decoded: unknown = JSON.parse(raw);
       if (!Array.isArray(decoded)) return [];
