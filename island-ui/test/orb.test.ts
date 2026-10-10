@@ -50,11 +50,11 @@ describe("chatOrbFor", () => {
 
   it("priority: searching > solving > composing > working", () => {
     assert.equal(
-      chatOrbFor({ bridgeOn: true, activity: "Searching the web", stepsActive: true, partial: "half an answer" }),
+      chatOrbFor({ bridgeOn: true, activity: "· WebSearch steroids island", stepsActive: true, partial: "half an answer" }),
       "searching",
     );
     assert.equal(
-      chatOrbFor({ bridgeOn: true, activity: "Reading foo.ts", partial: "half an answer" }),
+      chatOrbFor({ bridgeOn: true, activity: "· Read foo.ts 📄", partial: "half an answer" }),
       "searching",
     );
     assert.equal(
@@ -65,5 +65,21 @@ describe("chatOrbFor", () => {
       chatOrbFor({ bridgeOn: true, partial: "half an answer" }),
       "composing",
     );
+  });
+
+  it("plain prose never reads as searching (user-echo taxonomy)", () => {
+    // agentlog echoes the user's own prompt as `· <text>` — free prose,
+    // not a tool call, so the searching design must stay off.
+    for (const activity of [
+      "· looking for lunch…",
+      "· find out the time…",
+      "· web view of the app…",
+      "· Searching the web", // no `· ` tool prefix, not engine-shaped
+      "· Reading foo.ts", // prose gerund, not the `Read` tool verb
+      "thinking",
+      "working…",
+    ]) {
+      assert.equal(chatOrbFor({ bridgeOn: true, activity }), "working");
+    }
   });
 });

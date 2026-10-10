@@ -5,6 +5,7 @@ export { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
 import { SafeOrb } from "../orb";
 import { chatOrbFor } from "../orb_state";
 import { LensBlock, StepsList, useSessionProgress } from "./TeamGrid";
+import Mascot from "./Mascot";
 import { HiveBoard, LoopTile, LoopTasks, LiveLoops, SchedulesSection, useLoopTasks } from "./Loop";
 import MermaidBlock from "./Mermaid";
 import {
@@ -362,6 +363,7 @@ export function ChatPanel({
   useEffect(() => {
     if (firstThread.current) { firstThread.current = false; return; }
     setDraft("");
+    stick.current = true; // new/resumed thread opens at the latest.
     try { localStorage.removeItem(DRAFT_KEY); } catch { /* ignore */ }
     if (boxRef.current) boxRef.current.style.height = "auto";
   }, [threadKey]);
@@ -430,13 +432,22 @@ export function ChatPanel({
   const [phoneDrag, setPhoneDrag] = useState(false);
   const dragDepth = useRef(0);
   const logRef = useRef<HTMLDivElement>(null);
+  // stick-to-bottom: the user owns the scroll. While stuck (near bottom)
+  // new turns pin to the latest; scrolled up stays put — streaming chunks
+  // must never yank a reader back down. Ref, not state: no re-render per scroll.
+  const stick = useRef(true);
+  const onLogScroll = () => {
+    const el = logRef.current;
+    if (!el) return;
+    stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
+  };
 
-  // newest reply always visible: pin the log to the bottom as turns stream.
-  // layout effect, not passive: passive fires after paint, flashing the
-  // log top for one frame on every open with history (chat-open flash).
+  // newest reply visible while stuck: pin the log to the bottom as turns
+  // stream. layout effect, not passive: passive fires after paint, flashing
+  // the log top for one frame on every open with history (chat-open flash).
   useLayoutEffect(() => {
     const el = logRef.current;
-    if (el) el.scrollTop = el.scrollHeight;
+    if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages, thinking, livePartial]);
   const fileRef = useRef<HTMLInputElement>(null);
   const snapRef = useRef<HTMLInputElement>(null);
@@ -461,6 +472,7 @@ export function ChatPanel({
     const t = draft.trim();
     if ((!t && !attachments.length) || thinking) return;
     setDraft("");
+    stick.current = true; // own send re-sticks: follow the reply.
     if (boxRef.current) boxRef.current.style.height = "auto";
     onSend(t, provider, { model, effort });
   };
@@ -512,6 +524,10 @@ export function ChatPanel({
       document.execCommand("copy");
       ta.remove();
     }
+    // Command Echo: programmatic copies fire no DOM copy event — announce it.
+    try {
+      document.dispatchEvent(new CustomEvent<string>("steroids:copied", { detail: text }));
+    } catch { /* listeners optional */ }
     setCopiedId(id);
     setTimeout(() => setCopiedId((c) => (c === id ? null : c)), 1200);
   };
@@ -592,7 +608,7 @@ export function ChatPanel({
       }}
     >
       {teamNode}
-      <div className="chat-log" ref={logRef}>
+      <div className="chat-log" ref={logRef} onScroll={onLogScroll}>
         {(recording ||
           (battery?.has_battery === true && (battery.charging || (battery.pct ?? 100) <= 20))) && (
           <div className="live-strip" aria-live="polite">
@@ -612,6 +628,12 @@ export function ChatPanel({
         {messages.map((m) => (
           <div key={m.id} className={m.role === "user" ? "chat-row user" : "chat-row"}>
             <div className={m.role === "user" ? "bubble" : "reply"}>
+              {m.role === "assistant" && (
+                <div className="reply-pill" aria-hidden>
+                  <i className="pill-dot" />
+                  <span>nicki</span>
+                </div>
+              )}
               {m.attachments?.filter((a) => a.kind === "image" && a.url).map((a) => (
                 <img
                   key={a.id}
@@ -731,9 +753,8 @@ export function ChatPanel({
                     : `${workSecs}s`}
                 </span>
                 {!livePartial && !(liveProgress && (liveProgress.steps.length > 0 || (liveProgress.lens && liveProgress.lens.file))) && (
-                  <div className="work-bones" aria-hidden>
-                    <span className="bone shimmer work-bone" style={{ width: "82%" }} />
-                    <span className="bone shimmer work-bone" style={{ width: "64%" }} />
+                  <div className="typing" aria-hidden>
+                    <i /><i /><i />
                   </div>
                 )}
                 {liveProgress && liveProgress.steps.length > 0 && (
@@ -867,7 +888,7 @@ export function ChatPanel({
           ref={boxRef}
           className="composer-input"
           rows={1}
-          placeholder={attachments.length ? "Ask about these files…" : `Ask ${displayModel(model)} anything…`}
+          placeholder={attachments.length ? "Ask about these files…" : "Continue..."}
           value={draft}
           onChange={(e) => {
             setDraft(e.target.value);
@@ -885,6 +906,9 @@ export function ChatPanel({
           }}
         />
         <div className="composer-innerbar">
+          <span className="chat-buddy" aria-hidden>
+            <Mascot mood="neutral" />
+          </span>
           <div ref={attachDismiss} className="attach-wrap">
             <button
               className="tool-btn"
@@ -963,7 +987,7 @@ export function ChatPanel({
             title={recording ? `Stop recording (${recSecs}s)` : "Record voice note — attaches audio, hit send after"}
             onClick={toggleRecording}
           >
-            {recording ? <span className="rec-dot" /> : <MicIcon size={20} />}
+            {recording ? <SafeOrb state="listening" size={20} /> : <MicIcon size={20} />}
           </button>
           {thinking && onStop ? (
             <button className="send-btn stop" onClick={onStop} aria-label="Stop the turn" title="Stop — keeps the partial above"><StopIcon size={16} /></button>

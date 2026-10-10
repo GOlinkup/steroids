@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { AgentSession, Approval, ChatSession, IslandView, Question } from "../store";
 import type { SettingsPage } from "./Cards";
 import {
-  BellIcon, BoltIcon, ChatIcon, ExploreIcon, GearIcon, HistoryIcon, HomeIcon, LensIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ShelfIcon, TrashIcon,
+  BellIcon, BoltIcon, ChatIcon, ExploreIcon, GearIcon, HistoryIcon, HomeIcon, LensIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ShelfIcon, SoundOffIcon, SoundOnIcon, TrashIcon,
 } from "./icons";
 import { useDismiss, MenuRow } from "./pickers";
 
@@ -172,6 +172,8 @@ export function Header({
   question = null,
   hiddenViews = [],
   settingsPage = "general",
+  soundOn = true,
+  onToggleSound = () => {},
 }: {
   view: IslandView;
   unread: number;
@@ -194,6 +196,8 @@ export function Header({
   question?: Question | null;
   hiddenViews?: IslandView[];
   settingsPage?: SettingsPage;
+  soundOn?: boolean;
+  onToggleSound?: () => void;
 }) {
   // Atoll rule: disabled features render no tab. Toggles live in settings.
   const tabs = TABS.filter((t) => !hiddenViews.includes(t.view)).map((t) => ({
@@ -224,6 +228,16 @@ export function Header({
       </div>
       <div className="nav-middle">{middle}</div>
       <div className="nav-actions">
+        <HeaderIconButton title="Start a new chat" onClick={() => onNewChat?.()}>
+          <PlusIcon size={22} />
+        </HeaderIconButton>
+        <HeaderIconButton
+          active={!soundOn}
+          title={soundOn ? "Mute sounds" : "Unmute sounds"}
+          onClick={() => onToggleSound()}
+        >
+          {soundOn ? <SoundOnIcon size={22} /> : <SoundOffIcon size={22} />}
+        </HeaderIconButton>
         <HeaderIconButton
           active={histOpen}
           title="Chat history"

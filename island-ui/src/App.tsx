@@ -16,7 +16,7 @@ import type { CloudRow, DisplayName } from "./sync";
 // main bundle. Every cloud call below goes through loadSync(), so boot
 // stays lean and the chunk loads on first login/sync tap, never at startup.
 const loadSync = () => import("./sync");
-import { Sound, setMuted, setVolume } from "./sound";
+import { Sound, setMuted, setPack, setVolume } from "./sound";
 import { RelayClient } from "./relay";
 import { OutboxStore } from "./outbox";
 import "./index.css";
@@ -392,6 +392,19 @@ export default function App() {
         if (!dead && typeof j?.version === "string" && j.version !== "?") setAppVer("v" + j.version);
       })
       .catch(() => {});
+    // sound-pack mode: first installed openpeon pack feeds Sound.playFile;
+    // empty map (no packs) keeps synth. One fetch per boot, silent either way.
+    fetch(`${BRIDGE}/soundpack/map`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (dead || !j || typeof j.map !== "object") return;
+        const pack: Record<string, string[]> = {};
+        for (const [ev, url] of Object.entries(j.map)) {
+          if (typeof url === "string" && url) pack[ev] = [`${BRIDGE}${url}`];
+        }
+        if (Object.keys(pack).length) setPack(pack);
+      })
+      .catch(() => {});
     // profile photo for the avatar button (GOlinkup rule: photo when live,
     // initial the moment it dies — the button itself owns the fallback).
     fetch(`${BRIDGE}/profile`)
@@ -534,6 +547,14 @@ export default function App() {
       } catch { /* selection unreadable */ }
     };
     document.addEventListener("copy", onCopy);
+    // In-app programmatic copies (message copy button, pairing code) fire
+    // no DOM copy event — they announce themselves with the copy text.
+    const onEchoEvent = (e: Event) => {
+      try {
+        showEcho((e as CustomEvent<string>).detail ?? "");
+      } catch { /* bad detail */ }
+    };
+    document.addEventListener("steroids:copied", onEchoEvent);
     let last = "";
     // PC (Glance notch): the window shrink-wraps the pill — small and
     // centered, never window.screen.width (the full-width strip read as
@@ -581,6 +602,7 @@ export default function App() {
     return () => {
       ro.disconnect();
       document.removeEventListener("copy", onCopy);
+      document.removeEventListener("steroids:copied", onEchoEvent);
       if (echoTimer.current) clearTimeout(echoTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps

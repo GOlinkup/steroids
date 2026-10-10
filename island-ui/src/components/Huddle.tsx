@@ -1,5 +1,6 @@
 import { useEffect, useRef } from "react";
 import Mascot, { type MascotHandle } from "./Mascot";
+import { Sound } from "../sound";
 import "./huddle.css";
 
 export interface HuddleProps {
@@ -17,6 +18,14 @@ export default function Huddle({ lite }: HuddleProps) {
     const t = window.setInterval(() => mascotRef.current?.poke(), 9000);
     return () => window.clearInterval(t);
   }, [lite]);
+  // crew hello + send-off: mount announces the huddle, taps pop up the
+  // pitch ladder with the poke count, unmount (first send) chimes out.
+  // Silent until first user gesture anyway (suspended AudioContext).
+  useEffect(() => {
+    if (lite) return;
+    Sound.huddleConnect();
+    return () => Sound.huddleChime();
+  }, [lite]);
   return (
     <div
       className={lite ? "huddle-stage huddle-static" : "huddle-stage"}
@@ -25,7 +34,7 @@ export default function Huddle({ lite }: HuddleProps) {
     >
       <div className="huddle-nicki">
         {/* wave mood: rounded hands up, always (neutral hides them). */}
-        <Mascot ref={mascotRef} mood="wave" />
+        <Mascot ref={mascotRef} mood="wave" onTap={(n) => Sound.huddlePop(n)} />
         <div className="huddle-bubble" aria-live="polite">
           <span className="huddle-bubble-text">Crew ready — what&apos;s first?</span>
         </div>

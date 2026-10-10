@@ -1,10 +1,9 @@
-// ActivityOrb: thinking-orbs face for empty/live states.
+// SafeOrb: thinking-orbs face for the live turn bubble.
 // The orb always shows *something alive* (breathing at rest), so content
 // areas never sit as a black void. Zero config: state in, orb out.
 import { ThinkingOrb } from "thinking-orbs";
 import type { OrbState, OrbSize } from "thinking-orbs";
 import { Component, type JSX, type ReactNode } from "react";
-import { orbFor, type IslandActivity } from "./orb_state";
 
 // Canvas can fail where there is no GPU (cloud browsers, blocked WebGL):
 // the guard swaps in a pure-CSS blue-blur pulse so the wait still reads.
@@ -25,22 +24,6 @@ export function SafeOrb(props: { state: OrbState; size?: OrbSize }): JSX.Element
     <OrbGuard>
       <ThinkingOrb state={props.state} size={props.size ?? 20} />
     </OrbGuard>
-  );
-}
-
-export function ActivityOrb(props: {
-  activity: IslandActivity;
-  size?: 64 | 20;
-  label?: string;
-}): JSX.Element {
-  const state = orbFor(props.activity);
-  return (
-    <div className="activity-orb">
-      <OrbGuard>
-        <ThinkingOrb state={state} size={props.size ?? 64} />
-      </OrbGuard>
-      <div className="card-detail">{props.label ?? state}</div>
-    </div>
   );
 }
 

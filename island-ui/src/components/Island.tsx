@@ -237,9 +237,11 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     frame = null,
   } = props;
   // glance light trace: one thin amber line hugging the closed pill's
-  // bottom edge (the step-notch path crossed the whole panel — read as a bug).
+  // bottom OUTSIDE edge (inside the black card it drowns; only halo spilled).
+  // Inset past the pill's corner radius so it never pokes past the curves.
+  // Overflow paints past the svg box — that spill IS the look.
   const glowD = frame
-    ? `M0 ${Math.max(2, frame.h - 3)} H${frame.w}`
+    ? `M18 ${frame.h + 1} H${Math.max(20, frame.w - 18)}`
     : "";
 
   // Avatar menu jumps: everything but Phone lands on the one General
@@ -313,6 +315,8 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             approval={approval}
             question={question}
             onSignOut={onSignOut}
+            soundOn={settings.soundOn}
+            onToggleSound={() => onSettings({ ...settings, soundOn: !settings.soundOn })}
           />
           {/* Command Echo: open panel uses this space for the copy preview. */}
           {echo ? (

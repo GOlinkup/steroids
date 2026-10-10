@@ -28,6 +28,13 @@ export function orbFor(a: IslandActivity): OrbState {
   return "breathing";
 }
 
+// Search-family tool verbs, as the engine emits them: `· Tool …`
+// (agentlog latest(): `· Read App.tsx 📄`, `· Grep foo`). Anchored on
+// purpose — bare-substring matching lit `searching` on plain prose:
+// user-prompt echoes share the `· ` prefix ("· looking for lunch…",
+// "· find out…"), and they are not tool calls.
+const SEARCH_ACTIVITY = /^·\s*(read|glob|grep|webfetch|websearch)\b/i;
+
 // Chat working bubble -> orb: each live turn signal owns its design, so
 // the bubble shows more than one animation end-to-end. Order is deliberate
 // (bridge-down honesty first, then the most specific live signal wins).
@@ -39,8 +46,7 @@ export function chatOrbFor(opts: {
   stepsActive?: boolean;
 }): OrbState {
   if (!opts.bridgeOn) return "breathing";
-  if (/search|read|glob|grep|fetch|web|look|find|scout/i.test(opts.activity ?? ""))
-    return "searching";
+  if (SEARCH_ACTIVITY.test(opts.activity ?? "")) return "searching";
   if (opts.stepsActive) return "solving";
   if ((opts.partial ?? "").length > 0) return "composing";
   return "working";

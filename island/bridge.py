@@ -28,7 +28,7 @@ import time
 import urllib.request
 from collections import Counter
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
-from urllib.parse import urlparse, parse_qs
+from urllib.parse import urlparse, parse_qs, quote
 
 sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 import agentlog  # noqa: E402  (same CLI path as the desktop island app)
@@ -1291,6 +1291,56 @@ class Handler(SimpleHTTPRequestHandler):
             self._send({"usage": agentlog.transcript_usage(p) if p else {}})
         elif parts.path == "/soundpacks":
             self._send({"packs": soundpack.packs()})
+        elif parts.path == "/soundpack/map":
+            # web pack map: first installed openpeon pack as {event: url}.
+            # Empty map = no packs installed, UI keeps synth. Pack identity
+            # is basename-matched against discovered dirs (never a raw path).
+            qs = parse_qs(parts.query)
+            want = (qs.get("pack") or [""])[0]
+            found = soundpack.packs()
+            base = next((p for p in found
+                         if os.path.basename(os.path.normpath(p)) == want),
+                        found[0] if found else "")
+            out = {}
+            if base:
+                name = os.path.basename(os.path.normpath(base))
+                for ev, files in soundpack.load(base).items():
+                    if files:
+                        out[ev] = "/soundpack/file?pack=%s&f=%s" % (
+                            quote(name), quote(os.path.basename(files[0])))
+            self._send({"pack": os.path.basename(os.path.normpath(base))
+                        if base else "", "map": out})
+        elif parts.path == "/soundpack/file":
+            # serve one pack file: basename-only + realpath containment,
+            # audio extensions only. Anything else is a 404, never a read.
+            qs = parse_qs(parts.query)
+            name = (qs.get("pack") or [""])[0]
+            fn = (qs.get("f") or [""])[0]
+            base = next((p for p in soundpack.packs()
+                         if os.path.basename(os.path.normpath(p)) == name), "")
+            p = ""
+            if base and fn and "/" not in fn and "\\" not in fn \
+                    and not fn.startswith(".") \
+                    and fn.endswith((".wav", ".mp3", ".ogg")):
+                cand = os.path.join(os.path.realpath(base), fn)
+                if os.path.realpath(cand) == cand and os.path.isfile(cand):
+                    p = cand
+            if not p:
+                return self._send({"ok": False, "error": "nope"}, 404)
+            try:
+                with open(p, "rb") as f:
+                    body = f.read()
+                self.send_response(200)
+                self.send_header("Content-Type",
+                                 mimetypes.guess_type(p)[0] or "audio/wav")
+                self.send_header("Content-Length", str(len(body)))
+                self.send_header("Access-Control-Allow-Origin", "*")
+                self.send_header("Cache-Control", "max-age=3600")
+                self.end_headers()
+                self.wfile.write(body)
+            except OSError:
+                return self._send({"ok": False, "error": "gone"}, 404)
+            return
         elif parts.path == "/energy":
             now = time.time()
             evs = agentlog.read_events(limit=30)
