@@ -28,6 +28,10 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 #island .pill-team.mini-grid{display:grid;grid-template-columns:1fr 1fr;gap:2px;margin-left:16px}
 .pill-face{width:20px;height:20px;display:grid;place-items:center}
 .pill-face .mascot{width:20px;height:20px;cursor:default}
+/* music mode: grid steps aside for one small wave beside nicki. */
+.pill-wave{width:20px;height:20px;flex:none;display:grid;place-items:center;overflow:visible}
+.pill-wave .mascot{width:20px;height:20px;cursor:default}
+.pill-wave .m-fx svg{width:20px;height:20px}
 .pill-face .m-fx svg{width:20px;height:20px}
 #island[data-state="hidden"] > .mascot.mascot-svg{display:none}
 #island[data-state="hidden"] .pill-team .mascot{visibility:visible}
@@ -53,6 +57,10 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 @keyframes halo-breathe{0%,100%{box-shadow:0 0 0 1px rgba(251,146,60,.35),0 0 14px 1px rgba(251,146,60,.18)}50%{box-shadow:0 0 0 1px rgba(251,146,60,.6),0 0 26px 4px rgba(251,146,60,.38)}}
 @keyframes halo-urgent{0%,100%{box-shadow:0 0 0 1px var(--brand),0 0 18px 2px rgba(255,77,28,.35)}50%{box-shadow:0 0 0 2px var(--brand),0 0 34px 8px rgba(255,77,28,.65)}}
 .jacked-body{display:flex;flex-direction:column;gap:.34rem;flex:1;min-width:0;width:100%;overflow:visible}
+/* page swap: each view fades/rises in on mount, so tab switches feel like
+   one gliding panel instead of a hard cut. Header persists (no remount,
+   no replay); reduced-motion already stills this below. */
+.jacked-body > *{animation:viewIn .25s ease-out}
 
 /* harness pills + ticker */
 .pill-row{display:flex;gap:.4rem;flex-wrap:wrap}
@@ -129,6 +137,8 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .team-menu .attach-opt{color:var(--text)}
 .team-edit{flex:1;min-width:0;background:transparent;border:none;border-bottom:1px solid var(--brand);color:#fff;font-size:.82rem;font-weight:700;outline:none}
 .team-cell.on{border-color:var(--brand)}
+/* nicki's highlight stays quiet: thin grey, never the orange agent ring. */
+.team-cell.nicki.on{border-color:rgba(255,255,255,.28)}
 /* grid tiles show the full buddy face — never circle-cropped. Moods,
    blinks + glances ride the Mascot itself, so tiles stay busy for free. */
 .team-face{width:32px;height:32px;flex:none;display:grid;place-items:center;background:none;overflow:visible}
@@ -429,7 +439,7 @@ button:disabled{opacity:.4;cursor:default}
 @keyframes work-ping{0%,100%{transform:scale(1);opacity:1}50%{transform:scale(1.35);opacity:.55}}
 .work-meta{display:flex;flex-direction:column;gap:.15rem;min-width:0;flex:1}
 .work-sub{font-size:var(--size-floor);color:var(--text-dim);font-family:var(--font-mono)}
-.work-partial{font-size:.82rem;line-height:1.55;white-space:pre-wrap;overflow-wrap:break-word;max-height:16em;overflow:auto;opacity:.92;color:var(--text-dim);scrollbar-width:thin}
+.work-partial{font-size:.82rem;line-height:1.55;white-space:pre-wrap;overflow-wrap:break-word;max-height:16em;overflow:auto;scrollbar-gutter:stable;opacity:.92;color:var(--text-dim);scrollbar-width:thin}
 .reply a,.bubble a{color:var(--brand-light)}
 .md-h1{font-size:1.05rem;font-weight:700;margin:.3rem 0 .1rem}
 .md-h2{font-size:.98rem;font-weight:700;margin:.3rem 0 .1rem}
@@ -465,9 +475,8 @@ button:disabled{opacity:.4;cursor:default}
 @media (forced-colors:active){.work-cap .shimmer{animation:none;background:none;color:CanvasText}}
 /* landing-bone opt-in sweep: same tokens for hero text bones only —
    container bones stay static so layout never shifts. */
-.bone.shimmer{background:linear-gradient(90deg,var(--surface-2) 25%,rgba(255,255,255,.14) 50%,var(--surface-2) 75%);background-size:200% 100%;animation:bone-shimmer 1.8s linear infinite}
 @keyframes bone-shimmer{to{background-position:-200% 0}}
-@media (prefers-reduced-motion:reduce){.bone.shimmer{animation:none;background:var(--surface-2)}}
+@media (prefers-reduced-motion:reduce){.bone,.bone.shimmer{animation:none;background:var(--field)}}
 @keyframes blink{0%,100%{opacity:.3}50%{opacity:1}}
 .composer-box{background:var(--field);border:1px solid var(--border);border-radius:var(--radius);display:flex;flex-direction:column;min-width:0;overflow:visible;position:relative}
 /* chat-open visibility: long histories push the panel past the fold — the
@@ -969,7 +978,7 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
 #island[data-glow="urgent"] .jacked-body::after{content:"";height:2px;border-radius:99px;background:rgba(251,146,60,.9);box-shadow:0 0 8px rgba(251,146,60,.6)}
 /* stays absolute behind content (the pc >* rule lifts siblings to z-1) */
 .stage.app.pc #island>.notch-frame{position:absolute;inset:0;z-index:0}
-.stage.app.pc #island{width:auto;max-width:min(1020px,calc(100vw - 16px));margin:0 auto;justify-content:center;position:relative;overflow:visible;background:transparent;border-color:transparent;box-shadow:none;border-radius:0 0 18px 18px;padding:12px 18px;transition:none}
+.stage.app.pc #island{width:auto;max-width:min(1020px,calc(100vw - 16px));margin:0 auto;justify-content:center;position:relative;overflow:visible;background:transparent;border-color:transparent;box-shadow:none;border-radius:0 0 18px 18px;padding:12px 18px}
 /* stepped notch silhouette (glance frame): the center drops below a
    short top lip with square ledges each side. One clipped layer
    paints the black; the amber step-glow is a real SVG stroke (.notch-frame,
@@ -1000,8 +1009,8 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
 .stage.app.pc #island[data-state="flex"] .pill-face .mascot,.stage.app.pc #island[data-state="flex"] .pill-face .m-fx svg,.stage.app.pc #island[data-state="pump"] .pill-face .mascot,.stage.app.pc #island[data-state="pump"] .pill-face .m-fx svg{width:12px;height:12px}
 /* motion (un-held loop3): app shell moves too — 963's transition:none would
    freeze it, so these app-scoped twins restore open .52 / close .34. */
-.stage.app.pc #island{transition:width .34s cubic-bezier(.45,0,.2,1)}
-.stage.app.pc #island[data-state="jacked"]{transition:width .52s cubic-bezier(.32,1.22,.42,1)}
+.stage.app.pc #island{transition:width .34s cubic-bezier(.45,0,.2,1),height .34s cubic-bezier(.45,0,.2,1)}
+.stage.app.pc #island[data-state="jacked"]{transition:width .52s cubic-bezier(.32,1.22,.42,1),height .52s cubic-bezier(.32,1.22,.42,1),overflow .01s linear .52s;transition-behavior:allow-discrete}
 /* flex buddy slims toward the reference notch (faces stay 20px). */
 #island[data-state="flex"] > .mascot.mascot-svg{width:44px;height:44px}
 /* closed pill = same solid black card as the open panel (no strip layer,
@@ -1029,16 +1038,18 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
 .stage.app.pc #island[data-state="jacked"] .jacked-body{max-height:var(--jacked-cap, calc(100dvh - 150px));overflow:hidden}
 .stage.app.pc .navbar{padding:.2rem 0;position:sticky;top:0;z-index:5}
 /* Command Echo (glance): transient copy preview. One grey (--field),
-   no border. Pill swells to fit, melts back after ~2.6s. */
+   no border. Pill swells to fit, melts back fast (~1.4s). */
 .pill-echo{display:inline-flex;align-items:center;gap:.4rem;color:var(--text);font-size:.78rem;font-weight:600;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis;padding:.3rem .2rem;animation:viewIn .18s ease-out}
-.pill-echo .e-ic,.nav-echo-chip .e-ic{display:inline-flex;align-items:center;gap:.15rem;color:#ff7a45}
-/* Command Echo chip (glance): our own copy icons + Copied on the left,
-   Text on the right. Compact absolute overlay in the empty navbar center —
-   nav icons stay visible around it. White/amber, no grey box. Pops in. */
-.nav-middle:has(.nav-echo-chip){position:relative;overflow:visible}
-.nav-echo-chip{position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);display:inline-flex;align-items:center;gap:.5rem;background:#000;border-radius:99px;padding:.32rem 1rem;white-space:nowrap;color:#fff;font-size:.82rem;font-weight:700;pointer-events:none;animation:echo-pop .32s cubic-bezier(.34,1.56,.64,1)}
-.nav-echo-chip .e-t{font-weight:500;color:var(--text-dim)}
-@keyframes echo-pop{from{opacity:0;transform:translate(-50%,-50%) scale(.8)}to{opacity:1;transform:translate(-50%,-50%) scale(1)}}
+.pill-echo .e-ic{display:inline-flex;align-items:center;gap:.15rem;color:#ff7a45}
+/* Command Echo takes the whole navbar for its flash (glance): left our
+   copy icons + Copied on the nav padding, Text on the right section.
+   Full overlay (tabs stay clickable under it, pointer-events none).
+   White/amber, no grey box. Slides in, melts fast — it borrows nav space. */
+.nav-echo-bar{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:space-between;background:#000;white-space:nowrap;color:#fff;font-size:.85rem;font-weight:700;pointer-events:none;animation:echo-bar-in .25s cubic-bezier(.34,1.4,.64,1)}
+.nav-echo-bar .ne-left,.nav-echo-bar .ne-right{display:inline-flex;align-items:center;gap:.5rem;min-width:0}
+.nav-echo-bar .e-ic{display:inline-flex;align-items:center;gap:.2rem;color:#ff7a45}
+.nav-echo-bar .ne-right{font-weight:500;color:var(--text-dim)}
+@keyframes echo-bar-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
 /* no scrollbar chrome anywhere in the island window (both axes, every
    view/sheet) — EXCEPT the message log, which keeps its thin styled thumb
    so long chats stay visibly scrollable. Inner views still wheel/touch-
@@ -1104,12 +1115,12 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
   .mascot-svg svg,.mascot-svg .m-eyes,.m-fx.m-squish,.m-fx.m-jump,.m-fx.m-wobble{animation:none}
 }
 
-/* Boneyard placeholders — home boot skeleton, ported from GOlinkup GlassShimmer
-   geometry (lib/shared/widgets/shimmer_tile.dart) but STATIC: no sweep, no
-   pulse, nothing moves. Each bone is sized to the exact asset it stands in
-   for (hero 18px, team tile 44px, art 30px…) inside the REAL container
-   classes, so content paints with zero layout shift. */
-.bone{background:var(--surface-2);border-radius:4px;flex:none;min-width:0}
+/* Boneyard placeholders — home boot skeleton. One grey (--field, the chat
+   textfield grey) with a gentle sweep while loading; static + flat under
+   reduced-motion. Each bone sits inside the REAL container classes at the
+   size of the asset it stands in for (hero 18px, team face 26px, art 24px,
+   transport 32/17px…), so content paints with zero layout shift. */
+.bone{background:linear-gradient(90deg,var(--field) 25%,rgba(255,255,255,.09) 50%,var(--field) 75%);background-size:200% 100%;animation:bone-shimmer 1.8s linear infinite;border-radius:4px;flex:none;min-width:0}
 .bone-stack{display:flex;flex-direction:column;gap:.4rem;min-width:0}
 .bone-tile{min-height:44px;border-radius:14px}
 /* skeleton buddy: same box as the home mascot (72px, 56px on phones) */

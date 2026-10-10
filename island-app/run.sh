@@ -31,4 +31,4 @@ except Exception:
 # KWin: loaded scripts need an explicit start, and the Gio start call never
 # resolves (journal: "Could not find slot"). busctl delivers it fine.
 busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting start 2>/dev/null || true
-exec ./node_modules/.bin/electron --ozone-platform=wayland --disable-gpu --remote-debugging-port=9335 .
+exec ./node_modules/.bin/electron --ozone-platform=wayland --disable-gpu --enable-unsafe-swiftshader --remote-debugging-port=9335 .

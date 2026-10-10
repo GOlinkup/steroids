@@ -160,6 +160,13 @@ export default function App() {
     }, 2000);
   };
   const [ocSession, setOcSession] = useState<string | null>(() => initialDraft?.session ?? null);
+  // driving a mate's own CLI: which session the composer talks to (null =
+  // nicki's live draft). The draft is stashed on the way in and restored
+  // on the way back, so each of the 5 keeps its own turns.
+  const [drivingSid, setDrivingSid] = useState<string | null>(null);
+  const drivingRef = useRef<string | null>(null);
+  drivingRef.current = drivingSid;
+  const stashRef = useRef<{ messages: ChatMessage[]; sid: string | null } | null>(null);
   const [agentSessions, setAgentSessions] = useState<AgentSession[]>([]);
   const [exploreFeed, setExploreFeed] = useState<ExploreFeed | null>(null);
   const [feedEvents, setFeedEvents] = useState<FeedEvent[]>([]);
@@ -528,7 +535,8 @@ export default function App() {
       }
     });
     // Command Echo: system copy → pill swells with the preview + mascot
-    // yay, melts back after 2.6s. ResizeObserver grows the window to fit.
+    // yay, melts back fast (1.4s — it borrows nav space, never lingers).
+    // ResizeObserver grows the window to fit.
     // (Wayland gates the system clipboard to the focused app, so copies
     // made inside the island echo via the copy event below; the shell poll
     // in main.js covers copies made while the island is focused.)
@@ -538,7 +546,7 @@ export default function App() {
       setEcho(s);
       mascotRef.current?.celebrate();
       if (echoTimer.current) clearTimeout(echoTimer.current);
-      echoTimer.current = window.setTimeout(() => setEcho(null), 2600);
+      echoTimer.current = window.setTimeout(() => setEcho(null), 1400);
     };
     shell?.onEcho?.(showEcho);
     const onCopy = () => {
@@ -547,6 +555,16 @@ export default function App() {
       } catch { /* selection unreadable */ }
     };
     document.addEventListener("copy", onCopy);
+    // paste mirrors copy: whatever lands in the island echoes the same way.
+    // Pastes made outside the island are unobservable (paste never touches
+    // the clipboard, the OS tells us nothing) — copies everywhere are
+    // covered by the main-process poll instead.
+    const onPaste = (e: Event) => {
+      try {
+        showEcho((e as ClipboardEvent).clipboardData?.getData("text") ?? "");
+      } catch { /* nothing pasted */ }
+    };
+    document.addEventListener("paste", onPaste);
     // In-app programmatic copies (message copy button, pairing code) fire
     // no DOM copy event — they announce themselves with the copy text.
     const onEchoEvent = (e: Event) => {
@@ -597,11 +615,20 @@ export default function App() {
       }
     };
     report();
-    const ro = new ResizeObserver(report);
+    // native window follows the settled size, never animation frames:
+    // resizing per frame while the spring runs is what leaps on 4k.
+    let pending: ReturnType<typeof setTimeout> | null = null;
+    const queueReport = () => {
+      if (pending) clearTimeout(pending);
+      pending = setTimeout(report, 120);
+    };
+    const ro = new ResizeObserver(queueReport);
     if (islandRef.current) ro.observe(islandRef.current);
     return () => {
       ro.disconnect();
+      if (pending) clearTimeout(pending);
       document.removeEventListener("copy", onCopy);
+      document.removeEventListener("paste", onPaste);
       document.removeEventListener("steroids:copied", onEchoEvent);
       if (echoTimer.current) clearTimeout(echoTimer.current);
     };
@@ -1623,6 +1650,12 @@ export default function App() {
   const resumeAgentSession = (sid: string, first: string) => {
     Sound.pop();
     stopGreet();
+    // stash nicki's live draft once (mate→mate keeps the same stash).
+    setMessages((cur) => {
+      if (!drivingRef.current) stashRef.current = { messages: cur, sid: ocSessionRef.current };
+      return cur;
+    });
+    setDrivingSid(sid);
     setOcSession(sid);
     // terminal chats keep their engine when continued here.
     const agent =
@@ -1633,13 +1666,46 @@ export default function App() {
     setUnread(0);
     setView("chat");
     fsm.forceJacked();
-    // same transcript, new engine: honest label so a mate tap never reads
-    // as that mate's own 1v1 history (bridge exposes progress, not turns).
-    setMessages((m) => [
-      ...m,
-      { id: msgId++, role: "assistant", content: `Driving “${first}” (${agent} ${sid.slice(0, 8)}…) here — same chat, ask away.` },
-    ]);
+    // each mate opens its OWN turns (bridge /transcript from the hook
+    // ledger). Empty ledger = hook-free session: honest receipt instead.
+    const receipt = () => {
+      setMessages((m) => {
+        const label = `Driving “${first.slice(0, 40)}” — ask away.`;
+        const last = m[m.length - 1];
+        if (last && last.role === "assistant" && last.content.startsWith("Driving “")) {
+          return [...m.slice(0, -1), { ...last, content: label }];
+        }
+        return [...m, { id: msgId++, role: "assistant", content: label }];
+      });
+    };
+    fetch(`${BRIDGE}/transcript?session=${encodeURIComponent(sid)}`)
+      .then((r) => r.json())
+      .then((j) => {
+        const items = Array.isArray(j?.transcript) ? j.transcript : [];
+        if (!items.length) { receipt(); return; }
+        setMessages(items.map((t: { role?: unknown; text?: unknown }) => ({
+          id: msgId++,
+          role: t.role === "user" ? "user" as const : "assistant" as const,
+          content: String(t.text ?? ""),
+        })));
+      })
+      .catch(() => receipt());
     say(`driving agent session ${sid.slice(0, 12)}…`);
+  };
+
+  const backToNicki = () => {
+    Sound.pop();
+    const stash = stashRef.current;
+    stashRef.current = null;
+    setDrivingSid(null);
+    if (stash) {
+      setMessages(stash.messages);
+      setOcSession(stash.sid);
+    }
+    setUnread(0);
+    setView("chat");
+    fsm.forceJacked();
+    say("back to nicki");
   };
 
   // PC→phone: bytes ride the paired pipe. Small files go inline in one
@@ -2046,6 +2112,7 @@ export default function App() {
         onInstall={handleInstall}
         agentSessions={agentSessions}
         onResumeAgentSession={resumeAgentSession}
+        onBackToNicki={drivingSid ? backToNicki : undefined}
         onDeleteAgentSession={deleteAgentSession}
         settings={settings}
         onSettings={applySettings}

@@ -264,7 +264,13 @@ function AccountCard({
     if (!shownCode) return;
     try {
       void navigator.clipboard?.writeText(shownCode).then(
-        () => setCopied(true),
+        () => {
+          setCopied(true);
+          // Command Echo: programmatic copies fire no DOM copy event.
+          try {
+            document.dispatchEvent(new CustomEvent<string>("steroids:copied", { detail: shownCode }));
+          } catch { /* listeners optional */ }
+        },
         () => setCopied(false),
       );
     } catch {

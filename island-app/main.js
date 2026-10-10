@@ -42,6 +42,27 @@ function createWindow() {
     },
   });
   win.loadURL(URL);
+  // First-map placement can override our position (pre-map client moves are
+  // ignored — settled read 0,0 on a slow first paint). Re-assert center from
+  // the live display once the first frame is in (post-map writes stick),
+  // plus one late backstop for slow bridges.
+  const reassert = () => {
+    if (!win || win.isDestroyed()) return;
+    try {
+      const b = win.getBounds();
+      const wa2 = screen.getDisplayNearestPoint({ x: b.x + b.width / 2, y: b.y + b.height / 2 }).workArea;
+      const isX11b = process.argv.join(" ").includes("ozone-platform=x11");
+      const cx2 = Math.round(wa2.x + (wa2.width - b.width) / 2);
+      win.setPosition(isX11b ? -cx2 : cx2, wa2.y, false);
+    } catch { /* window gone */ }
+  };
+  win.once("ready-to-show", () => setTimeout(reassert, 300));
+  setTimeout(reassert, 4000);
+  // boot position proof (one line): where the window actually settled.
+  setTimeout(() => {
+    if (!win || win.isDestroyed()) return;
+    try { console.log("[island-settled]", JSON.stringify(win.getBounds())); } catch { /* noop */ }
+  }, 5500);
   win.on("blur", () => {
     if (win && !win.isDestroyed()) win.webContents.send("island-blur");
   });
@@ -51,7 +72,20 @@ function createWindow() {
 // than the work area (tall chat logs scroll inside instead of clipping).
 // w is capped at the open-panel width — never the full screen width
 // (that strip read as a giant middle-screen bar on 4k).
+// Trailing-edge debounce (50ms): typing bursts and stream chunks coalesce
+// into one KWin roundtrip instead of one resize per keystroke.
+let rzTimer = null;
+let rzPending = null;
 ipcMain.on("island-resize", (_e, w, h) => {
+  rzPending = [w, h];
+  if (rzTimer) clearTimeout(rzTimer);
+  rzTimer = setTimeout(() => {
+    rzTimer = null;
+    const [bw, bh] = rzPending;
+    applyIslandResize(bw, bh);
+  }, 50);
+});
+function applyIslandResize(w, h) {
   if (!win || win.isDestroyed()) return;
   // anchor to the window's CURRENT display — cursor-follow teleported the
   // pill across screens on every resize (minimal "lost position").
@@ -73,7 +107,7 @@ ipcMain.on("island-resize", (_e, w, h) => {
   const cx = Math.round(wa.x + (wa.width - w) / 2);
   const isX11 = process.argv.join(" ").includes("ozone-platform=x11");
   win.setPosition(isX11 ? -cx : cx, wa.y, false);
-});
+}
 
 app.whenReady().then(() => {
   createWindow();

@@ -1,7 +1,9 @@
 import { forwardRef, lazy, Suspense, useEffect, useRef, useState } from "react";
 import Mascot, { type MascotHandle } from "./Mascot";
+import { CopyIcon, CheckIcon } from "./icons";
 import { ApprovalCard, QuestionCard, ChatPanel, ExploreView, FeedView, SettingsView, type SettingsState, type SettingsPage } from "./Cards";
-import { TeamGrid, useTeam, hueFor } from "./TeamGrid";
+import { TeamGrid, useTeam, useSessionProgress, hueFor } from "./TeamGrid";
+import { fetchNowPlaying } from "../music";
 import Huddle from "./Huddle";
 import { Header } from "./Header";
 // ponytail: lens + daily ride separate chunks — default chat view stays lean,
@@ -15,8 +17,11 @@ import type { IslandState } from "../fsm";
 
 // Edge glow: one fixed strip. Volume/brightness wakes it with a single
 // start→end sweep (~0.9s), then it sits as a steady full ring until idle.
+// Turn progress parks the same ring at the real step ratio (blue).
 // No settings, no variants — holding a key glides without restarting.
-function EdgeGlow() {
+const WORK_TONE = "#7dbdff";
+const WORK_GLOW = "rgba(125,189,255,.45)";
+function EdgeGlow({ workRatio = null }: { workRatio?: number | null }) {
   const [show, setShow] = useState<{ pct: number; tone: string; glow: string } | null>(null);
   const showRef = useRef(show);
   showRef.current = show;
@@ -69,6 +74,27 @@ function EdgeGlow() {
       if (timer.current) clearTimeout(timer.current);
     };
   }, []);
+  // (copy echo deliberately does NOT ping this ring: the flash must stay
+  // in the header chip, never repaint the whole panel.)
+  // turn progress parks the ring at the real step ratio (determinate —
+  // never a directionless loop). No melt timer while work runs; when the
+  // turn ends the ring clears. A volume press may briefly borrow the ring.
+  const workOn = useRef(false);
+  useEffect(() => {
+    if (workRatio == null) {
+      if (workOn.current) { workOn.current = false; setShow(null); }
+      return;
+    }
+    workOn.current = true;
+    const pct = Math.max(0, Math.min(100, Math.round(workRatio * 100)));
+    const isl = document.getElementById("island") as HTMLElement | null;
+    if (showRef.current?.tone === WORK_TONE && isl?.hasAttribute("data-edge")) {
+      isl.style.setProperty("--fill", String(pct));
+      return;
+    }
+    if (timer.current) clearTimeout(timer.current);
+    setShow({ pct, tone: WORK_TONE, glow: WORK_GLOW });
+  }, [workRatio]);
   useEffect(() => {
     const isl = document.getElementById("island") as HTMLElement | null;
     if (!isl) return;
@@ -180,6 +206,7 @@ interface Props {
   onNewChat: () => void;
   agentSessions: AgentSession[];
   onResumeAgentSession: (sid: string, first: string) => void;
+  onBackToNicki?: () => void;
   onDeleteAgentSession: (sid: string) => void;
   onRefreshSessions?: () => void;
   exploreLive: boolean;
@@ -227,6 +254,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     sessions, activeSessionId, onResumeSession, onDeleteSession, onNewChat,
     histHint = null,
     agentSessions, onResumeAgentSession, onDeleteAgentSession,
+    onBackToNicki,
     exploreLive, exploreFeed, feedEvents, onSearchSkills,
     providers = null, installState = "idle", onInstall = () => {},
     settings, onSettings, onTab, unread, zoomShot,
@@ -234,22 +262,29 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     onDropToPhone, onDropFilesToPhone, phoneLinked, pairNode, accountNode, shelfNode,
     staged = [], onAttachStaged,
     accountEmail = null, accountAvatar = null, onSignOut = () => {}, onIslandClick,
-    frame = null,
   } = props;
-  // glance light trace: one thin amber line hugging the closed pill's
-  // bottom OUTSIDE edge (inside the black card it drowns; only halo spilled).
-  // Inset past the pill's corner radius so it never pokes past the curves.
-  // Overflow paints past the svg box — that spill IS the look.
-  const glowD = frame
-    ? `M18 ${frame.h + 1} H${Math.max(20, frame.w - 18)}`
-    : "";
+  // glance light trace retired (see render below) — no path needed.
 
   // Avatar menu jumps: everything but Phone lands on the one General
   // page (account section on top); Profile scrolls straight to it.
   // Huddle: chat crew shares one team instance (tiles + huddle read the
   // same roster). Empty-state hero: visible on empty chat, gone the moment
   // the first message sends; new chat brings it back.
+  // music-mode pill: while a track plays, the 4-mate grid steps aside
+  // for nicki's wave (same 3s rhythm as the groove poll, one cheap fetch).
   const team = useTeam();
+  const [musicLive, setMusicLive] = useState(false);
+  useEffect(() => {
+    let dead = false;
+    const poll = () => {
+      fetchNowPlaying(window.location.origin, fetch)
+        .then((n) => { if (!dead) setMusicLive(n.playing); })
+        .catch(() => {});
+    };
+    poll();
+    const t = setInterval(poll, 3000);
+    return () => { dead = true; clearInterval(t); };
+  }, []);
   const showHuddle = messages.length === 0;
   const avatarNav = (page: "profile" | "explore" | "settings" | "account" | "phone") => {
     if (page === "explore") {
@@ -265,9 +300,23 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     }
   };
 
+  // turn step ratio drives the edge ring (determinate progress, same
+  // hook the tiles use — session id is all the fetch needs).
+  const { prog, refresh } = useSessionProgress(liveSession && thinking ? [{ session: liveSession, agent: "", first: "" }] : []);
+  useEffect(() => {
+    if (!thinking || !liveSession) return;
+    refresh(liveSession);
+    const t = setInterval(() => refresh(liveSession), 2000);
+    return () => clearInterval(t);
+  }, [thinking, liveSession, refresh]);
+  const workSteps = thinking && liveSession ? prog[liveSession]?.steps : undefined;
+  const workRatio = workSteps && workSteps.length > 0
+    ? workSteps.filter((s) => s.status === "done").length / workSteps.length
+    : null;
+
   return (
     <>
-      {NEON_ON && <EdgeGlow />}
+      {NEON_ON && <EdgeGlow workRatio={workRatio} />}
       <NickiGroove mascotRef={mascotRef} />
     <div
       ref={ref}
@@ -279,19 +328,9 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
       onMouseLeave={onMouseLeave}
       onClick={onIslandClick}
     >
-      {NEON_ON && frame && fsmState !== "jacked" && (
-        <svg className="notch-frame" viewBox={`0 0 ${frame.w} ${frame.h}`} aria-hidden>
-          <defs>
-            <filter id="notchGlow" x="-30%" y="-30%" width="160%" height="160%">
-              <feGaussianBlur stdDeviation="5" result="b" />
-              <feMerge><feMergeNode in="b" /><feMergeNode in="SourceGraphic" /></feMerge>
-            </filter>
-          </defs>
-          <path d={glowD} fill="none" stroke="rgba(251,146,60,.16)" strokeWidth="4" strokeLinejoin="round" />
-          <path d={glowD} fill="none" stroke="#ffe9b8" strokeWidth="1.4" strokeLinejoin="round" filter="url(#notchGlow)" />
-        </svg>
-      )}
-      {fsmState !== "jacked" && <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />}
+      {/* glance light trace retired: the amber under-line read as a stray
+          orange strip on the minimal pill. Masot halos (data-glow) stay. */}
+      {fsmState !== "jacked" && <Mascot key={fsmState} ref={mascotRef} px={8} mood="wave" onTap={onMascotTap} />}
       {fsmState === "hidden" ? null : fsmState === "jacked" ? (
         <div className="jacked-body">
           <Header
@@ -299,6 +338,12 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             unread={unread}
             onTab={onTab}
             hiddenViews={settings.hiddenViews}
+            middle={echo ? (
+              <span className="nav-echo-bar" role="status">
+                <span className="ne-left"><span className="e-ic" aria-hidden><CopyIcon size={16} /><CheckIcon size={16} /></span><span>Copied</span></span>
+                <span className="ne-right">Text</span>
+              </span>
+            ) : undefined}
             sessions={sessions}
             histHint={histHint}
             activeSessionId={activeSessionId}
@@ -318,10 +363,6 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             soundOn={settings.soundOn}
             onToggleSound={() => onSettings({ ...settings, soundOn: !settings.soundOn })}
           />
-          {/* Command Echo: open panel uses this space for the copy preview. */}
-          {echo ? (
-            <div className="echo-banner" role="status">📋 Copied — {echo}</div>
-          ) : null}
           {view !== "daily" && view !== "chat" && (
             <div className="mascot-top">
               <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />
@@ -397,7 +438,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
                   )}
                   {/* crew rail: the huddle above is nicki's hello (crew ready),
                       the grid below leads with nicki, then the mates. */}
-                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} onPick={onResumeAgentSession} detail="none" compact={messages.length > 0} />
+                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} onPick={onResumeAgentSession} onPickNicki={onBackToNicki} detail="none" compact={messages.length > 0} />
                 </div>
               }
             />
@@ -430,9 +471,15 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
         </div>
       ) : (
         <>
-          {/* minimized pill: echo preview swells it, else nicki + mates grid. */}
+          {/* minimized pill: echo notice swells it, else nicki + mates grid.
+              Text-only language, our own icons — never the copied content. */}
           {echo ? (
-            <span className="pill-echo" role="status" aria-live="polite">📋 {echo}</span>
+            <span className="pill-echo" role="status" aria-live="polite"><span className="e-ic" aria-hidden><CopyIcon size={13} /><CheckIcon size={13} /></span>Copied · Text</span>
+          ) : (
+          musicLive ? (
+            <span className="pill-wave" title="now playing" aria-hidden>
+              <Mascot mood="wave" />
+            </span>
           ) : (
           <span className="pill-team mini-grid" title={routeHint} aria-hidden>
             {team.members.slice(0, 4).map((m) => (
@@ -441,6 +488,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
               </span>
             ))}
           </span>
+          )
           )}
         </>
       )}

@@ -394,12 +394,14 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
   );
 }
 
-export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel, detail = "below", team: teamProp, live: liveProp, compact = false }: {
+export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoChat, sel, onSel, detail = "below", team: teamProp, live: liveProp, compact = false }: {
   sessions?: AgentMini[];
   onResume?: (sid: string, first: string) => void;
   // pick mode (chat view): tapping a live tile opens that agent's chat
   // instead of selecting — the conversation moves, no detail panel.
   onPick?: (sid: string, first: string) => void;
+  // back to nicki's own draft (only passed while driving a mate).
+  onPickNicki?: () => void;
   // jump to the chat composer (home of the provider dropdown).
   onGoChat?: () => void;
   sel?: string | null;
@@ -413,7 +415,7 @@ export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel
 }) {
   const teamInternal = useTeam();
   const liveInternal = useSessionProgress(sessions);
-  const { members, rename, remove, cycleRole, add } = teamProp ?? teamInternal;
+  const { members, rename, remove, cycleRole, setSid, add } = teamProp ?? teamInternal;
   const { prog, refresh } = liveProp ?? liveInternal;
   // affection: drives per mate id (see AFF_KEY). Bumped on explicit
   // Resume; tiles show one heart at 3+ drives.
@@ -473,8 +475,13 @@ export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel
   void compact;
   // nicki leads the grid visually (this chat is hers). Visual-only: she
   // takes no session slot, so slotSession indexing below is untouched.
-  const nickiOn = !cur;
+  const nickiOn = !cur && !onPickNicki;
   const nickiClick = () => {
+    // driving a mate: nicki's tile jumps back to her own draft.
+    if (onPickNicki) {
+      onPickNicki();
+      return;
+    }
     // chat pick mode: already talking to her — focus the composer.
     if (onPick) {
       document.querySelector<HTMLTextAreaElement>(".composer-input")?.focus();
@@ -505,8 +512,8 @@ export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel
       <div className="team-grid">
         <div key="nicki" className="team-cellwrap">
           <button
-            className={nickiOn ? "team-cell on" : "team-cell"}
-            title="nicki — main · this chat is hers · tap to talk"
+            className={nickiOn ? "team-cell nicki on" : "team-cell nicki"}
+            title={onPickNicki ? "nicki — main · back to her draft" : "nicki — main · this chat is hers · tap to talk"}
             aria-pressed={nickiOn}
             onClick={nickiClick}
           >
@@ -540,7 +547,11 @@ export function TeamGrid({ sessions = [], onResume, onPick, onGoChat, sel, onSel
                 onClick={() => {
                   // pick mode: the tile IS the jump — open the mate's
                   // chat directly instead of selecting a detail panel.
+                  // First tap claims the lane: an unpinned slot binds the
+                  // session its tile is already showing (Munder-Difflin
+                  // lanes — every mate keeps its own CLI from here on).
                   if (onPick && s) {
+                    if (!m.sid) setSid(m.id, s.session);
                     refresh(s.session);
                     onPick(s.session, s.first);
                     return;
