@@ -6,6 +6,8 @@ export type RelayStatus = "idle" | "connecting" | "connected" | "offline";
 export interface RelayFrame {
   type: string;
   key: string;
+  /** Idempotency token: sender-set, never routing. Absent on legacy frames. */
+  id?: unknown;
   [k: string]: unknown;
 }
 
@@ -38,6 +40,9 @@ export class RelayClient {
   private timer: unknown = null;
   private statusSubs = new Set<(s: RelayStatus) => void>();
   private msgSubs = new Set<(f: RelayFrame) => void>();
+  // Receiver seen-set: production dedup (not test-local). Ids of delivered
+  // frames, FIFO-capped so a long session can't grow it without bound.
+  private seenIds: string[] = [];
 
   constructor(opts: {
     urlOf: () => string;
@@ -99,7 +104,9 @@ export class RelayClient {
     this.emit("idle");
   }
 
-  /** Send a frame. False = offline (caller queues to outbox, never drops). */
+  /** Send a frame. False = offline (caller queues to outbox, never drops).
+   * `key` is always the routing/pairing key (payload `key` never survives);
+   * a caller `id` passes through untouched for far-end dedup. */
   send(type: string, payload: Record<string, unknown> = {}): boolean {
     const s = this.socket;
     if (!s) return false;
@@ -152,6 +159,11 @@ export class RelayClient {
       try {
         const f = JSON.parse(e.data) as RelayFrame;
         if (f && typeof f.type === "string") {
+          if (typeof f.id === "string" && f.id) {
+            if (this.seenIds.includes(f.id)) return; // redelivery: drop
+            this.seenIds.push(f.id);
+            if (this.seenIds.length > 500) this.seenIds.shift();
+          }
           for (const fn of this.msgSubs) fn(f);
         }
       } catch {

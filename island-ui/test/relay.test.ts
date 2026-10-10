@@ -77,4 +77,34 @@ describe("relay client", () => {
     client.onMessage((f) => void got.push(f));
     assert.equal(client.send("reply"), false); // caller queues, never drops
   });
+
+  it("receiver seen-set: same id delivers once, legacy no-id passes", () => {
+    const sockets: FakeSocket[] = [];
+    const client = new RelayClient({
+      urlOf: () => "ws://x/relay/ws",
+      openSocket: () => {
+        const s = new FakeSocket();
+        sockets.push(s);
+        return s;
+      },
+      store: memStore(),
+    });
+    const got: string[] = [];
+    client.onMessage((f) => void got.push(`${String(f.id ?? "-")}:${String(f.type)}`));
+    client.pair("ws://x/relay/ws", "K1");
+    client.connect();
+    sockets[0].onopen?.({});
+    const emit = (obj: unknown) => sockets[0].onmessage?.({ data: JSON.stringify(obj) });
+    emit({ type: "chat", key: "K1", id: "A", text: "hi" });
+    emit({ type: "chat", key: "K1", id: "A", text: "hi" }); // hub redelivery
+    emit({ type: "chat", key: "K1", id: "B", text: "yo" });
+    emit({ type: "chat", key: "K1", text: "legacy" }); // pre-split: no token
+    emit({ type: "chat", key: "K1", text: "legacy" });
+    assert.deepEqual(got, ["A:chat", "B:chat", "-:chat", "-:chat"]);
+    // sender keeps routing key while preserving the token
+    assert.ok(client.send("reply", { id: "C" }));
+    const frame = JSON.parse(sockets[0].sent[0]) as Record<string, unknown>;
+    assert.equal(frame.key, "K1");
+    assert.equal(frame.id, "C");
+  });
 });

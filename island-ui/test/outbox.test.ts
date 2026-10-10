@@ -17,13 +17,14 @@ describe("outbox", () => {
   it("airplane toggle x3: each reply fires once, in order", async () => {
     const backing = new Map<string, string>();
     const outbox = new OutboxStore(memStore(backing));
-    const k1 = outbox.enqueue("reply", { text: "one" });
-    const k2 = outbox.enqueue("reply", { text: "two" });
+    outbox.enqueue("reply", { text: "one" });
+    outbox.enqueue("reply", { text: "two" });
+    const ids = outbox.pending().map((i) => i.id);
     const seen: string[] = [];
     let online = false;
     const fired = await outbox.flush(async (f) => {
       if (!online) return false;
-      seen.push(`${f.key}:${f.text}`);
+      seen.push(`${f.id}:${f.text}`);
       return true;
     });
     assert.equal(fired, 0); // offline: head stays
@@ -31,29 +32,30 @@ describe("outbox", () => {
     online = true; // reconnect x3 (same call covers all toggles)
     assert.equal(await outbox.flush(async () => false), 0);
     assert.equal(await outbox.flush(async (f) => {
-      seen.push(`${f.key}:${f.text}`);
+      seen.push(`${f.id}:${f.text}`);
       return true;
     }), 2);
-    assert.deepEqual(seen, [`${k1}:one`, `${k2}:two`]);
+    assert.deepEqual(seen, [`${ids[0]}:one`, `${ids[1]}:two`]);
     assert.equal(outbox.pending().length, 0);
   });
 
-  it("flaky reconnect retries same key: far end sees it once", async () => {
+  it("flaky reconnect retries same id: far end sees it once", async () => {
     const outbox = new OutboxStore(memStore());
-    const key = outbox.enqueue("reply", { text: "hi" });
+    outbox.enqueue("reply", { text: "hi" });
+    const id = outbox.pending()[0].id;
     const delivered = new Set<string>();
-    // First attempt flakes: head stays queued under the same key.
+    // First attempt flakes: head stays queued under the same id.
     assert.equal(await outbox.flush(async () => false), 0);
     assert.equal(outbox.pending().length, 1);
-    assert.equal(outbox.pending()[0].key, key);
+    assert.equal(outbox.pending()[0].id, id);
     // Retry fires it; a duplicate retry would throw (far end dedups).
     const fired = await outbox.flush(async (f) => {
-      if (delivered.has(f.key as string)) throw new Error("double fire");
-      delivered.add(f.key as string);
+      if (delivered.has(f.id as string)) throw new Error("double fire");
+      delivered.add(f.id as string);
       return true;
     });
     assert.equal(fired, 1);
-    assert.deepEqual([...delivered], [key]);
+    assert.deepEqual([...delivered], [id]);
   });
 
   it("cancel before fire removes; unknown key false", () => {
@@ -71,5 +73,14 @@ describe("outbox", () => {
     const b = new OutboxStore(memStore(backing)); // "restart"
     assert.equal(b.pending().length, 1);
     assert.equal(await b.flush(async () => true), 1);
+  });
+
+  it("pre-split stored items backfill id from key", () => {
+    const backing = new Map<string, string>();
+    backing.set("island_outbox_v1", JSON.stringify([
+      { key: "old-k", type: "reply", payload: { text: "x" }, enqueuedAt: "2026-01-01T00:00:00Z" },
+    ]));
+    const outbox = new OutboxStore(memStore(backing));
+    assert.equal(outbox.pending()[0].id, "old-k");
   });
 });

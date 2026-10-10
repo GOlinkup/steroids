@@ -1,11 +1,14 @@
 // Offline outbox: durable FIFO queue, fire-on-reconnect, exactly-once.
-// Idempotency key (crypto.randomUUID, no deps) rides inside every frame;
-// the far end dedups, so a flaky retry can never double-deliver.
+// Idempotency token (crypto.randomUUID, no deps) rides every frame as `id`;
+// the far end (RelayClient seen-set) dedups on it, so a flaky retry can
+// never double-deliver. `key` stays routing-only and is never the token.
 // Erasable TS only (node --test strips types).
 import type { StorageLike } from "./relay";
 
 export interface OutboxItem {
   key: string;
+  /** Idempotency token. Backfilled from key for pre-split stored queues. */
+  id: string;
   type: string;
   payload: Record<string, unknown>;
   enqueuedAt: string;
@@ -27,11 +30,12 @@ export class OutboxStore {
         Math.random().toString(36).slice(2) + Date.now().toString(36));
   }
 
-  /** Queue an item, returns its idempotency key. */
+  /** Queue an item, returns its cancel handle (routing key, not the token). */
   enqueue(type: string, payload: Record<string, unknown>): string {
     const items = this.read();
     const item: OutboxItem = {
       key: this.newKey(),
+      id: this.newKey(),
       type,
       payload,
       enqueuedAt: new Date().toISOString(),
@@ -56,7 +60,9 @@ export class OutboxStore {
 
   /**
    * Fire in order via send. An item leaves only after the transport
-   * confirms it — a flaky reconnect retries with the same key.
+   * confirms it — a flaky reconnect retries with the same id. The token
+   * rides `id`; `key` is left for the transport to route (relay.send
+   * stamps the pairing key, the POST path routes on the outer key).
    */
   async flush(
     send: (frame: Record<string, unknown>) => Promise<boolean>,
@@ -65,7 +71,7 @@ export class OutboxStore {
     let fired = 0;
     while (items.length > 0) {
       const head = items[0];
-      const ok = await send({ ...head.payload, type: head.type, key: head.key });
+      const ok = await send({ ...head.payload, type: head.type, id: head.id });
       if (!ok) break; // still offline: head stays, order preserved
       items = items.slice(1);
       this.write(items);
@@ -98,7 +104,10 @@ export class OutboxStore {
       return (decoded as OutboxItem[]).filter(
         (i) =>
           i && typeof i.key === "string" && typeof i.type === "string",
-      );
+      ).map((i) => ({
+        ...i,
+        id: typeof i.id === "string" && i.id ? i.id : i.key,
+      }));
     } catch {
       return [];
     }
