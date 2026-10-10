@@ -1,4 +1,4 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon, PhoneIcon, BoltIcon, StopIcon } from "./icons";
 import { EffortPicker, PillButton, ProviderPicker, useDismiss, useEngines, ENGINES, displayModel } from "./pickers";
 export { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
@@ -440,13 +440,27 @@ export function ChatPanel({
     stick.current = el.scrollHeight - el.scrollTop - el.clientHeight < 80;
   };
 
+  // streaming tail: the cap must never cut the head mid-line. A raw char
+  // window drops head chars every chunk, so md() re-parses a different
+  // fragment each tick and the text jumps. Anchor to a line boundary, and
+  // memoize so typing/workSecs ticks reuse the same node instead of
+  // re-parsing. Finished messages render via md() untouched.
+  const streamTail = useMemo(() => {
+    if (!livePartial) return null;
+    const tail = livePartial.slice(-1200);
+    const cut = livePartial.length > 1200 ? tail.indexOf("\n") : -1;
+    return md(cut > 0 ? tail.slice(cut + 1) : tail);
+  }, [livePartial]);
+
   // newest reply visible while stuck: pin the log to the bottom as turns
   // stream. layout effect, not passive: passive fires after paint, flashing
   // the log top for one frame on every open with history (chat-open flash).
+  // Per-chunk growth is followed by the ResizeObserver below — livePartial
+  // stays out of these deps so streaming never yanks pre-paint.
   useLayoutEffect(() => {
     const el = logRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [messages, thinking, livePartial]);
+  }, [messages, thinking]);
   // late growth the message deps miss (bubble images, webfont swap): while
   // stuck, follow the log's own resize too. Scrolled-up stays put.
   useLayoutEffect(() => {
@@ -747,7 +761,7 @@ export function ChatPanel({
               <SafeOrb state={chatOrb} size={20} />
               <div className="work-meta">
                 <span className="work-cap">
-                  <span className="shimmer" key={liveActivity || "idle"}>
+                  <span className="shimmer">
                     {bridgeOn ? (liveActivity || `talking to nicki · ${turnEngine || `${provider}/${displayModel(model)}`}`) : "bridge down — nothing running"}
                   </span>
                 </span>
@@ -768,7 +782,7 @@ export function ChatPanel({
                   </div>
                 )}
                 {!!livePartial && (
-                  <div className="work-partial">{md(livePartial.slice(-1200))}</div>
+                  <div className="work-partial">{streamTail}</div>
                 )}
               </div>
             </div>
