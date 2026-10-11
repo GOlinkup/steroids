@@ -15,9 +15,4 @@ contextBridge.exposeInMainWorld("island", {
     ipcRenderer.removeAllListeners("island-blur");
     ipcRenderer.on("island-blur", () => fn());
   },
-  // Command Echo: main polls the system clipboard, renderer shows it.
-  onEcho: (fn) => {
-    ipcRenderer.removeAllListeners("island-echo");
-    ipcRenderer.on("island-echo", (_e, text) => fn(text));
-  },
 });

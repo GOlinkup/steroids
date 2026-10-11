@@ -118,36 +118,17 @@ export default function App() {
     : v === "approval" || v === "question" || v === "chat" || v === "daily" ||
       v === "explore" || v === "settings" || v === "lens" || v === "shelf" || v === "feed" ? v : "full";
   const foot = footprintName(fsmState, view);
-  const [swapping, setSwapping] = useState(false);
-  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const lastFoot = useRef("");
-  // ponytail: layout effect, not passive (their transitions never show an
-  // uncovered frame). Passive effects fire AFTER paint: the state flip
-  // painted one naked frame mid-flight (the broken close). Layout effects
-  // run synchronously post-DOM, pre-paint: cover + IPC land before pixels.
-  // Key skips closed↔closed (hover peeks stay live, no cover) and covers
-  // every open/view change (each has its own window height).
+  // ponytail: NO cover (human order — every page shows its content
+  // INSTANTLY on click, never a blank flash). Height-only window snaps
+  // land same-tick via IPC; the card glides .34s behind with content
+  // visible throughout. Closed↔closed never needed one either.
   useLayoutEffect(() => {
-    const key = fsmState === "jacked" ? `open/${view}` : "closed";
     try {
       (window as unknown as { island?: { state?: (s: string, v: string) => void } })
         .island?.state?.(fsmState, view);
     } catch { /* plain browser, no shell */ }
-    if (key === lastFoot.current) return;
-    lastFoot.current = key;
-    setSwapping(true);
-    if (swapTimer.current) clearTimeout(swapTimer.current);
-    swapTimer.current = window.setTimeout(() => setSwapping(false), 380);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fsmState, view]);
-  // Command Echo (glance): transient "Copied/Pasted — …" preview.
-  // ECHO_MS is the single source for visible time — the neon sweep in
-  // index.css (.nav-echo-bar::after, .pill-echo::after) runs on the same
-  // duration via the --echo-ms var, so the sweep always lands as the bar melts.
-  const ECHO_MS = 1400;
-  const [echo, setEcho] = useState<string | null>(null);
-  const [echoKind, setEchoKind] = useState<"copied" | "pasted">("copied");
-  const echoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [, setPills] = useState<Pill[]>(HARNESS_PILLS);
   const [initialDraft] = useState(loadDraft);
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages ?? []);
@@ -570,49 +551,6 @@ export default function App() {
         say("tap-outside → notch");
       }
     });
-    // Command Echo: system copy → pill swells with the preview + mascot
-    // yay, melts back fast (1.4s — it borrows nav space, never lingers).
-    // ResizeObserver grows the window to fit.
-    // (Wayland gates the system clipboard to the focused app, so copies
-    // made inside the island echo via the copy event below; the shell poll
-    // in main.js covers copies made while the island is focused.)
-    const showEcho = (t: string, kind: "copied" | "pasted" = "copied") => {
-      const s = t.trim().replace(/\s+/g, " ").slice(0, 48);
-      if (!s) return;
-      setEcho(s);
-      setEchoKind(kind);
-      mascotRef.current?.celebrate();
-      if (echoTimer.current) clearTimeout(echoTimer.current);
-      echoTimer.current = window.setTimeout(() => setEcho(null), ECHO_MS);
-    };
-    shell?.onEcho?.(showEcho);
-    // ponytail: DOM hover (no cursor poll — setIgnoreCursorEvents does not
-    // exist on Linux, proven at boot; the strip fits the pill exactly so
-    // the visible pill is always directly hoverable).
-    const onCopy = () => {
-      try {
-        showEcho(window.getSelection()?.toString() ?? "");
-      } catch { /* selection unreadable */ }
-    };
-    document.addEventListener("copy", onCopy);
-    // paste mirrors copy: whatever lands in the island echoes the same way.
-    // Pastes made outside the island are unobservable (paste never touches
-    // the clipboard, the OS tells us nothing) — copies everywhere are
-    // covered by the main-process poll instead.
-    const onPaste = (e: Event) => {
-      try {
-        showEcho((e as ClipboardEvent).clipboardData?.getData("text") ?? "", "pasted");
-      } catch { /* nothing pasted */ }
-    };
-    document.addEventListener("paste", onPaste);
-    // In-app programmatic copies (message copy button, pairing code) fire
-    // no DOM copy event — they announce themselves with the copy text.
-    const onEchoEvent = (e: Event) => {
-      try {
-        showEcho((e as CustomEvent<string>).detail ?? "");
-      } catch { /* bad detail */ }
-    };
-    document.addEventListener("steroids:copied", onEchoEvent);
     // ponytail: fixed footprints (coucou-sheet parity) — the window NEVER
     // follows content. Sizes live in main's table; this observer only feeds
     // the step-glow outline (pure React state, no window involved).
@@ -640,10 +578,6 @@ export default function App() {
     if (islandRef.current) ro.observe(islandRef.current);
     return () => {
       ro.disconnect();
-      document.removeEventListener("copy", onCopy);
-      document.removeEventListener("paste", onPaste);
-      document.removeEventListener("steroids:copied", onEchoEvent);
-      if (echoTimer.current) clearTimeout(echoTimer.current);
     };
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fsmState]);
@@ -2092,10 +2026,6 @@ export default function App() {
         foot={foot}
         mascotRef={mascotRef}
         routeHint={hint}
-        echo={echo}
-        echoKind={echoKind}
-        echoMs={ECHO_MS}
-        swapping={swapping}
         approval={approval}
         question={question}
         messages={messages}

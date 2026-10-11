@@ -32,30 +32,20 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .pill-wave{width:20px;height:20px;flex:none;display:grid;place-items:center;overflow:visible}
 .pill-wave .mascot{width:20px;height:20px;cursor:default}
 .pill-wave .m-fx svg{width:20px;height:20px}
+/* ponytail: now-playing wave bars (human order — one mascot in the pill,
+   animated wav icon rides right where the mates grid sits when idle). */
+.wavebars{display:inline-flex;align-items:flex-end;gap:2px;height:20px;margin-left:16px;flex:none}
+.wavebars i{width:3px;border-radius:2px;background:var(--brand,#fb923c);transform-origin:50% 100%;animation:eqbounce .9s ease-in-out infinite}
+.wavebars i:nth-child(1){height:40%;animation-delay:0s}
+.wavebars i:nth-child(2){height:75%;animation-delay:.12s}
+.wavebars i:nth-child(3){height:100%;animation-delay:.24s}
+.wavebars i:nth-child(4){height:60%;animation-delay:.36s}
+.wavebars i:nth-child(5){height:35%;animation-delay:.48s}
+@keyframes eqbounce{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
+@media (prefers-reduced-motion:reduce){.wavebars i{animation:none}}
 .pill-face .m-fx svg{width:20px;height:20px}
 #island[data-state="hidden"] > .mascot.mascot-svg{display:none}
 #island[data-state="hidden"] .pill-team .mascot{visibility:visible}
-/* outer neon edge (Glance light-strip idiom, clean-room): the island always
-   wears a faint amber hairline at rest; volume/brightness wakes it to a
-   level ring (filled arc = pct, --fill glides on hold), one bright head
-   sweeps start→end (~0.9s), then it parks back to ambient. */
-@property --fill{syntax:"<number>";inherits:false;initial-value:0}
-@property --angle{syntax:"<angle>";inherits:false;initial-value:-90deg}
-@keyframes edge-spin{to{--angle:270deg}}
-@keyframes edge-in{from{opacity:.25}to{opacity:1}}
-@keyframes edge-sweep{from{--angle:-90deg}to{--angle:270deg}}
-#island[data-edge]{border:2px solid transparent;background:linear-gradient(var(--ink),var(--ink)) padding-box,conic-gradient(from -90deg,var(--edge,#fb923c) 0deg,color-mix(in srgb,var(--edge,#fb923c) 65%,transparent) calc(var(--fill,100)*3.6deg),rgba(255,255,255,.07) calc(var(--fill,100)*3.6deg)) border-box;box-shadow:0 0 32px 6px var(--edge-glow,rgba(251,146,60,.35));animation:edge-in .45s ease-out;transition:--fill .2s linear}
-/* turn-on sweep: one bright head runs start→end (~0.9s), then parks — the
-   level ring underneath is seamless, so no cut shows when it lands. */
-#island[data-edge][data-sweep]{background:linear-gradient(var(--ink),var(--ink)) padding-box,conic-gradient(from var(--angle),rgba(255,255,255,.95) 0%,color-mix(in srgb,var(--edge,#fb923c) 65%,transparent) 12%,transparent 24% 100%) border-box,conic-gradient(from -90deg,var(--edge,#fb923c) 0deg,color-mix(in srgb,var(--edge,#fb923c) 65%,transparent) calc(var(--fill,100)*3.6deg),rgba(255,255,255,.07) calc(var(--fill,100)*3.6deg)) border-box;animation:edge-sweep .9s ease-out 1,edge-in .45s ease-out}
-/* halo: the island lights up when something needs you (working = amber
-   breathe, approval/question = brand-orange urgent pulse), dark when idle.
-   Clean-room take on the light-notch idiom; static border when still. */
-#island[data-glow="working"]{box-shadow:0 0 0 1px rgba(251,146,60,.45),0 0 22px 2px rgba(251,146,60,.28);animation:halo-breathe 2.6s ease-in-out infinite}
-#island[data-glow="urgent"]{box-shadow:0 0 0 1px var(--brand),0 0 28px 4px rgba(255,77,28,.5);animation:halo-urgent 1.1s ease-in-out infinite}
-#island[data-glow="working"] .mascot,#island[data-glow="urgent"] .mascot{filter:drop-shadow(0 0 6px rgba(251,146,60,.8))}
-@keyframes halo-breathe{0%,100%{box-shadow:0 0 0 1px rgba(251,146,60,.35),0 0 14px 1px rgba(251,146,60,.18)}50%{box-shadow:0 0 0 1px rgba(251,146,60,.6),0 0 26px 4px rgba(251,146,60,.38)}}
-@keyframes halo-urgent{0%,100%{box-shadow:0 0 0 1px var(--brand),0 0 18px 2px rgba(255,77,28,.35)}50%{box-shadow:0 0 0 2px var(--brand),0 0 34px 8px rgba(255,77,28,.65)}}
 .jacked-body{display:flex;flex-direction:column;gap:.34rem;flex:1;min-width:0;width:100%;overflow:visible}
 /* page swap: each view fades/rises in on mount, so tab switches feel like
    one gliding panel instead of a hard cut. Header persists (no remount,
@@ -145,7 +135,6 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .team-dots{position:absolute;right:.3rem;top:50%;transform:translateY(-50%);background:transparent;border:none;color:rgba(255,255,255,.45);font-size:.95rem;line-height:1;padding:.3rem .25rem;cursor:pointer;border-radius:8px}
 .team-dots:hover{color:#fff}
 .team-menu{position:absolute;right:0;top:calc(100% + 4px);min-width:170px;display:flex;flex-direction:column;gap:.1rem;z-index:60}
-.team-menu.floating{position:fixed;right:auto;top:auto;min-width:190px;max-height:min(320px,60dvh);overflow:auto;z-index:80}
 .team-menu .attach-opt{color:var(--text)}
 .team-edit{flex:1;min-width:0;background:transparent;border:none;border-bottom:1px solid var(--brand);color:#fff;font-size:.82rem;font-weight:700;outline:none}
 /* ponytail: ONE selector (human order) — one thin grey highlight ring for
@@ -270,8 +259,6 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .lf-add{color:#4ade80}
 .lf-del{color:#f87171}
 .reply.working .lens-diff{scrollbar-color:rgba(255,255,255,.22) transparent}
-.term-block{background:rgba(0,0,0,.3);border-radius:8px;padding:.35rem .5rem}
-.term-head{color:#fff;font-weight:700}
 .live-tokens>span{display:flex;align-items:baseline;gap:.4rem}
 .live-tokens .tok-total{color:#fff;font-weight:700;font-size:.72rem}
 .live-tokens .tok-split{margin-left:auto;font-size:.62rem}
@@ -376,7 +363,7 @@ button:disabled{opacity:.4;cursor:default}
 .pair-pin{font-family:var(--font-mono);font-size:1.4rem;letter-spacing:.35em;color:var(--brand)}
 .pair-join{display:flex;gap:.4rem;align-items:center}
 .pair-join .explore-search{flex:1;min-width:0}
-.composer-innerbar{display:flex;align-items:center;gap:.4rem;padding:0 .4rem .15rem}
+.composer-innerbar{display:flex;align-items:center;gap:.3rem;padding:0 .4rem .08rem}
 .composer-innerbar .effort{flex:1;min-width:0}
 .picker-group{display:flex;align-items:center;gap:.5rem;margin-left:auto}
 .effort-wrap{position:relative;flex:none;display:flex;align-items:center}
@@ -506,7 +493,7 @@ button:disabled{opacity:.4;cursor:default}
 .composer-box:focus-within{border-color:rgba(255,255,255,.25)}
 .composer-box.dragover{border-color:var(--brand);box-shadow:0 0 0 2px var(--brand-chip)}
 .composer-drop-hint{position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:.85rem;font-weight:var(--weight-em);color:var(--text);z-index:5;pointer-events:none;background:radial-gradient(220px 120px at 50% 100%,color-mix(in srgb,var(--text) 8%,transparent),transparent 70%)}
-.composer-input{background:transparent;border:0;color:var(--text);padding:.6rem .7rem 0;font-size:.95rem;font-family:var(--font-ui);resize:none;outline:none;overflow-y:auto;min-height:2.6em;line-height:1.4}
+.composer-input{background:transparent;border:0;color:var(--text);padding:.4rem .6rem 0;font-size:.95rem;font-family:var(--font-ui);resize:none;outline:none;overflow-y:auto;min-height:2.2em;line-height:1.4}
 .tokens{font-size:var(--size-floor);font-family:var(--font-ui);opacity:.5}
 .tool-btn{background:rgba(255,255,255,.07);border:1px solid transparent;color:var(--text-mute);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;padding:0;border-radius:99px;width:32px;height:32px;flex:none}
 .tool-btn.recording{color:var(--danger)}
@@ -589,9 +576,6 @@ button.live-pill:hover{border-color:var(--brand)}
 /* navbar — 3-zone grid: left / middle centered / right. Perfectly aligned.
    Icons-only, no pill surface — dropdowns keep their own card bg. */
 .navbar{display:grid;grid-template-columns:1fr auto 1fr;align-items:center;padding:.25rem .5rem;position:relative;gap:.5rem;background:transparent;border:none;border-radius:0}
-/* copy echo owns the bar while it shows: black backdrop hides the tabs
-   behind it so the Copied text reads clear. */
-.navbar.echoing{background:#000;border-radius:14px}
 .tabs{display:flex;gap:.5rem;justify-self:start;align-items:center}
 .tab{background:transparent;border:1px solid transparent;border-radius:18px;width:48px;height:36px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;padding:0}
 .tab:hover{background:transparent;border-color:transparent;color:var(--text)}
@@ -764,8 +748,6 @@ button.hpill:hover{border-color:var(--brand)}
 
 @media (prefers-reduced-motion: reduce){
   .jacked-body > *, .lens-live, .chip, .mascot, .ticker, .work-pulse, .chat-log > .chat-row{animation:none !important}
-  #island[data-glow]{animation:none !important;box-shadow:0 0 0 1px var(--brand)}
-  #island[data-edge]{animation:none !important;transition:none !important}
   .drop-frame rect{animation:none !important}
   .hpill.live .dot{animation:none !important}
   .eq-bars i{animation:none !important}
@@ -997,22 +979,10 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
    painted a giant bar across 4k screens). Base per-state widths size
    it; max-width only caps the open panel. Phone keeps the floating pill. */
 .stage.app.pc{padding-left:0;padding-right:0;padding-top:0;max-width:none}
-/* stepped glow outline: real SVG stroke (Island renders .notch-frame from
-   measured px — CSS drop-shadow can't trace a clip-path in this renderer,
-   verified black-only in screenshots). ::before keeps the black fill. */
-.notch-frame{position:absolute;inset:0;width:100%;height:100%;pointer-events:none;overflow:visible}
-/* open panel: urgent parks a full amber hold under the navbar while
-   approval waits. */
-#island[data-glow="urgent"] .jacked-body::after{content:"";height:2px;border-radius:99px;background:rgba(251,146,60,.9);box-shadow:0 0 8px rgba(251,146,60,.6)}
 /* stays absolute behind content (the pc >* rule lifts siblings to z-1) */
-.stage.app.pc #island>.notch-frame{position:absolute;inset:0;z-index:0}
 .stage.app.pc #island{width:auto;max-width:min(1020px,calc(100vw - 16px));margin:0 auto;justify-content:center;position:relative;overflow:visible;background:transparent;border-color:transparent;box-shadow:none;border-radius:0 0 18px 18px;padding:12px 18px}
-/* stepped notch silhouette (glance frame): the center drops below a
-   short top lip with square ledges each side. One clipped layer
-   paints the black; the amber step-glow is a real SVG stroke (.notch-frame,
-   measured px from the shell) — CSS drop-shadow can't trace a clip-path
-   in this renderer (verified black-only), and rectangular border/shadow
-   can never follow steps, so all three stay off here. */
+/* stepped notch silhouette: the center drops below a short top lip
+   with square ledges each side. One clipped layer paints the black. */
 .stage.app.pc #island::before{content:"";position:absolute;inset:0;background:#000;pointer-events:none;border-radius:0 0 18px 18px;--notch:min(520px,44%);clip-path:polygon(0 0,100% 0,100% 56px,calc(50% + var(--notch)) 56px,calc(50% + var(--notch)) 100%,calc(50% - var(--notch)) 100%,calc(50% - var(--notch)) 56px,0 56px)}
 .stage.app.pc #island>*{position:relative;z-index:1}
 /* hidden = bare mac-like tab only, never a full-width fill: small centered
@@ -1063,10 +1033,6 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
    follows). A fill pinned through the close flight held a tall black slab
    for 340ms before the snap: the close glitch. */
 .stage.app.pc #island[data-state="jacked"]:not([data-swapping]){min-height:calc(100dvh - 16px)}
-/* volume/brightness echo (glance): transient level ring on the black card.
-   Base [data-edge] paints the conic ring + glow; keep our pill radii. */
-.stage.app.pc #island[data-edge]{border-radius:0 0 18px 18px}
-.stage.app.pc #island[data-state="jacked"][data-edge]{border-radius:0 0 22px 22px}
 .stage.app.pc .jacked-body{max-width:980px;margin:0 auto;width:100%}
 /* open card paints the whole fixed footprint (coucou: dead area inside the
    island is painted card, never transparent click-eater): per-view body caps
@@ -1076,7 +1042,16 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
 .stage.app.pc #island[data-state="jacked"] .jacked-body{overflow-y:auto}
 .stage.app.pc #island[data-foot="approval"] .jacked-body{max-height:260px}
 .stage.app.pc #island[data-foot="question"] .jacked-body{max-height:390px}
-.stage.app.pc #island[data-foot="chat"] .jacked-body{max-height:320px}
+.stage.app.pc #island[data-foot="chat"] .jacked-body{max-height:min(var(--jacked-cap, calc(100dvh - 150px)), calc(100dvh - 64px));overflow-y:auto}
+/* ponytail: chat flex layout (human order — the log tail must never slide
+   under the sticky composer; industry standard: the list flexes, the
+   composer is a static sibling AFTER it, nothing sticky, nothing overlaps).
+   Card fills the body exactly so the body never scrolls in chat; only the
+   log scrolls, internally. */
+.stage.app.pc #island[data-foot="chat"] .jacked-body{height:calc(100dvh - 62px);max-height:calc(100dvh - 62px);overflow:hidden}
+.stage.app.pc #island[data-foot="chat"] .chat-card{height:100%;display:flex;flex-direction:column;min-height:0}
+.stage.app.pc #island[data-foot="chat"] .chat-log{flex:1 1 auto;min-height:0;max-height:none}
+.stage.app.pc #island[data-foot="chat"] .composer-box{flex:none;position:relative}
 .stage.app.pc #island[data-foot="daily"] .jacked-body{max-height:380px}
 .stage.app.pc #island[data-foot="explore"] .jacked-body{max-height:750px}
 .stage.app.pc #island[data-foot="settings"] .jacked-body{max-height:795px}
@@ -1084,37 +1059,15 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
 .stage.app.pc #island[data-foot="shelf"] .jacked-body{max-height:870px}
 .stage.app.pc #island[data-foot="feed"] .jacked-body,.stage.app.pc #island[data-foot="full"] .jacked-body{max-height:min(var(--jacked-cap, calc(100dvh - 150px)), calc(100dvh - 80px))}
 .stage.app.pc #island > .navbar{padding:.2rem 0;position:relative;z-index:5}
+/* ponytail: field blends into the black card (human order — it wore the
+   exact grey as message bubbles, unreadable as a field). Bubbles keep
+   their grey; the field keeps only its border. Structure untouched. */
+.stage.app.pc .composer-box{background:transparent}
 /* morph cover (app window only — browsers don't glide the window): while
    KWin flies the card between sizes, content hides so nothing reads
    cropped or lost mid-flight. Black card glides, content fades back in. */
 .stage.app.pc #island .jacked-body,.stage.app.pc #island .pill-team,.stage.app.pc #island > .mascot,.stage.app.pc #island .mascot-top,.stage.app.pc #island .navbar{transition:opacity .13s ease-out}
 .stage.app.pc #island[data-swapping] .jacked-body,.stage.app.pc #island[data-swapping] .pill-team,.stage.app.pc #island[data-swapping] > .mascot,.stage.app.pc #island[data-swapping] .mascot-top,.stage.app.pc #island[data-swapping] .navbar{opacity:0}
-/* Command Echo (glance): transient copy preview. One grey (--field),
-   no border. Pill swells to fit, melts back fast (~1.4s). */
-.pill-echo{display:inline-flex;align-items:center;gap:.4rem;color:var(--text);font-size:.78rem;font-weight:600;white-space:nowrap;max-width:60vw;overflow:hidden;text-overflow:ellipsis;padding:.3rem .2rem;animation:viewIn .18s ease-out}
-.pill-echo .e-ic{display:inline-flex;align-items:center;gap:.15rem;color:#ff7a45}
-/* Command Echo takes the whole navbar for its flash (glance): left our
-   copy icons + Copied on the nav padding, Text on the right section.
-   Full overlay (tabs stay clickable under it, pointer-events none).
-   White/amber, no grey box. Slides in, melts fast — it borrows nav space. */
-.nav-echo-bar{position:absolute;inset:0;z-index:6;display:flex;align-items:center;justify-content:space-between;background:#000;white-space:nowrap;color:#fff;font-size:.85rem;font-weight:700;pointer-events:none;animation:echo-bar-in .25s cubic-bezier(.34,1.4,.64,1)}
-.nav-echo-bar .ne-left,.nav-echo-bar .ne-right{display:inline-flex;align-items:center;gap:.5rem;min-width:0}
-.nav-echo-bar .e-ic{display:inline-flex;align-items:center;gap:.2rem;color:#ff7a45}
-.nav-echo-bar .ne-right{font-weight:500;color:var(--text-dim)}
-@keyframes echo-bar-in{from{opacity:0;transform:translateY(-8px)}to{opacity:1;transform:none}}
-@property --beam-a{syntax:"<angle>";inherits:false;initial-value:270deg}
-/* echo edge-light: dim full rim (glance image 1) + bright beam hugging the
-   edge from the left corner along the downside to the right corner (image 2
-   flare — ice-blue core, not a straight strip). Same border-beam idiom as
-   #island[data-edge]: 2px border-box ring, beam head at the gradient origin;
-   270° left → 180° bottom → 90° right (waypointed, no shortest-arc flip).
-   Runs exactly --echo-ms (App ECHO_MS) so it lands as the bar melts. */
-.nav-echo-bar{border-radius:14px}
-.nav-echo-bar::before,.pill-echo::before{content:"";position:absolute;inset:0;border-radius:inherit;padding:1px;background:linear-gradient(transparent,transparent) padding-box,rgba(255,255,255,.22) border-box;pointer-events:none}
-.nav-echo-bar::after,.pill-echo::after{content:"";position:absolute;inset:0;border-radius:inherit;padding:2px;background:linear-gradient(transparent,transparent) padding-box,conic-gradient(from var(--beam-a),transparent 0deg,#ffffff 7deg,#bae6fd 14deg,#7dd3fc 22deg,transparent 34deg,transparent 360deg) border-box;filter:drop-shadow(0 0 4px rgba(255,255,255,.95)) drop-shadow(0 0 14px rgba(125,211,252,.9));pointer-events:none;animation:beam-travel var(--echo-ms,1400ms) linear forwards}
-.pill-echo{position:relative;border-radius:99px;padding-bottom:9px}
-@keyframes beam-travel{0%{--beam-a:270deg}50%{--beam-a:180deg}100%{--beam-a:90deg}}
-@media (prefers-reduced-motion:reduce){.nav-echo-bar::after,.pill-echo::after{animation:none;opacity:0}}
 /* no scrollbar chrome anywhere in the island window (both axes, every
    view/sheet) — EXCEPT the message log, which keeps its thin styled thumb
    so long chats stay visibly scrollable. Inner views still wheel/touch-

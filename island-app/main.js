@@ -118,7 +118,7 @@ const STRIP = { w: 228, h: 44 };
 // Measured live: card ran 368 in a 320 body and the sticky composer buried
 // the log tail 39px deep. Chat fits its card exactly: no body scroll, the
 // sticky never engages, overlap structurally impossible.
-const FOOT_H = { approval: 330, question: 460, chat: 440, daily: 450, explore: 820, settings: 865, lens: 895, shelf: 940, feed: 925 };
+const FOOT_H = { approval: 320, question: 445, chat: 425, daily: 435, explore: 805, settings: 850, lens: 880, shelf: 925, feed: 925 };
 function panelFor(wa) {
   return { w: Math.min(1020, wa.width - 16), h: Math.max(500, wa.height - 120) };
 }
@@ -271,20 +271,6 @@ app.whenReady().then(() => {
   );
   tray.setToolTip("Steroids Island");
   app.on("activate", () => win.show());
-  // Command Echo (glance): any system copy swells the pill with a preview
-  // + mascot yay. Local only — clipboard text never leaves this machine
-  // (only the preview string crosses to the renderer).
-  let lastClip = "";
-  setInterval(() => {
-    try {
-      const t = clipboard.readText();
-      if (t && t !== lastClip) {
-        lastClip = t;
-        console.log("[island-echo]", JSON.stringify(t.slice(0, 48)));
-        if (win && !win.isDestroyed()) win.webContents.send("island-echo", t.slice(0, 200));
-      }
-    } catch { /* clipboard busy — next tick */ }
-  }, 700);
 });
 
 app.on("second-instance", () => {

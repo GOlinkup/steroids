@@ -192,5 +192,56 @@ class EventsReceiverTest(unittest.TestCase):
         self.assertEqual(c.getresponse().status, 400)
 
 
+class TranscriptTest(unittest.TestCase):
+    """GET /transcript?session= serves one CLI's own turns."""
+
+    @classmethod
+    def setUpClass(cls):
+        import tempfile
+        cls._tmp = tempfile.mkdtemp(prefix="steroids-transcript-test-")
+        cls._old_home = os.environ.get("STEROIDS_HOME")
+        os.environ["STEROIDS_HOME"] = cls._tmp
+        cls.srv = ThreadingHTTPServer(("127.0.0.1", 0), Handler)
+        cls.port = cls.srv.server_address[1]
+        cls.thread = Thread(target=cls.srv.serve_forever, daemon=True)
+        cls.thread.start()
+
+    @classmethod
+    def tearDownClass(cls):
+        cls.srv.shutdown()
+        if cls._old_home is None:
+            del os.environ["STEROIDS_HOME"]
+        else:
+            os.environ["STEROIDS_HOME"] = cls._old_home
+
+    def test_own_turns_only(self):
+        stamp = str(int(time.time() * 1000))
+        mine, theirs = "mate-a-" + stamp, "mate-b-" + stamp
+        c = HTTPConnection("127.0.0.1", self.port, timeout=5)
+        for payload in ({"kind": "prompt", "text": "luna task",
+                         "session": mine},
+                        {"kind": "tool-before", "tool": "Read",
+                         "file": "/tmp/a.py", "session": mine},
+                        {"kind": "prompt", "text": "milo task",
+                         "session": theirs}):
+            c.request("POST", "/events", json.dumps(payload),
+                      {"Content-Type": "application/json"})
+            self.assertTrue(json.loads(c.getresponse().read())["ok"])
+        c.request("GET", "/transcript?session=" + mine)
+        items = json.loads(c.getresponse().read())["transcript"]
+        self.assertTrue(items)
+        self.assertTrue(all(i["session"] == mine for i in items))
+        roles = [i["role"] for i in items]
+        self.assertIn("user", roles)
+        self.assertIn("agent", roles)
+        self.assertIn("luna task", [i["text"] for i in items
+                                    if i["role"] == "user"])
+
+    def test_missing_session_is_400(self):
+        c = HTTPConnection("127.0.0.1", self.port, timeout=5)
+        c.request("GET", "/transcript")
+        self.assertEqual(c.getresponse().status, 400)
+
+
 if __name__ == "__main__":
     unittest.main()

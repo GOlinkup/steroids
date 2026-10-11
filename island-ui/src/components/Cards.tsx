@@ -290,7 +290,6 @@ export function ChatPanel({
   turnEngine = "",
   teamNode = null,
   liveSession = null,
-  liveShot = null,
   threadKey = null,
   onEditMessage,
   lastThought = null,
@@ -328,9 +327,6 @@ export function ChatPanel({
   // active agent session: the working bubble reuses the home widgets
   // (steps + lens) off its live progress — nothing extra fetched.
   liveSession?: string | null;
-  // live lens frame: newest /shots picture, rendered inside the working
-  // bubble. Structural Shot match, no import (no cycle). Null = no shots yet.
-  liveShot?: { src: string; label: string; time: string } | null;
   // team rail: rendered above the log always (empty or chatting), so the
   // crew never disappears mid-conversation — nicki leads it, this chat is hers.
   teamNode?: React.ReactNode;
@@ -784,21 +780,10 @@ export function ChatPanel({
                     ? `${liveProgress.steps.filter((s) => s.status === "done").length}/${liveProgress.steps.length} steps · ${workSecs}s`
                     : `${workSecs}s`}
                 </span>
-                {liveShot && (
-                  <div className="lens-live lens-in-bubble">
-                    <img src={liveShot.src} alt={liveShot.label} className="bubble-img" />
-                  </div>
-                )}
                 {liveProgress && liveProgress.steps.length > 0 && (
                   <StepsList steps={liveProgress.steps} />
                 )}
                 <LensBlock lens={liveProgress?.lens} />
-                {liveProgress?.output?.text && (
-                  <pre className="lens-code term-block" title={`${liveProgress.output.tool} output`}>
-                    <span className="term-head">$ {liveProgress.output.tool}</span>
-                    {"\n" + liveProgress.output.text.slice(-1500)}
-                  </pre>
-                )}
                 {liveProgress && liveProgress.files.length > 0 && (
                   <div className="live-dim">
                     {liveProgress.files.slice(0, 3).map((f, i) => (

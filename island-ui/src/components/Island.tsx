@@ -1,6 +1,5 @@
-import { forwardRef, lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
+import { forwardRef, lazy, Suspense, useEffect, useState } from "react";
 import Mascot, { type MascotHandle } from "./Mascot";
-import { CopyIcon, CheckIcon } from "./icons";
 import { ApprovalCard, QuestionCard, ChatPanel, ExploreView, FeedView, SettingsView, type SettingsState, type SettingsPage } from "./Cards";
 import { TeamGrid, TeamMinis, useTeam, useSessionProgress } from "./TeamGrid";
 import { fetchNowPlaying } from "../music";
@@ -14,108 +13,6 @@ import { HomeSkeleton } from "./HomeSkeleton";
 import type { Shot } from "./LensView";
 import type { AgentSession, Approval, Attachment, ChatMessage, ChatSession, ExploreFeed, FeedEvent, IslandView, Question, SkillHit } from "../store";
 import type { IslandState } from "../fsm";
-
-// Edge glow: one fixed strip. Volume/brightness wakes it with a single
-// start→end sweep (~0.9s), then it sits as a steady full ring until idle.
-// Turn progress parks the same ring at the real step ratio (blue).
-// No settings, no variants — holding a key glides without restarting.
-const WORK_TONE = "#7dbdff";
-const WORK_GLOW = "rgba(125,189,255,.45)";
-function EdgeGlow({ workRatio = null }: { workRatio?: number | null }) {
-  const [show, setShow] = useState<{ pct: number; tone: string; glow: string } | null>(null);
-  const showRef = useRef(show);
-  showRef.current = show;
-  const seen = useRef<{ volume: number | null; brightness: number | null }>({ volume: null, brightness: null });
-  const timer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  useEffect(() => {
-    let alive = true;
-    // QA hook: ?demo=edge pins the level ring (mirrors demo=approval).
-    if (new URLSearchParams(window.location.search).get("demo") === "edge") {
-      const t = setTimeout(() => setShow({ pct: 63, tone: "#fb923c", glow: "rgba(251,146,60,.45)" }), 0);
-      return () => { alive = false; clearTimeout(t); };
-    }
-    const poll = () => {
-      fetch(`${window.location.origin}/echo`, { cache: "no-store" })
-        .then((r) => r.json())
-        .then((j) => {
-          if (!alive) return;
-          const s = seen.current;
-          let cur: { pct: number; tone: string; glow: string } | null = null;
-          if (typeof j?.volume === "number" && j.volume !== s.volume) {
-            s.volume = j.volume;
-            if (!j.muted) cur = { pct: j.volume, tone: "#fb923c", glow: "rgba(251,146,60,.45)" };
-          }
-          if (typeof j?.brightness === "number" && j.brightness !== s.brightness) {
-            s.brightness = j.brightness;
-            cur = { pct: j.brightness, tone: "#7dd3fc", glow: "rgba(125,211,252,.45)" };
-          }
-          if (cur) {
-            // holding volume: same tone, just move the var — no re-render,
-            // so the sweep never restarts mid-hold. Hide 1.2s after release.
-            const isl = document.getElementById("island") as HTMLElement | null;
-            if (showRef.current?.tone === cur.tone && isl?.hasAttribute("data-edge")) {
-              isl.style.setProperty("--fill", String(cur.pct));
-              if (timer.current) clearTimeout(timer.current);
-              timer.current = setTimeout(() => { if (alive) setShow(null); }, 1200);
-              return;
-            }
-            setShow(cur);
-            if (timer.current) clearTimeout(timer.current);
-            timer.current = setTimeout(() => { if (alive) setShow(null); }, 1200);
-          }
-        })
-        .catch(() => {});
-    };
-    poll();
-    const t = setInterval(poll, 200);
-    return () => {
-      alive = false;
-      clearInterval(t);
-      if (timer.current) clearTimeout(timer.current);
-    };
-  }, []);
-  // (copy echo deliberately does NOT ping this ring: the flash must stay
-  // in the header chip, never repaint the whole panel.)
-  // turn progress parks the ring at the real step ratio (determinate —
-  // never a directionless loop). No melt timer while work runs; when the
-  // turn ends the ring clears. A volume press may briefly borrow the ring.
-  const workOn = useRef(false);
-  useEffect(() => {
-    if (workRatio == null) {
-      if (workOn.current) { workOn.current = false; setShow(null); }
-      return;
-    }
-    workOn.current = true;
-    const pct = Math.max(0, Math.min(100, Math.round(workRatio * 100)));
-    const isl = document.getElementById("island") as HTMLElement | null;
-    if (showRef.current?.tone === WORK_TONE && isl?.hasAttribute("data-edge")) {
-      isl.style.setProperty("--fill", String(pct));
-      return;
-    }
-    if (timer.current) clearTimeout(timer.current);
-    setShow({ pct, tone: WORK_TONE, glow: WORK_GLOW });
-  }, [workRatio]);
-  useEffect(() => {
-    const isl = document.getElementById("island") as HTMLElement | null;
-    if (!isl) return;
-    if (!show) {
-      isl.removeAttribute("data-edge");
-      isl.removeAttribute("data-sweep");
-      return;
-    }
-    const fresh = !isl.hasAttribute("data-edge");
-    isl.setAttribute("data-edge", "level");
-    isl.style.setProperty("--edge", show.tone);
-    isl.style.setProperty("--edge-glow", show.glow);
-    isl.style.setProperty("--fill", String(show.pct));
-    if (fresh) {
-      // one start→end run, then park on the seamless ring.
-      isl.setAttribute("data-sweep", "");
-      setTimeout(() => isl.removeAttribute("data-sweep"), 950);
-    }
-  }, [show]);
-  return null;
-}
 
 // Nicki groove: while any player runs, the island mascot bobs on the
 // beat (hop edges kick, --e rides bounce height) — same contract as
@@ -176,14 +73,6 @@ interface Props {
   foot?: string;
   mascotRef: React.Ref<MascotHandle>;
   routeHint: string;
-  /** Command Echo: transient "Copied/Pasted — …" preview; pill swells, melts back. */
-  echo?: string | null;
-  /** copy vs paste label for the echo bar. echoMs feeds --echo-ms so the
-      neon sweep lands exactly as the bar melts (single source: App ECHO_MS). */
-  echoKind?: "copied" | "pasted";
-  echoMs?: number;
-  /** Morph cover: hide content while the window glides between sizes. */
-  swapping?: boolean;
   approval: Approval | null;
   question: Question | null;
   messages: ChatMessage[];
@@ -249,14 +138,10 @@ interface Props {
   onSignOut?: () => void;
 }
 
-// ponytail: neon on — glance light studies (glow trace, halos, level ring).
-// One flag restores the edge ring; off = plain border, no polling, no sweep.
-const NEON_ON = true;
-
 // Island shell — steroids spotter bar. Ranked routes, plate snap.
 const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
   const {
-    fsmState, view, foot = "", mascotRef, routeHint, echo = null, echoKind = "copied", echoMs = 1400, swapping = false,
+    fsmState, view, foot = "", mascotRef, routeHint,
     approval, question, messages, thinking, liveActivity, livePartial, turnEngine, attachments,
     onFiles, onRemoveAttachment, shots,
     onMouseEnter, onMouseLeave, onMascotTap,
@@ -296,6 +181,8 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     return () => { dead = true; clearInterval(t); };
   }, []);
   const showHuddle = messages.length === 0;
+  // level pill number: glides to each new destination (volume keys land in
+  // steps) instead of jumping. Runs at top level; hidden pills ignore it.
   const avatarNav = (page: "profile" | "explore" | "settings" | "account" | "phone") => {
     if (page === "explore") {
       onTab("explore");
@@ -310,23 +197,17 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     }
   };
 
-  // turn step ratio drives the edge ring (determinate progress, same
-  // hook the tiles use — session id is all the fetch needs).
-  const { prog, refresh } = useSessionProgress(liveSession && thinking ? [{ session: liveSession, agent: "", first: "" }] : []);
+  // live session progress for the tiles (session id is all the fetch needs).
+  const { refresh } = useSessionProgress(liveSession && thinking ? [{ session: liveSession, agent: "", first: "" }] : []);
   useEffect(() => {
     if (!thinking || !liveSession) return;
     refresh(liveSession);
     const t = setInterval(() => refresh(liveSession), 2000);
     return () => clearInterval(t);
   }, [thinking, liveSession, refresh]);
-  const workSteps = thinking && liveSession ? prog[liveSession]?.steps : undefined;
-  const workRatio = workSteps && workSteps.length > 0
-    ? workSteps.filter((s) => s.status === "done").length / workSteps.length
-    : null;
 
   return (
     <>
-      {NEON_ON && <EdgeGlow workRatio={workRatio} />}
       <NickiGroove mascotRef={mascotRef} />
     <div
       ref={ref}
@@ -334,14 +215,10 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
       data-state={fsmState}
       data-view={view}
       data-foot={foot || undefined}
-      data-swapping={swapping || undefined}
-      data-glow={NEON_ON ? (approval || question ? "urgent" : thinking ? "working" : undefined) : undefined}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
       onClick={onIslandClick}
     >
-      {/* glance light trace retired: the amber under-line read as a stray
-          orange strip on the minimal pill. Masot halos (data-glow) stay. */}
       {fsmState !== "jacked" && <Mascot key={fsmState} ref={mascotRef} px={8} mood="wave" onTap={onMascotTap} />}
       {fsmState === "hidden" ? null : fsmState === "jacked" ? (
         <>
@@ -353,12 +230,6 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             unread={unread}
             onTab={onTab}
             hiddenViews={settings.hiddenViews}
-            middle={echo ? (
-              <span className="nav-echo-bar" role="status" style={{ "--echo-ms": `${echoMs}ms` } as CSSProperties}>
-                <span className="ne-left"><span className="e-ic" aria-hidden><CopyIcon size={16} /><CheckIcon size={16} /></span><span>{echoKind === "pasted" ? "Pasted" : "Copied"}</span></span>
-                <span className="ne-right">Text</span>
-              </span>
-            ) : undefined}
             sessions={sessions}
             histHint={histHint}
             activeSessionId={activeSessionId}
@@ -442,7 +313,6 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
               lastThought={lastThought}
               onStop={onStop}
               liveSession={liveSession}
-              liveShot={shots[0] ?? null}
               providers={providers}
               installState={installState}
               onInstall={onInstall}
@@ -455,7 +325,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
                   )}
                   {/* crew rail: the huddle above is nicki's hello (crew ready),
                       the grid below leads with nicki, then the mates. */}
-                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} onPick={onResumeAgentSession} onPickNicki={onBackToNicki} onAvatarNav={avatarNav} detail="none" compact={messages.length > 0} />
+                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} onPick={onResumeAgentSession} onPickNicki={onBackToNicki} detail="none" compact={messages.length > 0} />
                 </div>
               }
             />
@@ -489,18 +359,12 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
         </>
       ) : (
         <>
-          {/* minimized pill: echo notice swells it, else nicki + mates grid.
-              Text-only language, our own icons — never the copied content. */}
-          {echo ? (
-            <span className="pill-echo" role="status" aria-live="polite" style={{ "--echo-ms": `${echoMs}ms` } as CSSProperties}><span className="e-ic" aria-hidden><CopyIcon size={13} /><CheckIcon size={13} /></span>{echoKind === "pasted" ? "Pasted" : "Copied"} · Text</span>
-          ) : (
-          musicLive ? (
-            <span className="pill-wave" title="now playing" aria-hidden>
-              <Mascot mood="wave" />
-            </span>
+          {/* minimized pill: nicki + mates grid. Playing: one mascot
+              only (human order — no double buddy), wave bars ride right. */}
+          {musicLive ? (
+            <span className="wavebars" title="now playing" aria-hidden><i /><i /><i /><i /><i /></span>
           ) : (
           <TeamMinis members={team.members} title={routeHint} />
-          )
           )}
         </>
       )}

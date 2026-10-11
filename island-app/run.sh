@@ -42,8 +42,8 @@ busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting start 2>/dev/n
 # ponytail: X11 platform (human order — best-and-reliable call 2026-10-11).
 # Wayland clients cannot place windows (protocol forbids it) and this
 # KWin 6.7.4 runs no scripts (broken start slot), so Wayland top-center
-# is unachievable. Under X11 setPosition works (proven live: create at
-# 100,100, move to 500,60, read-back exact) and main.js already owns the
-# X11 mirror math + truthful settled proof. If text renders soft at 4K,
-# revert this one flag (placement was the trade).
-exec ./node_modules/.bin/electron --ozone-platform=x11 --disable-gpu --enable-unsafe-swiftshader --remote-debugging-port=9335 .
+# is unachievable. Under X11 setPosition works (proven live) and main.js
+# already owns plain coords + truthful settled proof. XCURSOR_SIZE keeps
+# the pointer full-size over XWayland windows (1x cursors render tiny).
+# If text renders soft at 4K, revert this one flag (placement dies with it).
+XCURSOR_SIZE=48 exec ./node_modules/.bin/electron --ozone-platform=x11 --disable-gpu --enable-unsafe-swiftshader --remote-debugging-port=9335 .
