@@ -13,11 +13,12 @@ if ! curl -sf -o /dev/null --max-time 2 http://127.0.0.1:8096/health; then
     sleep 0.5
   done
 fi
-# NOTE: position-watch.py retired — external moves are ignored by the
-# compositor here; main.js compensates the mirrored write path instead.
-# KWin notch pin: the compositor itself keeps the island top-center
-# (X11 clients see a mirrored view on this box, so only KWin-side
-# enforcement is trustworthy). Reloaded every launch, idempotent.
+# NOTE: position-watch.py retired — X11 placement uses PLAIN client coords
+# on this box (proven 2026-10-11: the old -cx "mirror" compensated mirrored
+# X READS, not mirrored placement — xlib reports negated values while the
+# window itself obeys plain coords; KWin clamps truly-off-screen requests
+# to 0,0). main.js places directly; the KWin pin backstops in compositor
+# coords. Reloaded every launch, idempotent.
 python3 -c "
 import gi
 gi.require_version('Gio', '2.0')
@@ -38,4 +39,11 @@ except Exception as e:
 # KWin: loaded scripts need an explicit start, and the Gio start call never
 # resolves (journal: "Could not find slot"). busctl delivers it fine.
 busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting start 2>/dev/null || true
-exec ./node_modules/.bin/electron --ozone-platform=wayland --disable-gpu --enable-unsafe-swiftshader --remote-debugging-port=9335 .
+# ponytail: X11 platform (human order — best-and-reliable call 2026-10-11).
+# Wayland clients cannot place windows (protocol forbids it) and this
+# KWin 6.7.4 runs no scripts (broken start slot), so Wayland top-center
+# is unachievable. Under X11 setPosition works (proven live: create at
+# 100,100, move to 500,60, read-back exact) and main.js already owns the
+# X11 mirror math + truthful settled proof. If text renders soft at 4K,
+# revert this one flag (placement was the trade).
+exec ./node_modules/.bin/electron --ozone-platform=x11 --disable-gpu --enable-unsafe-swiftshader --remote-debugging-port=9335 .

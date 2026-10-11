@@ -63,7 +63,7 @@ function createWindow() {
       const wa2 = screen.getDisplayNearestPoint({ x: b.x + b.width / 2, y: b.y + b.height / 2 }).workArea;
       const isX11b = process.argv.join(" ").includes("ozone-platform=x11");
       const cx2 = Math.round(wa2.x + (wa2.width - b.width) / 2);
-      win.setPosition(isX11b ? -cx2 : cx2, wa2.y, false);
+      win.setPosition(cx2, wa2.y, false);
     } catch { /* window gone */ }
   };
   win.once("ready-to-show", () => setTimeout(reassert, 300));
@@ -159,8 +159,8 @@ function placeWindow(w, h, wa) {
   }
   if (IS_X11) {
     const cx = Math.round(wa.x + (wa.width - w) / 2);
-    tracked.x = -cx; tracked.y = wa.y;
-    win.setBounds({ x: -cx, y: wa.y, width: w, height: h }, false);
+    tracked.x = cx; tracked.y = wa.y;
+    win.setBounds({ x: cx, y: wa.y, width: w, height: h }, false);
   } else {
     // Wayland: size only — the compositor pin owns position (its hook fires
     // on this resize and re-pins). tracked x/y assume the pin's formula,
@@ -243,11 +243,11 @@ app.whenReady().then(() => {
         tracked.panelW = p.w; tracked.panelH = p.h;
         const f = footprintSize(tracked.state, tracked.view, wa);
         const cx = Math.round(wa.x + (wa.width - f.w) / 2);
-        tracked.x = -cx; tracked.y = wa.y;
+        tracked.x = cx; tracked.y = wa.y;
         tracked.collapsed = f.name === "strip";
         tracked.lastName = f.name;
         tracked.appliedKey = `${f.name}x${f.w}x${f.h}`;
-        win.setBounds({ x: -cx, y: wa.y, width: f.w, height: f.h }, false);
+        win.setBounds({ x: cx, y: wa.y, width: f.w, height: f.h }, false);
         console.log("[island-reposition]", JSON.stringify({ why, ask: [f.w, f.h] }));
         return;
       }
