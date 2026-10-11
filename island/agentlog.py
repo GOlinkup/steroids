@@ -68,6 +68,66 @@ def _tool_lines(inp, ev):
     return 0, 0
 
 
+OUTPUT_MAX = 2000
+
+
+def _extract_output(p):
+    """Tool result text from any provider payload. Never throws, '' when none.
+
+    Claude PostToolUse carries tool_response; opencode after carries output;
+    be tolerant — stringify dicts/lists, join text parts, cap OUTPUT_MAX."""
+    try:
+        for k in ('tool_response', 'tool_result', 'output', 'result',
+                  'stdout', 'stderr', 'text', 'content'):
+            v = p.get(k) if isinstance(p, dict) else None
+            if v is None or v is False:
+                continue
+            if isinstance(v, dict):
+                # opencode output: {text, data, error, exitCode} — prefer text.
+                for tk in ('text', 'data', 'result', 'stdout', 'output'):
+                    tv = v.get(tk)
+                    if isinstance(tv, str) and tv.strip():
+                        return tv.strip()[:OUTPUT_MAX]
+                if v.get('error') not in (None, 0, '', False):
+                    return str(v.get('error'))[:OUTPUT_MAX]
+                continue
+            if isinstance(v, list):
+                parts = []
+                for item in v:
+                    if isinstance(item, str):
+                        parts.append(item)
+                    elif isinstance(item, dict) and isinstance(item.get('text'), str):
+                        parts.append(item['text'])
+                t = ' '.join(parts).strip()
+                if t:
+                    return t[:OUTPUT_MAX]
+                continue
+            if isinstance(v, str) and v.strip():
+                # skip echo of input-only keys
+                if k in ('text', 'content') and len(v) > OUTPUT_MAX:
+                    return v.strip()[:OUTPUT_MAX]
+                return v.strip()[:OUTPUT_MAX]
+        return ''
+    except Exception:
+        return ''
+
+
+_APPROVAL_FIELDS = ("command", "file_path", "path", "url",
+                      "query", "pattern", "prompt")
+
+
+def approval_target(tool, inp):
+    """What the Allow button authorises: `Tool · specific`, never bare tool.
+    Port of coucou hooks.ts approvalTarget — ordered by specificity."""
+    if not isinstance(inp, dict):
+        return tool or ''
+    for f in _APPROVAL_FIELDS:
+        v = inp.get(f)
+        if isinstance(v, str) and v.strip():
+            return "%s · %s" % (tool, v.strip()[:120])
+    return tool or ''
+
+
 def normalize_claude(p, agent='claude'):
     ev = p.get('hook_event_name') or p.get('event') or ''
     tool = p.get('tool_name') or p.get('tool') or ''
@@ -94,7 +154,9 @@ def normalize_claude(p, agent='claude'):
                 if isinstance(inp, dict) else '',
         'added': added,
         'removed': removed,
-        'text': str(p.get('prompt') or p.get('message') or '')[:600],
+        'text': (str(p.get('prompt') or p.get('message') or '')[:600]
+                 or approval_target(tool, inp) if ev in ('PreToolUse', 'PostToolUse')
+                 else str(p.get('prompt') or p.get('message') or '')[:600]),
         'session': str(p.get('session_id') or '')[:64],
         'ok': bool(p.get('ok', ev != 'StopFailure')),
         'agent': agent,
@@ -104,6 +166,10 @@ def normalize_claude(p, agent='claude'):
               'term_pid', 'ssh', 'title_hint'):
         if p.get(k):
             e[k] = str(p[k])[:128]
+    if ev == 'PostToolUse':
+        out = _extract_output(p)
+        if out:
+            e['output'] = out
     if p.get('hook_event_name') == 'PermissionRequest':
         e['attention'] = True
     if agent == 'codex' and ev == 'PreToolUse':
@@ -137,6 +203,10 @@ def normalize_opencode(p, agent='opencode'):
         'ok': bool(p.get('ok', True)),
         'agent': agent,
     }
+    if ev == 'PostToolUse':
+        out = _extract_output(p) or str(p.get('text') or '')[:OUTPUT_MAX]
+        if out.strip():
+            e['output'] = out.strip()[:OUTPUT_MAX]
     for k in ('cwd', 'tmux', 'term_program', 'tty'):
         if p.get(k):
             e[k] = str(p[k])[:128]
@@ -622,7 +692,8 @@ def session_progress(evs, sid):
         if not sev:
             return {'task': '', 'state': 'idle', 'activity': '',
                     'steps': [], 'files': [],
-                    'lens': {'file': '', 'lines': [], 'diff': []}}
+                    'lens': {'file': '', 'lines': [], 'diff': []},
+                    'output': None}
         task = ''
         for e in sev:
             if (e.get('event') or '') == 'UserPromptSubmit' and e.get('text'):
@@ -683,13 +754,21 @@ def session_progress(evs, sid):
         lens = file_lens(last_path)
         if not lens['file']:
             lens = cwd_lens(last_cwd)
+        out_tool, out_text = '', ''
+        for e in reversed(sev):
+            if (e.get('event') or '') == 'PostToolUse' and str(e.get('output') or '').strip():
+                out_tool = str(e.get('tool') or '')
+                out_text = str(e.get('output') or '')[:OUTPUT_MAX]
+                break
         return {'task': task, 'state': state, 'activity': activity,
                 'steps': steps[:8], 'files': files[:6],
-                'lens': lens}
+                'lens': lens,
+                'output': {'tool': out_tool, 'text': out_text} if out_text else None}
     except Exception:
         return {'task': '', 'state': 'idle', 'activity': '',
                 'steps': [], 'files': [],
-                'lens': {'file': '', 'lines': [], 'diff': []}}
+                'lens': {'file': '', 'lines': [], 'diff': []},
+                'output': None}
 
 
 def build_handoff_brief(evs, from_sid, to_text='', max_chars=3000):

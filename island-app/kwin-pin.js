@@ -1,3 +1,6 @@
+// SHEET-FREEZE — human order 2026-10-11: top-center positioning + sheet
+// geometry locked. No agent edits this file until the human says "unfreeze".
+// Enforced by tests/test_sheet_freeze.py. Details: CONTRIBUTING.md.
 // Steroids Island notch pin (KWin script).
 // The island is a widget, not a window: keep it top-center of its output.
 // External moves are ignored on this setup and client-side placement gets
@@ -18,6 +21,7 @@ function pin(win) {
   var t = targetFor(win);
   var g = win.frameGeometry;
   if (Math.abs(g.x - t.x) > 2 || Math.abs(g.y - t.y) > 2) {
+    print("[island-pin] move " + g.x + "," + g.y + " " + g.width + "x" + g.height + " -> " + t.x + "," + t.y);
     win.frameGeometry = { x: t.x, y: t.y, width: g.width, height: g.height };
   }
 }

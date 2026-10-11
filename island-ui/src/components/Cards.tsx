@@ -290,6 +290,7 @@ export function ChatPanel({
   turnEngine = "",
   teamNode = null,
   liveSession = null,
+  liveShot = null,
   threadKey = null,
   onEditMessage,
   lastThought = null,
@@ -327,6 +328,9 @@ export function ChatPanel({
   // active agent session: the working bubble reuses the home widgets
   // (steps + lens) off its live progress — nothing extra fetched.
   liveSession?: string | null;
+  // live lens frame: newest /shots picture, rendered inside the working
+  // bubble. Structural Shot match, no import (no cycle). Null = no shots yet.
+  liveShot?: { src: string; label: string; time: string } | null;
   // team rail: rendered above the log always (empty or chatting), so the
   // crew never disappears mid-conversation — nicki leads it, this chat is hers.
   teamNode?: React.ReactNode;
@@ -461,6 +465,14 @@ export function ChatPanel({
     const el = logRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
   }, [messages, thinking]);
+  // work starts: re-stick so the run pushes focus to the latest text, same
+  // as an own send (edits/regens re-stick at their call sites below).
+  useEffect(() => {
+    if (!thinking) return;
+    stick.current = true;
+    const el = logRef.current;
+    if (el) el.scrollTop = el.scrollHeight;
+  }, [thinking]);
   // late growth the message deps miss (bubble images, webfont swap): while
   // stuck, follow the log's own resize too. Scrolled-up stays put.
   useLayoutEffect(() => {
@@ -525,12 +537,14 @@ export function ChatPanel({
     const t = editDraft.trim();
     if (!m || !t || thinking) return;
     setEditingId(null);
+    stick.current = true; // re-send follows the reply.
     onEditMessage?.(m.id);
     onSend(t, provider, { model, effort }, m.attachments ?? []);
   };
   const regenLast = () => {
     const last = [...messages].reverse().find((m) => m.role === "user");
     if (!last || thinking) return;
+    stick.current = true; // re-run follows the reply.
     onSend(last.content, provider, { model, effort }, last.attachments ?? []);
   };
   const lastAssistantId = [...messages].reverse().find((m) => m.role === "assistant")?.id;
@@ -770,10 +784,21 @@ export function ChatPanel({
                     ? `${liveProgress.steps.filter((s) => s.status === "done").length}/${liveProgress.steps.length} steps · ${workSecs}s`
                     : `${workSecs}s`}
                 </span>
+                {liveShot && (
+                  <div className="lens-live lens-in-bubble">
+                    <img src={liveShot.src} alt={liveShot.label} className="bubble-img" />
+                  </div>
+                )}
                 {liveProgress && liveProgress.steps.length > 0 && (
                   <StepsList steps={liveProgress.steps} />
                 )}
                 <LensBlock lens={liveProgress?.lens} />
+                {liveProgress?.output?.text && (
+                  <pre className="lens-code term-block" title={`${liveProgress.output.tool} output`}>
+                    <span className="term-head">$ {liveProgress.output.tool}</span>
+                    {"\n" + liveProgress.output.text.slice(-1500)}
+                  </pre>
+                )}
                 {liveProgress && liveProgress.files.length > 0 && (
                   <div className="live-dim">
                     {liveProgress.files.slice(0, 3).map((f, i) => (
@@ -909,6 +934,9 @@ export function ChatPanel({
             if (el) {
               el.style.height = "auto";
               el.style.height = Math.min(120, el.scrollHeight) + "px";
+              // ponytail: follow the caret past the cap — without this the
+              // typed line slides under the fold and reads as cropped.
+              el.scrollTop = el.scrollHeight;
             }
           }}
           onKeyDown={(e) => {
@@ -916,6 +944,10 @@ export function ChatPanel({
               e.preventDefault();
               submit();
             }
+            // ponytail: Escape stays in the field (industry standard — the
+            // island-wide Esc-to-collapse must not fire mid-typing and strand
+            // a half-written message in a closed panel).
+            if (e.key === "Escape") e.stopPropagation();
           }}
         />
         <div className="composer-innerbar">
@@ -1466,7 +1498,6 @@ export function SettingsView({
   pair,
   extra,
   page = "general",
-  onPage,
 }: {
   settings: SettingsState;
   onChange: (s: SettingsState) => void;
@@ -1475,7 +1506,6 @@ export function SettingsView({
   page?: SettingsPage;
   onPage?: (p: SettingsPage) => void;
 }) {
-  const tab = page;
   const set = (patch: Partial<SettingsState>) => onChange({ ...settings, ...patch });
   // Only the prefs worth touching: provider default, notifications,
   // auto-save. The rest (auto-close, hover, hidden tabs/pills) rides its
@@ -1483,33 +1513,20 @@ export function SettingsView({
   const PROVIDERS = ENGINES.map((e) => e.id);
   const cycleProvider = () =>
     set({ provider: PROVIDERS[(PROVIDERS.indexOf(settings.provider) + 1) % PROVIDERS.length] });
-  // Master-detail: nav lives on the left, page on the right — one tap
-  // per hop, no dropdown round-trips. The avatar menu still deep-links
-  // (same page state), the sidebar is the always-visible switcher.
-  const NAV: Array<{ id: SettingsPage; label: string }> = [
-    { id: "general", label: "General" },
-    { id: "phone", label: "Phone link" },
-  ];
+  // ponytail: one nav (coucou-header parity — a single persistent bar, views
+  // never contain navigation). The settings sidebar is deleted: General +
+  // Phone link stack in one scrolling page, avatar-menu deep-links scroll
+  // to the section (same pattern as #island-account). `page` only selects
+  // the scroll target now; all wiring (AvatarMenu, onSettingsPage) stays.
+  useEffect(() => {
+    if (page !== "phone") return;
+    const t = window.setTimeout(() => {
+      document.querySelector("#island-phone")?.scrollIntoView({ block: "start" });
+    }, 60);
+    return () => window.clearTimeout(t);
+  }, [page]);
   return (
     <div className="card settings">
-      <div className="set-layout">
-        <div className="menu-card set-nav" role="tablist" aria-label="Settings pages">
-          {NAV.map((n) => (
-            <button
-              key={n.id}
-              role="tab"
-              aria-selected={tab === n.id}
-              className="menu-row action"
-              onClick={() => onPage?.(n.id)}
-            >
-              <span>{n.label}</span>
-              {tab === n.id && <CheckIcon size={14} />}
-            </button>
-          ))}
-        </div>
-        <div className="set-page">
-        {tab === "general" && (
-        <>
         <div id="island-account">{extra}</div>
         <div className="set-head">Preferences</div>
       <div className="menu-card" aria-label="Preferences">
@@ -1540,11 +1557,8 @@ export function SettingsView({
       </div>
         <div className="set-head">Automation</div>
         <RulesSection />
-        </>
-        )}
-        {tab === "phone" && pair}
-        </div>
-      </div>
+        <div className="set-head" id="island-phone">Phone link</div>
+        {pair}
     </div>
   );
 }

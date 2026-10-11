@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Mascot, { type MascotHandle, type MascotMood } from "./Mascot";
 import { DotsIcon } from "./icons";
-import { useDismiss, MenuRow } from "./pickers";
-import { BashIcon, CheckIcon, PencilIcon, ReadIcon, XIcon } from "./icons";
+import { MenuRow } from "./pickers";
+import { BashIcon, CheckIcon, GearIcon, PencilIcon, PersonIcon, PhoneIcon, ReadIcon, XIcon } from "./icons";
 
 // Team grid — minimal ref-style tiles (dot + name). Selection drives the
 // main left container (Daily work card); Lens renders the same detail
@@ -28,10 +28,40 @@ export function slotSession(members: Member[], sessions: AgentMini[], idx: numbe
 export interface Step { label: string; status: string }
 export interface ProgFile { name: string; added: number; removed: number }
 export interface Lens { file: string; lines: string[]; diff?: string[] }
-export interface Progress { task: string; state: string; activity: string; steps: Step[]; files: ProgFile[]; lens: Lens }
+export interface ToolOutput { tool: string; text: string }
+export interface Progress { task: string; state: string; activity: string; steps: Step[]; files: ProgFile[]; lens: Lens; output?: ToolOutput | null }
 
-// Name pool: short, easy names — no celebrities. Every slot takes the pool
-// name in order on load (customs included); deletes free the name back up.
+// ponytail: ONE face (OOP single source) — grid cells, pill minis, nicki:
+// every mate face renders here. Change the look once, here. wrapClass picks
+// the size context (team-face 32px / pill-face 20px); faces registry is
+// optional (pill minis stay out of the glance loop).
+export function MateFace({ color, mood, wrapClass = "team-face", faceKey, faces }: {
+  color?: string; mood?: MascotMood; wrapClass?: string; faceKey?: string;
+  faces?: { current: Map<string, MascotHandle | null> };
+}) {
+  return (
+    <span className={wrapClass} style={color ? { filter: `hue-rotate(${hueFor(color)}deg)` } : undefined} aria-hidden>
+      <Mascot
+        ref={faceKey && faces ? (h) => { faces.current.set(faceKey, h); } : undefined}
+        mood={mood ?? "neutral"}
+      />
+    </span>
+  );
+}
+
+// ponytail: ONE minis row — the minimized pill renders the same faces as
+// the grid (was hand-rolled duplicate markup in Island.tsx).
+export function TeamMinis({ members, title }: { members: Member[]; title?: string }) {
+  return (
+    <span className="pill-team mini-grid" title={title} aria-hidden>
+      {members.slice(0, 4).map((m) => (
+        <span key={m.id} className="pill-face" title={m.name}>
+          <MateFace color={m.color} mood="neutral" wrapClass="" />
+        </span>
+      ))}
+    </span>
+  );
+}
 const NAME_POOL = ["luna", "milo", "nala", "zuri", "kaya", "finn", "nova", "remy", "coco", "juno", "theo", "wren"];
 // Per-mate look: hue-rotated buddy by member color (orange ≈ 25° base).
 // Nicki (work buddy, mascot-top) stays untinted — she's the main.
@@ -394,7 +424,7 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
   );
 }
 
-export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoChat, sel, onSel, detail = "below", team: teamProp, live: liveProp, compact = false }: {
+export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoChat, onAvatarNav, sel, onSel, detail = "below", team: teamProp, live: liveProp, compact = false }: {
   sessions?: AgentMini[];
   onResume?: (sid: string, first: string) => void;
   // pick mode (chat view): tapping a live tile opens that agent's chat
@@ -404,6 +434,8 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
   onPickNicki?: () => void;
   // jump to the chat composer (home of the provider dropdown).
   onGoChat?: () => void;
+  // profile dropdown reuse: same pages as the header avatar menu.
+  onAvatarNav?: (page: "profile" | "explore" | "settings" | "account" | "phone") => void;
   sel?: string | null;
   onSel?: (id: string | null) => void;
   detail?: "below" | "none";
@@ -430,14 +462,56 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
     });
   const [inner, setInner] = useState<string | null>(null);
   const cur = onSel ? sel ?? null : inner;
-  // ⋯ menu: resume / rename / remove without leaving the grid.
+  // ⋯ menu: one floating sheet (position:fixed, escapes the chat rail's
+  // horizontal scroller that clipped the old in-cell absolute menus —
+  // dropdowns opened but painted invisible). Anchor = tapped dots' rect.
   const [menuId, setMenuId] = useState<string | null>(null);
+  const [anchor, setAnchor] = useState<{ x: number; top: number; bottom: number; up: boolean } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
-  const menuDismiss = useDismiss<HTMLDivElement>(menuId !== null, () => {
+  const menuRef = useRef<HTMLDivElement>(null);
+  const closeMenu = () => {
     setMenuId(null);
     setRenaming(null);
-  });
+  };
+  // outside closer: dots taps are exempt (the toggle owns them — otherwise
+  // the pre-click pointerdown would close first and every tap reopens).
+  useEffect(() => {
+    if (!menuId) return;
+    const onDown = (e: PointerEvent) => {
+      const t = e.target as HTMLElement | null;
+      if (t?.closest?.(".team-dots")) return;
+      if (menuRef.current && !menuRef.current.contains(t as Node)) closeMenu();
+    };
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") closeMenu();
+    };
+    document.addEventListener("pointerdown", onDown);
+    document.addEventListener("keydown", onKey);
+    return () => {
+      document.removeEventListener("pointerdown", onDown);
+      document.removeEventListener("keydown", onKey);
+    };
+  }, [menuId]);
+  const openMenu = (id: string, el: HTMLElement) => {
+    // toggle: stale-closure click after a pointerdown-dismiss still reads
+    // the old id, so tapping open dots closes (both paths land on null).
+    if (menuId === id) {
+      closeMenu();
+      return;
+    }
+    try {
+      const r = el.getBoundingClientRect();
+      setAnchor({
+        x: Math.max(8, Math.min(r.left, window.innerWidth - 200)),
+        top: r.top,
+        bottom: r.bottom + 4,
+        up: r.bottom > window.innerHeight - 250,
+      });
+    } catch { setAnchor(null); }
+    setMenuId(id);
+    setRenaming(null);
+  };
   // every mate keeps our face: a live mini that looks around, blinks,
   // and feels its own session (working → bright, error → annoyed).
   const faces = useRef(new Map<string, MascotHandle | null>());
@@ -475,8 +549,13 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
   void compact;
   // nicki leads the grid visually (this chat is hers). Visual-only: she
   // takes no session slot, so slotSession indexing below is untouched.
-  const nickiOn = !cur && !onPickNicki;
+  // on = nothing else selected — driving or not, the highlight tells the
+  // truth (was `!cur && !onPickNicki`, which left the old mate lit after
+  // back-to-nicki because cur was never cleared).
+  const nickiOn = !cur;
   const nickiClick = () => {
+    // clear any mate selection first so the highlight follows the tap.
+    pick(null);
     // driving a mate: nicki's tile jumps back to her own draft.
     if (onPickNicki) {
       onPickNicki();
@@ -517,16 +596,22 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
             aria-pressed={nickiOn}
             onClick={nickiClick}
           >
-            <span className="team-face" aria-hidden>
-              <Mascot
-                ref={(h) => { faces.current.set("nicki", h); }}
-                mood={nickiOn ? "happy" : "neutral"}
-              />
-            </span>
+            <MateFace mood={nickiOn ? "happy" : "neutral"} faceKey="nicki" faces={faces} />
             <span className="team-meta">
               <span className="team-name">nicki</span>
               <span className="team-sub">main</span>
             </span>
+          </button>
+          <button
+            className="team-dots"
+            aria-label="Options for nicki"
+            aria-expanded={menuId === "nicki"}
+            onClick={(e) => {
+              e.stopPropagation();
+              openMenu("nicki", e.currentTarget);
+            }}
+          >
+            <DotsIcon size={15} />
           </button>
         </div>
         {members.map((m, i) => {
@@ -545,6 +630,10 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
                 title={s ? `${m.name} — ${m.role}${MATE_QUIPS[m.name] ? `. ${MATE_QUIPS[m.name]}` : ""} · ${s.agent} · ${s.first}` : `${m.name} — ${m.role}${MATE_QUIPS[m.name] ? `. ${MATE_QUIPS[m.name]}` : ""} · tap to view`}
                 aria-pressed={m.id === cur}
                 onClick={() => {
+                  // tap selects the character in place first (highlight +
+                  // mood follow), then jumps only in pick mode (chat).
+                  // Selection state stays truthful on every screen.
+                  pick(m.id);
                   // pick mode: the tile IS the jump — open the mate's
                   // chat directly instead of selecting a detail panel.
                   // First tap claims the lane: an unpinned slot binds the
@@ -562,16 +651,10 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
                     document.querySelector<HTMLTextAreaElement>(".composer-input")?.focus();
                     return;
                   }
-                  pick(m.id === cur ? null : m.id);
                   if (s) refresh(s.session);
                 }}
               >
-                <span className="team-face" style={{ filter: `hue-rotate(${hueFor(m.color)}deg)` }} aria-hidden>
-                  <Mascot
-                    ref={(h) => { faces.current.set(m.id, h); }}
-                    mood={mood}
-                  />
-                </span>
+                <MateFace color={m.color} mood={mood} faceKey={m.id} faces={faces} />
                 {renaming === m.id ? (
                   <input
                     className="team-edit"
@@ -603,9 +686,10 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
                     {!s && <span className="team-sub">{m.role}</span>}
                   </span>
                 )}
-                {/* engine row, full tile width: nicki first, then the model.
-                    Own row so it never squeezes the name. Tap jumps to the
-                    chat composer dropdown that owns the switch. */}
+                {/* engine row, full tile width: agent only (the name is
+                    already the tile title — "luna · opencode" repeated it).
+                    Tap jumps to the chat composer dropdown that owns
+                    the switch. */}
                 {s && (
                   onGoChat ? (
                     <span
@@ -624,10 +708,10 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
                         }
                       }}
                     >
-                      {m.name} · {s.agent}
+                      {s.agent}
                     </span>
                   ) : (
-                    <span className="team-sub team-wide">{m.name} · {s.agent}</span>
+                    <span className="team-sub team-wide">{s.agent}</span>
                   )
                 )}
               </button>
@@ -637,54 +721,120 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
                 aria-expanded={menuId === m.id}
                 onClick={(e) => {
                   e.stopPropagation();
-                  setMenuId(menuId === m.id ? null : m.id);
-                  setRenaming(null);
+                  openMenu(m.id, e.currentTarget);
                 }}
               >
                 <DotsIcon size={15} />
               </button>
-              {menuId === m.id && (
-                <div ref={menuDismiss} className="sheet team-menu" role="menu" aria-label={`Options for ${m.name}`}>
-                  {s && onResume && (
-                    <MenuRow
-                      role="menuitem"
-                      onClick={() => {
-                        bumpAff(m.id);
-                        onResume(s.session, s.first);
-                        setMenuId(null);
-                      }}
-                    >
-                      ↩ Resume in chat
-                    </MenuRow>
-                  )}
-                  <MenuRow
-                    role="menuitem"
-                    onClick={() => {
-                      setDraft(m.name);
-                      setRenaming(m.id);
-                    }}
-                  >
-                    ✎ Rename
-                  </MenuRow>
-                  {members.length > 1 && (
-                    <MenuRow
-                      role="menuitem"
-                      danger
-                      onClick={() => {
-                        remove(m.id);
-                        if (cur === m.id) pick(null);
-                        setMenuId(null);
-                      }}
-                    >
-                      ✕ Remove
-                    </MenuRow>
-                  )}
-                </div>
-              )}
             </div>
           );
         })}
       </div>
+      )}
+      {menuId && (
+        <div
+          ref={menuRef}
+          className="sheet team-menu floating"
+          role="menu"
+          aria-label={menuId === "nicki" ? "Options for nicki" : `Options for ${members.find((m) => m.id === menuId)?.name ?? "mate"}`}
+          style={
+            anchor
+              ? {
+                  left: anchor.x,
+                  ...(anchor.up ? { bottom: window.innerHeight - anchor.top + 4 } : { top: anchor.bottom }),
+                }
+              : undefined
+          }
+        >
+          {menuId === "nicki" ? (
+            <>
+              {onPickNicki && (
+                <MenuRow
+                  role="menuitem"
+                  onClick={() => {
+                    pick(null);
+                    onPickNicki();
+                    closeMenu();
+                  }}
+                >
+                  ↩ Back to draft
+                </MenuRow>
+              )}
+              <MenuRow
+                role="menuitem"
+                onClick={() => {
+                  pick(null);
+                  if (onGoChat) onGoChat();
+                  else document.querySelector<HTMLTextAreaElement>(".composer-input")?.focus();
+                  closeMenu();
+                }}
+              >
+                💬 Talk in chat — CLI / provider lives in the composer
+              </MenuRow>
+              {onAvatarNav && (
+                <>
+                  <MenuRow role="menuitem" onClick={() => { closeMenu(); onAvatarNav("profile"); }}>
+                    <PersonIcon size={16} /> Profile
+                  </MenuRow>
+                  <MenuRow role="menuitem" onClick={() => { closeMenu(); onAvatarNav("settings"); }}>
+                    <GearIcon size={16} /> Settings
+                  </MenuRow>
+                  <MenuRow role="menuitem" onClick={() => { closeMenu(); onAvatarNav("phone"); }}>
+                    <PhoneIcon size={16} /> Phone link
+                  </MenuRow>
+                </>
+              )}
+            </>
+          ) : (
+            <>
+              {(() => {
+                const mm = members.find((m) => m.id === menuId);
+                const mi = members.findIndex((m) => m.id === menuId);
+                const ss = mi >= 0 ? slotSession(members, sessions, mi) : undefined;
+                if (!mm) return null;
+                return (
+                  <>
+                    {ss && onResume && (
+                      <MenuRow
+                        role="menuitem"
+                        onClick={() => {
+                          bumpAff(mm.id);
+                          onResume(ss.session, ss.first);
+                          closeMenu();
+                        }}
+                      >
+                        ↩ Resume in chat
+                      </MenuRow>
+                    )}
+                    <MenuRow
+                      role="menuitem"
+                      onClick={() => {
+                        setDraft(mm.name);
+                        setRenaming(mm.id);
+                        setMenuId(null);
+                      }}
+                    >
+                      ✎ Rename
+                    </MenuRow>
+                    {members.length > 1 && (
+                      <MenuRow
+                        role="menuitem"
+                        danger
+                        onClick={() => {
+                          remove(mm.id);
+                          if (cur === mm.id) pick(null);
+                          closeMenu();
+                        }}
+                      >
+                        ✕ Remove
+                      </MenuRow>
+                    )}
+                  </>
+                );
+              })()}
+            </>
+          )}
+        </div>
       )}
       {detail === "below" && !onPick && !collapsed && cur && selIdx >= 0 && (
         <div className="team-detail">

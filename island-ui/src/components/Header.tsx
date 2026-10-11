@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { AgentSession, Approval, ChatSession, IslandView, Question } from "../store";
 import type { SettingsPage } from "./Cards";
 import {
-  BellIcon, BoltIcon, ChatIcon, ExploreIcon, GearIcon, HistoryIcon, HomeIcon, LensIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ShelfIcon, SoundOffIcon, SoundOnIcon, TrashIcon,
+  BellIcon, ChatIcon, GearIcon, HistoryIcon, HomeIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ShelfIcon, SoundOffIcon, SoundOnIcon, TrashIcon,
 } from "./icons";
 import { useDismiss, MenuRow } from "./pickers";
 
@@ -16,9 +16,6 @@ interface IconProps {
 const TABS: Array<{ view: IslandView; title: string; Icon: ComponentType<IconProps> }> = [
   { view: "chat", title: "Chat", Icon: ChatIcon },
   { view: "daily", title: "Daily", Icon: HomeIcon },
-  { view: "explore", title: "Explore", Icon: ExploreIcon },
-  { view: "feed", title: "Feed", Icon: BoltIcon },
-  { view: "lens", title: "Lens", Icon: LensIcon },
   { view: "shelf", title: "Shelf", Icon: ShelfIcon },
 ];
 
@@ -123,9 +120,6 @@ function AvatarMenu({
           <MenuRow role="menuitem" active={onSettings && settingsPage === "general"} onClick={() => go("profile")}>
             <PersonIcon size={16} /> Profile
           </MenuRow>
-          <MenuRow role="menuitem" active={view === "explore"} onClick={() => go("explore")}>
-            <ExploreIcon size={16} /> Community
-          </MenuRow>
           <MenuRow role="menuitem" active={onSettings && settingsPage === "general"} onClick={() => go("settings")}>
             <GearIcon size={16} /> Settings
           </MenuRow>
@@ -218,19 +212,19 @@ export function Header({
   const hasChats = sessions.length > 0;
   const hasAgents = agentSessions.length > 0;
   return (
-    <div ref={histDismiss} className="navbar">
+    <div ref={histDismiss} className={middle ? "navbar echoing" : "navbar"}>
       <div className="tabs">
         {tabs.map(({ v, title, Icon, badge }) => (
           <NavButton key={v} active={view === v} title={title} badge={badge} onClick={() => { onTab(v); closeHist(); }}>
             <Icon bold={view === v} size={22} />
           </NavButton>
         ))}
-      </div>
-      <div className="nav-middle">{middle}</div>
-      <div className="nav-actions">
         <HeaderIconButton title="Start a new chat" onClick={() => onNewChat?.()}>
           <PlusIcon size={22} />
         </HeaderIconButton>
+      </div>
+      <div className="nav-middle">{middle}</div>
+      <div className="nav-actions">
         <HeaderIconButton
           active={!soundOn}
           title={soundOn ? "Mute sounds" : "Unmute sounds"}

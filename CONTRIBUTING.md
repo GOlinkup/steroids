@@ -41,3 +41,28 @@ do not start it.
   split forms (`poly`, `pizza`) in triggers and NEG sets.
 - Every new trigger batch needs 3 adversarial probes (trigger + unrelated
   domain); any hijack = NEG entry before merge.
+
+## Sheet freeze (human order 2026-10-11 — standing until human says "unfreeze")
+
+Top-center positioning + sheet geometry are locked. The island sits
+top-center (compositor-owned via `island-app/kwin-pin.js`), one fixed
+window (panel/strip + per-view heights, all constants in
+`island-app/main.js`), renderer reports state only. It is verified
+working — do not "improve", retune, or re-measure it.
+
+- PERMISSION: only the human unlocks. No agent infers, assumes, or
+  grants itself permission — when in doubt, LOOK at frozen code but do
+  not touch it. An unlock happens only when the human explicitly tells
+  an agent to unlock, in so many words. Until then the freeze holds no
+  matter what the task seems to require; route around it or ask.
+
+- Hash-enforced (fail the build on touch): `island-app/main.js`,
+  `island-app/kwin-pin.js`, `island-app/preload.js`, `island-app/run.sh`,
+  `island-ui/src/fsm.ts`. Gate: `python3 tests/test_sheet_freeze.py`.
+- Hands-off zones (no gate, still frozen): `App.tsx` footprint/cover/shell
+  regions, `index.css` `#island` / `.stage.app` / `.navbar.pc` / body-cap
+  rules, `Island.tsx` shell markup (`#island` attrs, `jacked-body` wrap).
+- Content inside the sheet (views, chat, approvals, mascot art) is NOT
+  frozen — work there freely.
+- Human-ordered change to frozen code: regenerate the manifest with the
+  command printed by the failing test, then re-run it green.

@@ -1009,6 +1009,12 @@ def start_turn(msg, session_id=None, provider="opencode", model=None):
         provider = "opencode"  # router-pick default: local opencode, no keys
     if provider not in ("opencode", "claude"):
         return {"ok": False, "error": "unknown provider %r" % provider}
+    # ponytail: house style (human order — the default CLI voice leans on
+    # em-dashes, " - " asides, "..." trails and "---" rules in prose, and
+    # opens with Driving/ask-away patter instead of working). One trailer
+    # at this single choke point covers both providers; code, commands,
+    # paths and lists are explicitly untouched.
+    msg = "%s\n\nHouse style for prose (code, commands, paths and lists untouched): no em-dashes, no ' - ' asides, no '...' trails, no '---' dividers. Plain full sentences. No preamble announcements, no driving/ask-away patter — start with the work." % (msg,)
     if not agentlog.provider_available(provider):
         return {"ok": False, "error": "%s CLI not installed" % provider,
                 "code": 503}
@@ -1173,6 +1179,21 @@ class Handler(SimpleHTTPRequestHandler):
                 self._send({"progress": agentlog.session_progress(evs, sid)})
             except Exception as e:
                 self._send({"progress": None, "error": str(e)})
+        elif parts.path == "/transcript":
+            # one session's own turns for mate taps (user/agent items from
+            # the hook ledger, oldest first, capped — the bridge holds no
+            # other per-session history).
+            sid = (parse_qs(parts.query).get("session") or [""])[0].strip()
+            if not sid:
+                return self._send({"ok": False,
+                                   "error": "session id required"}, 400)
+            try:
+                evs = agentlog.read_events(limit=500)
+                items = [it for it in agentlog.transcript(evs)
+                         if it.get("session") == sid][-100:]
+                self._send({"transcript": items})
+            except Exception as e:
+                self._send({"transcript": [], "error": str(e)})
         elif parts.path == "/models":
             # live `opencode models` ids so the picker never goes stale
             # when they ship a new model. Cached 5 min, [] on failure.

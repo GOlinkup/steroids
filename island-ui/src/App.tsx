@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import Island from "./components/Island";
 import type { MascotHandle } from "./components/Mascot";
 import { IslandFSM, type IslandState } from "./fsm";
@@ -105,8 +105,48 @@ export default function App() {
   const [view, setView] = useState<IslandView>("chat");
   const [settingsPage, setSettingsPage] = useState<SettingsPage>("general");
   const [hint, setHint] = useState(ROUTE_SAMPLES[0]);
-  // Command Echo (glance): transient "Copied — …" preview from the shell.
+  // Morph cover + footprint report: KWin glides the window itself on
+  // footprint changes (state flips AND cross-footprint tab switches), so
+  // full-size content inside a mid-flight window reads cropped and lost.
+  // Hide content for the flight; the black card glides clean, content fades
+  // back on arrival. Retrigger-safe: rapid toggles restart the timer.
+  // ponytail: footprint mirror of main.js FOOT_H (coucou VIEW_LAYOUTS
+  // parity) — same-footprint tab switches skip the cover AND the window
+  // entirely: zero transient possible.
+  const footprintName = (s: IslandState, v: IslandView) =>
+    s !== "jacked" ? s
+    : v === "approval" || v === "question" || v === "chat" || v === "daily" ||
+      v === "explore" || v === "settings" || v === "lens" || v === "shelf" || v === "feed" ? v : "full";
+  const foot = footprintName(fsmState, view);
+  const [swapping, setSwapping] = useState(false);
+  const swapTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const lastFoot = useRef("");
+  // ponytail: layout effect, not passive (their transitions never show an
+  // uncovered frame). Passive effects fire AFTER paint: the state flip
+  // painted one naked frame mid-flight (the broken close). Layout effects
+  // run synchronously post-DOM, pre-paint: cover + IPC land before pixels.
+  // Key skips closed↔closed (hover peeks stay live, no cover) and covers
+  // every open/view change (each has its own window height).
+  useLayoutEffect(() => {
+    const key = fsmState === "jacked" ? `open/${view}` : "closed";
+    try {
+      (window as unknown as { island?: { state?: (s: string, v: string) => void } })
+        .island?.state?.(fsmState, view);
+    } catch { /* plain browser, no shell */ }
+    if (key === lastFoot.current) return;
+    lastFoot.current = key;
+    setSwapping(true);
+    if (swapTimer.current) clearTimeout(swapTimer.current);
+    swapTimer.current = window.setTimeout(() => setSwapping(false), 380);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [fsmState, view]);
+  // Command Echo (glance): transient "Copied/Pasted — …" preview.
+  // ECHO_MS is the single source for visible time — the neon sweep in
+  // index.css (.nav-echo-bar::after, .pill-echo::after) runs on the same
+  // duration via the --echo-ms var, so the sweep always lands as the bar melts.
+  const ECHO_MS = 1400;
   const [echo, setEcho] = useState<string | null>(null);
+  const [echoKind, setEchoKind] = useState<"copied" | "pasted">("copied");
   const echoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [, setPills] = useState<Pill[]>(HARNESS_PILLS);
   const [initialDraft] = useState(loadDraft);
@@ -243,17 +283,12 @@ export default function App() {
     }
     fsm.mouseLeft();
   };
-  // Tap toggles: closed notch → pill → open panel → pill. Taps on
-  // panel controls/text never collapse (only chrome does); anything
-  // else collapses (stage backdrop + window blur below).
-  const islandClicked = (e?: React.MouseEvent) => {
-    if (fsm.state === "jacked" && !fsm.pinned) {
-      const t = e?.target as HTMLElement | undefined;
-      if (t && t.closest("button, a, input, textarea, select, [contenteditable], .chat-log, .hist-panel, .avatar-menu, .attach-menu, .effort-sheet, .reply, .bubble")) return;
-      fsm.forceFlex();
-      say("island closed on tap");
-      return;
-    }
+  // Tap OPENS only (coucou-sheet parity): closed notch → pill → panel.
+  // Taps inside never collapse — a press meant for content (mascot, ticker,
+  // team cell, card padding) that missed the control exclusion list used to
+  // slam the sheet shut mid-press. Close paths stay: tap-outside (stage
+  // backdrop below), window blur, Escape, auto-close timers.
+  const islandClicked = () => {
     if (fsm.state === "hidden") {
       fsm.reveal();
       say("island opened on tap");
@@ -481,7 +516,8 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    scheduleGreet();
+    // ponytail: no greet text, ever (human order — new chats start empty;
+    // memory lives in history, not in injected openers).
     if (initialDraft) {
       if (initialDraft.prov) ocProvider.current = initialDraft.prov;
       say(initialDraft.session ? "draft restored — same session continues" : "draft restored");
@@ -526,7 +562,7 @@ export default function App() {
     // (chat-log etc.) scroll.
     document.body.style.overflow = "hidden";
     const shell = (window as unknown as {
-      island?: { resize?: (w: number, h: number) => void; onBlur?: (fn: () => void) => void; onEcho?: (fn: (text: string) => void) => void };
+      island?: { state?: (s: string, v: string) => void; onBlur?: (fn: () => void) => void; onEcho?: (fn: (text: string) => void) => void };
     }).island;
     shell?.onBlur?.(() => {
       if (fsm.state === "jacked" && !fsm.pinned) {
@@ -540,15 +576,19 @@ export default function App() {
     // (Wayland gates the system clipboard to the focused app, so copies
     // made inside the island echo via the copy event below; the shell poll
     // in main.js covers copies made while the island is focused.)
-    const showEcho = (t: string) => {
+    const showEcho = (t: string, kind: "copied" | "pasted" = "copied") => {
       const s = t.trim().replace(/\s+/g, " ").slice(0, 48);
       if (!s) return;
       setEcho(s);
+      setEchoKind(kind);
       mascotRef.current?.celebrate();
       if (echoTimer.current) clearTimeout(echoTimer.current);
-      echoTimer.current = window.setTimeout(() => setEcho(null), 1400);
+      echoTimer.current = window.setTimeout(() => setEcho(null), ECHO_MS);
     };
     shell?.onEcho?.(showEcho);
+    // ponytail: DOM hover (no cursor poll — setIgnoreCursorEvents does not
+    // exist on Linux, proven at boot; the strip fits the pill exactly so
+    // the visible pill is always directly hoverable).
     const onCopy = () => {
       try {
         showEcho(window.getSelection()?.toString() ?? "");
@@ -561,7 +601,7 @@ export default function App() {
     // covered by the main-process poll instead.
     const onPaste = (e: Event) => {
       try {
-        showEcho((e as ClipboardEvent).clipboardData?.getData("text") ?? "");
+        showEcho((e as ClipboardEvent).clipboardData?.getData("text") ?? "", "pasted");
       } catch { /* nothing pasted */ }
     };
     document.addEventListener("paste", onPaste);
@@ -573,60 +613,33 @@ export default function App() {
       } catch { /* bad detail */ }
     };
     document.addEventListener("steroids:copied", onEchoEvent);
-    let last = "";
-    // PC (Glance notch): the window shrink-wraps the pill — small and
-    // centered, never window.screen.width (the full-width strip read as
-    // a giant bar in the middle of the screen on 4k). Phone: widths
-    // are CSS-fixed per state — pin them (measuring 94vw while the window
-    // is still pill-sized would feedback-loop). Height is measured.
-    const W_BY_STATE: Record<string, number> = { hidden: 184, flex: 248, pump: 248, jacked: 960 };
-    const report = () => {
-      const el = islandRef.current;
-      if (!el) return;
-      const r = el.getBoundingClientRect();
-      // island + stage chrome (gutters, 10px top pad, breathing room).
-      // hidden = small centered tab (never a full-width fill); strip and
-      // panel states span the screen.
-      const hiddenTab = isPcSide && fsm.state === "hidden";
-      // Fixed footprints on PC: the open card keeps ONE size across tabs
-      // (views scroll inside) so the window never leaps; the pill
-      // shrink-wraps its fixed CSS width. Never window.screen.width.
-      // Closed states fit content with a floor (never smaller than the
-      // hidden tab). Cap reads window.screen, NOT window.innerWidth:
-      // innerWidth tracks the current window and ratchets it down to
-      // minimal on every report.
-      const w = !isPcSide
-        ? (W_BY_STATE[fsm.state] ?? 300) + 56
-        : hiddenTab ? 232
-        : fsm.state === "jacked" ? Math.min(1020, window.screen.width - 16)
-        : Math.min(1020, window.screen.width - 16, Math.max(232, Math.ceil(r.width) + 36));
-      const h = isPcSide && fsm.state === "jacked"
-        ? Math.min(window.screen.height - 120, Math.ceil(r.top + r.height) + 16)
-        : Math.ceil(r.top + r.height) + 16;
-      // step-glow geometry mirrors the CSS clip (--notch:min(520px,44%)).
-      const iw = Math.ceil(r.width);
-      const ih = Math.ceil(r.height);
-      const n = Math.round(Math.min(520, r.width * 0.44));
-      const key = `${fsm.state}x${w}x${h}x${iw}x${ih}x${n}`;
-      if (key !== last) {
-        last = key;
-        shell?.resize?.(w, h);
-        setFrame(hiddenTab ? null : { w: iw, h: ih, n });
-      }
-    };
-    report();
-    // native window follows the settled size, never animation frames:
-    // resizing per frame while the spring runs is what leaps on 4k.
-    let pending: ReturnType<typeof setTimeout> | null = null;
-    const queueReport = () => {
-      if (pending) clearTimeout(pending);
-      pending = setTimeout(report, 120);
-    };
-    const ro = new ResizeObserver(queueReport);
+    // ponytail: fixed footprints (coucou-sheet parity) — the window NEVER
+    // follows content. Sizes live in main's table; this observer only feeds
+    // the step-glow outline (pure React state, no window involved).
+    const queueFrame = (() => {
+      let t: ReturnType<typeof setTimeout> | null = null;
+      let last = "";
+      return () => {
+        if (t) clearTimeout(t);
+        t = setTimeout(() => {
+          const el = islandRef.current;
+          if (!el) return;
+          const r = el.getBoundingClientRect();
+          const iw = Math.ceil(r.width);
+          const ih = Math.ceil(r.height);
+          const n = Math.round(Math.min(520, r.width * 0.44));
+          const key = `${fsm.state}x${iw}x${ih}x${n}`;
+          if (key !== last) {
+            last = key;
+            setFrame(isPcSide && fsm.state === "hidden" ? null : { w: iw, h: ih, n });
+          }
+        }, 280);
+      };
+    })();
+    const ro = new ResizeObserver(queueFrame);
     if (islandRef.current) ro.observe(islandRef.current);
     return () => {
       ro.disconnect();
-      if (pending) clearTimeout(pending);
       document.removeEventListener("copy", onCopy);
       document.removeEventListener("paste", onPaste);
       document.removeEventListener("steroids:copied", onEchoEvent);
@@ -1117,30 +1130,9 @@ export default function App() {
 
   const greetTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const greetOn = useRef(false);
-  // handoff note filed by the archiver (newChat) for the greet below.
-  const pendingHandoff = useRef<string | null>(null);
-  const greetedMount = useRef(false);
 
-  // Continuity greet (Nicki voice, never a fake hello): the just-filed
-  // handoff note wins (fresh page after an archive); otherwise, once per
-  // mount, the latest archived handoff — a cold open with memory. An
-  // empty start stays empty when there is nothing to continue.
-  const scheduleGreet = () => {
-    if (greetTimer.current) clearTimeout(greetTimer.current);
-    greetOn.current = false;
-    setThinking(false);
-    const filed = pendingHandoff.current;
-    pendingHandoff.current = null;
-    if (filed) {
-      pushBot(`Filed away: ${filed}. Fresh page — what's first?`);
-      return;
-    }
-    if (greetedMount.current || initialDraft) return;
-    greetedMount.current = true;
-    const last = sessions.find((s) => s.handoff);
-    if (last?.handoff) pushBot(`Last time — ${last.handoff}. Continue or new orders?`);
-  };
-
+  // ponytail: greets deleted (human order — chats start empty, memory
+  // lives in history). stopGreet stays as a null-safe timer guard.
   const stopGreet = () => {
     greetOn.current = false;
     if (greetTimer.current) clearTimeout(greetTimer.current);
@@ -1187,10 +1179,10 @@ export default function App() {
     stopGreet();
     setMessages((cur) => {
       if (worthKeeping(cur)) {
-        // archive files its own self-text note (goal → result) for the
-        // continuity greet below — the Munder-Difflin habit, scribed local.
+        // archive files its own self-text note (goal → result) onto the
+        // history row — the Munder-Difflin habit, scribed local. New chats
+        // start empty (human order): no greet text is filed or posted.
         const note = sessionHandoff(cur);
-        if (note) pendingHandoff.current = note;
         setSessions((s) => [
           { id: sessionId++, title: sessionTitle(cur), messages: cur, updatedAt: Date.now(), ...(note ? { handoff: note } : {}) },
           ...s,
@@ -1207,7 +1199,6 @@ export default function App() {
     setView("chat");
     fsm.forceJacked();
     say("new chat started");
-    scheduleGreet();
   };
   const resumeSession = (id: number) => {
     if (id === LIVE_ID && activeSessionId === null) return; // already viewing live draft
@@ -1257,7 +1248,6 @@ export default function App() {
       setOcSession(null);
       setMessages([]);
       setView("chat");
-      scheduleGreet();
     }
     say("chat deleted");
   };
@@ -1372,6 +1362,62 @@ export default function App() {
     }
     // auto chooses: stay on the current chat's engine, else first live one.
     let eng = provider;
+    // ponytail: local slash commands (human order — Steroids is a skill
+    // router, the composer promotes it). No turn spent, no session fork;
+    // unknown /words fall through to the agent untouched. With staged
+    // files attached, slash defers to the agent (files win).
+    if (!files.length) {
+      const slash = text.match(/^\/([a-z]+)\s*([\s\S]*)$/i);
+      const sayLocal = (user: string, bot: string) => {
+        setMessages((m) => [...m, { id: msgId++, role: "user", content: user }, { id: msgId++, role: "assistant", content: bot }]);
+      };
+      if (slash) {
+        const cmd = slash[1].toLowerCase();
+        const arg = slash[2].trim();
+        if (cmd === "new") { newChat(); return; }
+        if (cmd === "help") {
+          sayLocal(text, "Commands — /new fresh chat · /skills <words> search the skill index · /schedule <freq> <HH:MM> <prompt> save an automation · anything else goes to the agent.");
+          return;
+        }
+        if (cmd === "skills") {
+          sayLocal(text, "Searching skills…");
+          void fetch(`${BRIDGE}/skills?q=${encodeURIComponent(arg)}&n=5`)
+            .then((r) => r.json())
+            .then((j) => {
+              const hits: Array<{ name?: string; description?: string }> = Array.isArray(j.hits) ? j.hits : [];
+              setMessages((m) => [...m, {
+                id: msgId++, role: "assistant",
+                content: hits.length
+                  ? hits.map((h) => `${h.name} — ${h.description || "no description"}`).join("\n")
+                  : "No confident skill — abstaining. Try other words.",
+              }]);
+            })
+            .catch(() => pushBot("Skill search failed (bridge unreachable)."));
+          return;
+        }
+        if (cmd === "schedule") {
+          const parts = arg.split(/\s+/).filter(Boolean);
+          const freq = (parts[0] || "daily").toLowerCase();
+          let day = "", time = "", prompt = "";
+          if (freq === "weekly") { day = parts[1] || ""; time = parts[2] || ""; prompt = parts.slice(3).join(" "); }
+          else { time = parts[1] || ""; prompt = parts.slice(2).join(" "); }
+          if (!/^\d\d:\d\d$/.test(time) || !prompt) {
+            sayLocal(text, "Usage — /schedule <daily|weekdays|weekends|weekly> [day] <HH:MM> <prompt>. Example: /schedule daily 09:00 summarize the floor.");
+            return;
+          }
+          sayLocal(text, "Saving…");
+          void fetch(`${BRIDGE}/schedules`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ op: "create", freq, ...(day ? { day } : {}), time, prompt }),
+          })
+            .then((r) => r.json())
+            .then((j) => pushBot(j.ok ? `Saved — ${freq}${day ? ` ${day}` : ""} ${time}: ${prompt}` : `Couldn't save: ${j.error || "unknown error"}`))
+            .catch(() => pushBot("Couldn't save (bridge unreachable)."));
+          return;
+        }
+      }
+    }
     if (provider === "auto") {
       eng = (ocSessionRef.current && ocProvider.current) ||
         (caps.opencode ? "opencode" : "claude");
@@ -2043,9 +2089,13 @@ export default function App() {
         ref={islandRef}
         fsmState={fsmState}
         view={view}
+        foot={foot}
         mascotRef={mascotRef}
         routeHint={hint}
         echo={echo}
+        echoKind={echoKind}
+        echoMs={ECHO_MS}
+        swapping={swapping}
         approval={approval}
         question={question}
         messages={messages}

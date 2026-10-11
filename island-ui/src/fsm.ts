@@ -1,3 +1,6 @@
+// SHEET-FREEZE — human order 2026-10-11: top-center positioning + sheet
+// geometry locked. No agent edits this file until the human says "unfreeze".
+// Enforced by tests/test_sheet_freeze.py. Details: CONTRIBUTING.md.
 // Steroids island FSM — hidden | flex | jacked | pump are gym states.
 // Plate snap, no bounce.
 // Version comes from pyproject.toml — do not stamp here.
@@ -58,15 +61,37 @@ export class IslandFSM {
     if (this.hoverDwell != null) { clearTimeout(this.hoverDwell); this.hoverDwell = null; }
     switch (this.state) {
       case "flex": this.hide(this.flexToHiddenDelay); break;
-      case "jacked": this.collapse(this.jackedToFlexDelay); break;
+      case "jacked": this.collapseIn(this.jackedToFlexDelay); break;
       case "pump": this.clearGreet(); this.go("flex"); break;
     }
   }
 
   click() {
-    if (this.state !== "flex") return;
+    // ponytail: accept hidden (coucou parity) — after an alert the island can
+    // be on screen while the FSM never saw mouse-enter; click must still open.
+    if (this.state !== "flex" && this.state !== "hidden") return;
     this.cancelTimers();
     this.go("jacked");
+  }
+
+  // ponytail: external sync (coucou IslandStateMachine parity) — app hid /
+  // expanded / folded the island itself; mirror it so hover/click keep working.
+  hiddenExternally() {
+    if (this.state !== "flex") return;
+    this.cancelTimers();
+    this.state = "hidden";
+  }
+
+  openedExternally() {
+    this.cancelTimers();
+    if (this.state === "jacked" || this.state === "pump") return;
+    this.state = "jacked";
+  }
+
+  collapse() {
+    if (this.state !== "jacked" && this.state !== "pump") return;
+    this.cancelTimers();
+    this.go("flex");
   }
 
   greetComplete() {
@@ -100,7 +125,7 @@ export class IslandFSM {
     }, s * 1000);
   }
 
-  private collapse(s: number) {
+  private collapseIn(s: number) {
     this.clearJacked();
     if (this.pinned) return;
     this.jackedCollapse = setTimeout(() => {

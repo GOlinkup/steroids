@@ -1,8 +1,8 @@
-import { forwardRef, lazy, Suspense, useEffect, useRef, useState } from "react";
+import { forwardRef, lazy, Suspense, useEffect, useRef, useState, type CSSProperties } from "react";
 import Mascot, { type MascotHandle } from "./Mascot";
 import { CopyIcon, CheckIcon } from "./icons";
 import { ApprovalCard, QuestionCard, ChatPanel, ExploreView, FeedView, SettingsView, type SettingsState, type SettingsPage } from "./Cards";
-import { TeamGrid, useTeam, useSessionProgress, hueFor } from "./TeamGrid";
+import { TeamGrid, TeamMinis, useTeam, useSessionProgress } from "./TeamGrid";
 import { fetchNowPlaying } from "../music";
 import Huddle from "./Huddle";
 import { Header } from "./Header";
@@ -172,10 +172,18 @@ function NickiGroove({ mascotRef }: { mascotRef: React.Ref<MascotHandle> }) {
 interface Props {
   fsmState: IslandState;
   view: IslandView;
+  /** Fixed-footprint name (mirrors main.js table) — drives per-view body caps. */
+  foot?: string;
   mascotRef: React.Ref<MascotHandle>;
   routeHint: string;
-  /** Command Echo: transient "Copied — …" preview; pill swells, melts back. */
+  /** Command Echo: transient "Copied/Pasted — …" preview; pill swells, melts back. */
   echo?: string | null;
+  /** copy vs paste label for the echo bar. echoMs feeds --echo-ms so the
+      neon sweep lands exactly as the bar melts (single source: App ECHO_MS). */
+  echoKind?: "copied" | "pasted";
+  echoMs?: number;
+  /** Morph cover: hide content while the window glides between sizes. */
+  swapping?: boolean;
   approval: Approval | null;
   question: Question | null;
   messages: ChatMessage[];
@@ -189,6 +197,8 @@ interface Props {
   attachments: Attachment[];
   onFiles: (files: File[]) => void;
   onRemoveAttachment: (id: number) => void;
+  // hover is DOM-driven (Linux has no cursor click-through API, so the
+  // poll model can't run here; the strip fits the pill, always hoverable).
   shots: Shot[];
   onMouseEnter: () => void;
   onMouseLeave: () => void;
@@ -246,7 +256,7 @@ const NEON_ON = true;
 // Island shell — steroids spotter bar. Ranked routes, plate snap.
 const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
   const {
-    fsmState, view, mascotRef, routeHint, echo = null,
+    fsmState, view, foot = "", mascotRef, routeHint, echo = null, echoKind = "copied", echoMs = 1400, swapping = false,
     approval, question, messages, thinking, liveActivity, livePartial, turnEngine, attachments,
     onFiles, onRemoveAttachment, shots,
     onMouseEnter, onMouseLeave, onMascotTap,
@@ -323,6 +333,8 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
       id="island"
       data-state={fsmState}
       data-view={view}
+      data-foot={foot || undefined}
+      data-swapping={swapping || undefined}
       data-glow={NEON_ON ? (approval || question ? "urgent" : thinking ? "working" : undefined) : undefined}
       onMouseEnter={onMouseEnter}
       onMouseLeave={onMouseLeave}
@@ -332,15 +344,18 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
           orange strip on the minimal pill. Masot halos (data-glow) stay. */}
       {fsmState !== "jacked" && <Mascot key={fsmState} ref={mascotRef} px={8} mood="wave" onTap={onMascotTap} />}
       {fsmState === "hidden" ? null : fsmState === "jacked" ? (
-        <div className="jacked-body">
+        <>
+          {/* ponytail: one static nav (coucou-header parity) — the bar lives
+              ABOVE the scroll container, never inside it: always visible,
+              never sticking, drifting, or scrolling away. Views scroll below. */}
           <Header
             view={view}
             unread={unread}
             onTab={onTab}
             hiddenViews={settings.hiddenViews}
             middle={echo ? (
-              <span className="nav-echo-bar" role="status">
-                <span className="ne-left"><span className="e-ic" aria-hidden><CopyIcon size={16} /><CheckIcon size={16} /></span><span>Copied</span></span>
+              <span className="nav-echo-bar" role="status" style={{ "--echo-ms": `${echoMs}ms` } as CSSProperties}>
+                <span className="ne-left"><span className="e-ic" aria-hidden><CopyIcon size={16} /><CheckIcon size={16} /></span><span>{echoKind === "pasted" ? "Pasted" : "Copied"}</span></span>
                 <span className="ne-right">Text</span>
               </span>
             ) : undefined}
@@ -363,6 +378,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             soundOn={settings.soundOn}
             onToggleSound={() => onSettings({ ...settings, soundOn: !settings.soundOn })}
           />
+          <div className="jacked-body">
           {view !== "daily" && view !== "chat" && (
             <div className="mascot-top">
               <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />
@@ -426,6 +442,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
               lastThought={lastThought}
               onStop={onStop}
               liveSession={liveSession}
+              liveShot={shots[0] ?? null}
               providers={providers}
               installState={installState}
               onInstall={onInstall}
@@ -438,7 +455,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
                   )}
                   {/* crew rail: the huddle above is nicki's hello (crew ready),
                       the grid below leads with nicki, then the mates. */}
-                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} onPick={onResumeAgentSession} onPickNicki={onBackToNicki} detail="none" compact={messages.length > 0} />
+                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} onPick={onResumeAgentSession} onPickNicki={onBackToNicki} onAvatarNav={avatarNav} detail="none" compact={messages.length > 0} />
                 </div>
               }
             />
@@ -468,26 +485,21 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
               </div>
             </div>
           )}
-        </div>
+          </div>
+        </>
       ) : (
         <>
           {/* minimized pill: echo notice swells it, else nicki + mates grid.
               Text-only language, our own icons — never the copied content. */}
           {echo ? (
-            <span className="pill-echo" role="status" aria-live="polite"><span className="e-ic" aria-hidden><CopyIcon size={13} /><CheckIcon size={13} /></span>Copied · Text</span>
+            <span className="pill-echo" role="status" aria-live="polite" style={{ "--echo-ms": `${echoMs}ms` } as CSSProperties}><span className="e-ic" aria-hidden><CopyIcon size={13} /><CheckIcon size={13} /></span>{echoKind === "pasted" ? "Pasted" : "Copied"} · Text</span>
           ) : (
           musicLive ? (
             <span className="pill-wave" title="now playing" aria-hidden>
               <Mascot mood="wave" />
             </span>
           ) : (
-          <span className="pill-team mini-grid" title={routeHint} aria-hidden>
-            {team.members.slice(0, 4).map((m) => (
-              <span key={m.id} className="pill-face" title={m.name} style={{ filter: `hue-rotate(${hueFor(m.color)}deg)` }}>
-                <Mascot mood="neutral" />
-              </span>
-            ))}
-          </span>
+          <TeamMinis members={team.members} title={routeHint} />
           )
           )}
         </>

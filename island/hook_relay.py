@@ -39,6 +39,16 @@ def _blocking_response(payload, ev):
         return {"decision": "block", "reason": "island allow-rule"}
     req = str(payload.get('tool_use_id') or payload.get('request_id') or '')
     key = _dec.request_key(sid, tool, req)
+    if payload.get('hook_event_name') == 'PermissionRequest':
+        # ponytail: single-card guard (coucou parity) — a second request must
+        # never quietly replace the first; hand it straight back to terminal.
+        try:
+            for r in _dec.pending():
+                if r.get('key') != key:
+                    return {"decision": "block",
+                            "reason": "another approval pending in island"}
+        except Exception:
+            pass
     hit = _dec.take(key)
     if hit is None and _dec.auto_approve(sid) and ev.get('event') == 'PreToolUse':
         hit = {'verdict': 'approve', 'answer': ''}

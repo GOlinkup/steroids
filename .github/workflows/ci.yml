@@ -28,3 +28,7 @@ jobs:
         run: python3 scripts/lint_skills.py
       - name: agent ledger (hooks, chat, sessions)
         run: python3 tests/test_agentlog.py
+      - name: sheet freeze (positioning locked until human unfreeze)
+        run: python3 tests/test_sheet_freeze.py
+      - name: chat follow (scroll bar + focus push locked)
+        run: python3 tests/test_chat_follow.py

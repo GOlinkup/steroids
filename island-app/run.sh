@@ -1,4 +1,7 @@
 #!/usr/bin/env bash
+# SHEET-FREEZE — human order 2026-10-11: top-center positioning + sheet
+# geometry locked. No agent edits this file until the human says "unfreeze".
+# Enforced by tests/test_sheet_freeze.py. Details: CONTRIBUTING.md.
 # Steroids Island widget — transparent top-center pill on your screen.
 set -euo pipefail
 DIR="$(cd "$(dirname "$0")" && pwd)"
@@ -23,11 +26,15 @@ from gi.repository import Gio, GLib
 try:
     bus = Gio.bus_get_sync(Gio.BusType.SESSION, None)
     IF = 'org.kde.kwin.Scripting'
+    # ponytail: verify the pin actually loads — an unloaded pin is exactly
+    # how the island ends up compositor-centered instead of top-center.
+    # loadScript answers the script id (>=0); unload-then-load keeps it fresh.
     bus.call_sync('org.kde.KWin', '/Scripting', IF, 'unloadScript', GLib.Variant('(s)', ('$DIR/kwin-pin.js',)), GLib.VariantType('(b)'), Gio.DBusCallFlags.NONE, 5000, None)
-    bus.call_sync('org.kde.KWin', '/Scripting', IF, 'loadScript', GLib.Variant('(s)', ('$DIR/kwin-pin.js',)), GLib.VariantType('(i)'), Gio.DBusCallFlags.NONE, 5000, None)
-except Exception:
-    pass
-" 2>/dev/null || true
+    res = bus.call_sync('org.kde.KWin', '/Scripting', IF, 'loadScript', GLib.Variant('(s)', ('$DIR/kwin-pin.js',)), GLib.VariantType('(i)'), Gio.DBusCallFlags.NONE, 5000, None)
+    print('[kwin-pin] script id:', res.unpack()[0] if res else 'NO-REPLY (pin NOT loaded — island will be compositor-placed)')
+except Exception as e:
+    print('[kwin-pin] load failed:', e, '(pin NOT loaded — island will be compositor-placed)')
+" 2>/dev/null || echo '[kwin-pin] dbus unavailable — pin NOT loaded'
 # KWin: loaded scripts need an explicit start, and the Gio start call never
 # resolves (journal: "Could not find slot"). busctl delivers it fine.
 busctl --user call org.kde.KWin /Scripting org.kde.kwin.Scripting start 2>/dev/null || true

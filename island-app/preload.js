@@ -1,12 +1,16 @@
-// Island bridge: the renderer reports the pill size after every state
-// change, main shrink-wraps the window (no dead click areas). Blur events
-// collapse back to the notch (tap-outside closes). No node in the page.
+// SHEET-FREEZE — human order 2026-10-11: top-center positioning + sheet
+// geometry locked. No agent edits this file until the human says "unfreeze".
+// Enforced by tests/test_sheet_freeze.py. Details: CONTRIBUTING.md.
+// Island bridge: the renderer reports SHEET STATE, main toggles one fixed
+// PANEL / STRIP window (coucou model) and owns the mouse (cursor poll with
+// click-through). Blur collapses back to the notch (tap-outside closes).
+// No node in the page.
 const { contextBridge, ipcRenderer } = require("electron");
 
 contextBridge.exposeInMainWorld("island", {
-  resize: (w, h) => ipcRenderer.send("island-resize", w, h),
-  // idempotent: the renderer re-registers on every state change, so drop
-  // the stale listener first (else blur fires N times after N flips).
+  // ponytail: state-only (coucou-sheet parity) — the window toggles one
+  // fixed PANEL / STRIP; the old resize(w,h) measure→resize loop is deleted.
+  state: (s, v) => ipcRenderer.send("island-state", s, v),
   onBlur: (fn) => {
     ipcRenderer.removeAllListeners("island-blur");
     ipcRenderer.on("island-blur", () => fn());

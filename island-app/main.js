@@ -1,8 +1,11 @@
+// SHEET-FREEZE — human order 2026-10-11: top-center positioning + sheet
+// geometry locked. No agent edits this file until the human says "unfreeze".
+// Enforced by tests/test_sheet_freeze.py. Details: CONTRIBUTING.md.
 // Steroids Island — transparent top-center widget (Glance-notch idiom).
 // Frameless + see-through + always-on-top; only the island pill paints.
-// The window shrink-wraps the pill (renderer reports #island's size, see
-// preload.js) so dead transparent areas never eat desktop clicks, and
-// losing focus drops the panel back to the notch (tap-outside closes).
+// One fixed window (PANEL or STRIP per display, see below); the renderer
+// reports sheet state, the compositor pin owns position, and losing focus
+// drops the panel back to the notch (tap-outside closes).
 const { app, BrowserWindow, Tray, Menu, screen, ipcMain, clipboard } = require("electron");
 const path = require("node:path");
 
@@ -18,11 +21,15 @@ function createWindow() {
   // workArea is DIP-correct on 4k/HiDPI and clears the system top bar.
   const wa = screen.getDisplayNearestPoint(screen.getCursorScreenPoint()).workArea;
   console.log("[island-display]", JSON.stringify(wa));
-  const w0 = Math.min(420, wa.width - 16);  win = new BrowserWindow({
-    width: w0,
-    height: 96, // renderer reports the real height on load
-    x: Math.round(wa.x + (wa.width - w0) / 2), // first guess only; kwin-pin.js enforces scene center
-    y: wa.y, // notch-anchored at the very top
+  const p = panelFor(wa);
+  tracked.panelW = p.w; tracked.panelH = p.h;
+  tracked.x = Math.round(wa.x + (wa.width - STRIP.w) / 2);
+  tracked.y = wa.y;
+  win = new BrowserWindow({
+    width: STRIP.w,
+    height: STRIP.h, // boot is always a closed state; panel applies on open
+    x: tracked.x, // first guess only; kwin-pin.js enforces scene center
+    y: tracked.y, // notch-anchored at the very top
     transparent: true,
     frame: false,
     hasShadow: false,
@@ -30,10 +37,12 @@ function createWindow() {
     skipTaskbar: true,
     // resizable stays TRUE: with false, Chromium ratchets WM min-size up
     // on every growth and later shrinks are refused (pill stuck huge).
-    // Frameless = no grab handles anyway; floors match the resize clamp.
+    // Frameless = no grab handles anyway. (Coucou's Linux note is the same
+    // GTK quirk — they re-assert resizable before every resize; so do we
+    // in placeWindow below.)
     resizable: true,
     minWidth: 120,
-    minHeight: 48,
+    minHeight: 40,
     fullscreenable: false,
     backgroundColor: "#00000000",
     webPreferences: {
@@ -45,9 +54,10 @@ function createWindow() {
   // First-map placement can override our position (pre-map client moves are
   // ignored — settled read 0,0 on a slow first paint). Re-assert center from
   // the live display once the first frame is in (post-map writes stick),
-  // plus one late backstop for slow bridges.
+  // plus one late backstop for slow bridges. X11 only: on Wayland the
+  // compositor pin (windowAdded hook) owns first placement.
   const reassert = () => {
-    if (!win || win.isDestroyed()) return;
+    if (!win || win.isDestroyed() || !IS_X11) return;
     try {
       const b = win.getBounds();
       const wa2 = screen.getDisplayNearestPoint({ x: b.x + b.width / 2, y: b.y + b.height / 2 }).workArea;
@@ -58,59 +68,196 @@ function createWindow() {
   };
   win.once("ready-to-show", () => setTimeout(reassert, 300));
   setTimeout(reassert, 4000);
-  // boot position proof (one line): where the window actually settled.
+  // boot position proof (one line). On X11 getBounds is truthful; on
+  // Wayland the compositor owns position (see place()), so the proof is
+  // the pin's presence, not our coordinates.
   setTimeout(() => {
     if (!win || win.isDestroyed()) return;
-    try { console.log("[island-settled]", JSON.stringify(win.getBounds())); } catch { /* noop */ }
+    try {
+      if (IS_X11) {
+        const b = win.getBounds();
+        const waS = screen.getDisplayNearestPoint({ x: b.x + b.width / 2, y: b.y + b.height / 2 }).workArea;
+        const cxS = Math.round(waS.x + (waS.width - b.width) / 2);
+        const anchored = Math.abs(b.x - cxS) <= 2 && Math.abs(b.y - waS.y) <= 2;
+        console.log("[island-settled]", JSON.stringify(win.getBounds()), anchored ? "top-center OK" : "NOT top-center (pin missing?)");
+      } else {
+        console.log("[island-settled] wayland: position is compositor-owned (kwin-pin), size", JSON.stringify(win.getSize()));
+      }
+    } catch { /* noop */ }
   }, 5500);
+  // every move, logged. Moves now mean: panel/strip toggles, display
+  // changes, and compositor corrections only — steady states never move.
+  win.on("move", () => {
+    try { console.log("[island-move]", JSON.stringify(win.getBounds())); } catch { /* noop */ }
+  });
+  // positioning has ONE writer per platform (placeWindow below) plus the
+  // compositor-side kwin-pin.js (convergent: only writes when >2px off).
+  // Reasserts on ready-to-show + 4s backstop stay for first-map races.
   win.on("blur", () => {
     if (win && !win.isDestroyed()) win.webContents.send("island-blur");
   });
 }
 
-// renderer-driven shrink-wrap: small + top-centered, never taller
-// than the work area (tall chat logs scroll inside instead of clipping).
-// w is capped at the open-panel width — never the full screen width
-// (that strip read as a giant middle-screen bar on 4k).
-// Trailing-edge debounce (50ms): typing bursts and stream chunks coalesce
-// into one KWin roundtrip instead of one resize per keystroke.
-let rzTimer = null;
-let rzPending = null;
-ipcMain.on("island-resize", (_e, w, h) => {
-  rzPending = [w, h];
-  if (rzTimer) clearTimeout(rzTimer);
-  rzTimer = setTimeout(() => {
-    rzTimer = null;
-    const [bw, bh] = rzPending;
-    applyIslandResize(bw, bh);
-  }, 50);
-});
-function applyIslandResize(w, h) {
+// ponytail: ONE SHEET, ONE WIDTH (coucou's exact model — their window is
+// always the fixed PANEL or the wake strip). Width is constant per display
+// so x never moves and y is always the top edge: view switches only ever
+// change HEIGHT, atomically, which cannot jitter position. Heights come
+// from a fixed per-view table (measured 2026-10-11 + ~15px slack — the old
+// shrink-wrap converged to these same numbers). The renderer reports STATE
+// only (island-state). NOTE: their click-through input regions are NOT
+// portable — Electron's setIgnoreCursorEvents does not exist on Linux
+// (proven: TypeError at boot), and Wayland offers Electron no region API.
+// So dead areas are avoided structurally instead: the strip fits the pill
+// exactly, and jacked cards paint their whole window (opaque, min-height
+// fill) — clicks landing on paint are harmless.
+const IS_X11 = process.argv.join(" ").includes("ozone-platform=x11");
+const STRIP = { w: 228, h: 44 };
+// ponytail: window = body cap + 70 (navbar 46 + island padding 16 + gaps),
+// except chat: the team rail rides INSIDE the card above the log, so chat
+// needs card-fit (rail 71 + gaps + log cap 203 + composer 76 + nav + pad).
+// Measured live: card ran 368 in a 320 body and the sticky composer buried
+// the log tail 39px deep. Chat fits its card exactly: no body scroll, the
+// sticky never engages, overlap structurally impossible.
+const FOOT_H = { approval: 330, question: 460, chat: 440, daily: 450, explore: 820, settings: 865, lens: 895, shelf: 940, feed: 925 };
+function panelFor(wa) {
+  return { w: Math.min(1020, wa.width - 16), h: Math.max(500, wa.height - 120) };
+}
+// Tracked truth (never read back on Wayland — getBounds lies there).
+const tracked = {
+  x: 0, y: 0, panelW: 1020, panelH: 960, collapsed: true, state: "hidden",
+  view: "", lastName: "", appliedKey: "",
+};
+// One function owns every size: closed strip, or jacked width (constant)
+// + per-view height table. Display changes flow through here too.
+function footprintSize(state, view, wa) {
+  const p = panelFor(wa);
+  if (state !== "jacked") return { name: "strip", w: STRIP.w, h: STRIP.h, panel: p };
+  if (FOOT_H[view]) return { name: view, w: p.w, h: FOOT_H[view], panel: p };
+  return { name: "full", w: p.w, h: p.h, panel: p };
+}
+function placeWindow(w, h, wa) {
+  // GTK quirk (theirs too, island.rs): re-assert resizable before sizing
+  // or shrinks get refused and the pill sticks huge.
+  try { win.setResizable(true); } catch { /* gone */ }
+  // ponytail: no lateral slide — a width toggle (strip<->panel) recenters,
+  // and resize-then-recenter paint as two frames: the card visibly glides
+  // sideways (worse on close, which reads as sliding right instead of
+  // docking center). Fade the window out across the toggle and back in
+  // once the pin has re-pinned (300ms covers the slowest correction seen;
+  // the content cover runs 380ms, so both lift together); height-only view
+  // switches keep their size class and never fade. Retrigger-safe.
+  const widthSwap = tracked.lastW > 0 && w !== tracked.lastW;
+  tracked.lastW = w;
+  if (widthSwap) {
+    if (fadeTimer) { clearTimeout(fadeTimer); fadeTimer = null; }
+    try { win.setOpacity(0); } catch { /* gone */ }
+    fadeTimer = setTimeout(() => {
+      fadeTimer = null;
+      if (!win || win.isDestroyed()) return;
+      try { win.setOpacity(1); } catch { /* gone */ }
+    }, 300);
+  }
+  if (IS_X11) {
+    const cx = Math.round(wa.x + (wa.width - w) / 2);
+    tracked.x = -cx; tracked.y = wa.y;
+    win.setBounds({ x: -cx, y: wa.y, width: w, height: h }, false);
+  } else {
+    // Wayland: size only — the compositor pin owns position (its hook fires
+    // on this resize and re-pins). tracked x/y assume the pin's formula,
+    // identical to ours.
+    tracked.x = Math.round(wa.x + (wa.width - w) / 2); tracked.y = wa.y;
+    win.setSize(w, h, false);
+  }
+}
+// The one writer. Grows apply instantly (card expands into room); the
+// collapse to strip waits out the 340ms card flight (their 420ms delayed
+// collapse), cancelled by a reopen. Display changes force re-apply.
+let shrinkTimer = null;
+let fadeTimer = null;
+function syncWindow(force) {
   if (!win || win.isDestroyed()) return;
-  // anchor to the window's CURRENT display — cursor-follow teleported the
-  // pill across screens on every resize (minimal "lost position").
-  // Cursor display is only for first placement (createWindow above).
   const b = win.getBounds();
   const wa = screen.getDisplayNearestPoint({ x: b.x + b.width / 2, y: b.y + b.height / 2 }).workArea;
-  w = Math.max(120, Math.min(wa.width - 16, 1020, Math.round(w || 0)));
-  h = Math.max(48, Math.min(wa.height, Math.round(h || 0)));
-  const [cw, ch] = win.getSize();
-  if (Math.abs(cw - w) < 2 && Math.abs(ch - h) < 2) return;
-  console.log("[island-bounds]", JSON.stringify({ ask: [w, h], pos: win.getPosition(), size: win.getSize() }));
-  win.setSize(w, h, false);
-  // Position: kwin-pin.js (KWin script, scene coords) owns position and
-  // Electron owns size only — but the pin matches by caption/class and can
-  // miss (Wayland app-id), leaving the window at 0,0. So mirror its math
-  // here too (same center — two writers, one value, no fight). X11 keeps
-  // the old mirrored write for its flipped client view.
-  // ponytail: X11-only mirror hack; Wayland writes plain center.
-  const cx = Math.round(wa.x + (wa.width - w) / 2);
-  const isX11 = process.argv.join(" ").includes("ozone-platform=x11");
-  win.setPosition(isX11 ? -cx : cx, wa.y, false);
+  const p = panelFor(wa);
+  tracked.panelW = p.w; tracked.panelH = p.h;
+  const f = footprintSize(tracked.state, tracked.view, wa);
+  const w = f.w, h = f.h;
+  const key = `${f.name}x${w}x${h}`;
+  if (!force && key === tracked.appliedKey) return;
+  // ponytail: only the collapse to strip is delayed (card shrinks first,
+  // window follows +340ms). Every grow — strip→panel or short→tall view —
+  // applies instantly: the card always expands into room, never into edge.
+  const collapsing = f.name === "strip" && tracked.lastName !== "" && tracked.lastName !== "strip";
+  tracked.collapsed = f.name === "strip";
+  tracked.lastName = f.name;
+  tracked.appliedKey = key;
+  if (shrinkTimer) { clearTimeout(shrinkTimer); shrinkTimer = null; }
+  console.log("[island-sheet]", JSON.stringify({ state: tracked.state, view: tracked.view, ask: [w, h], when: collapsing ? "+340ms" : "now" }));
+  if (collapsing) {
+    shrinkTimer = setTimeout(() => {
+      shrinkTimer = null;
+      if (!win || win.isDestroyed()) return;
+      placeWindow(w, h, wa);
+    }, 340);
+  } else {
+    placeWindow(w, h, wa);
+  }
 }
+ipcMain.on("island-state", (_e, state, view) => {
+  tracked.state = String(state || "hidden");
+  tracked.view = String(view || "");
+  syncWindow(false);
+});
 
 app.whenReady().then(() => {
+  // ponytail: ensure the compositor pin every boot (coucou's layer-shell
+  // anchor is built into their shell; ours is kwin-pin.js and must be
+  // loaded no matter which launcher started the app — run.sh does it too,
+  // this is the backstop). Best-effort: failure just logs.
+  try {
+    const { execFileSync } = require("node:child_process");
+    execFileSync("busctl", ["--user", "call", "org.kde.KWin", "/Scripting",
+      "org.kde.kwin.Scripting", "loadScript", "s", path.join(__dirname, "kwin-pin.js")],
+      { timeout: 8000 });
+    execFileSync("busctl", ["--user", "call", "org.kde.KWin", "/Scripting",
+      "org.kde.kwin.Scripting", "start"], { timeout: 8000 });
+    console.log("[kwin-pin] ensured (compositor owns position)");
+  } catch (e) {
+    console.log("[kwin-pin] ensure failed (positioning unmanaged):", String(e).slice(0, 120));
+  }
   createWindow();
+  // ponytail: display-layout watch (coucou screen-changed parity — their
+  // Rust cursor-poll notices a changed layout ~2x/sec and repositions;
+  // Electron gets real screen events instead, so re-pin here, only here).
+  const repositionCurrent = (why) => {
+    if (!win || win.isDestroyed()) return;
+    try {
+      // Display geometry changed: panel dims may differ — force the one
+      // sheet to re-apply on the new display (pin hook fires on the resize
+      // and re-pins). No content is measured, ever.
+      tracked.appliedKey = "";
+      if (IS_X11) {
+        const b = win.getBounds();
+        const wa = screen.getDisplayNearestPoint({ x: b.x + b.width / 2, y: b.y + b.height / 2 }).workArea;
+        const p = panelFor(wa);
+        tracked.panelW = p.w; tracked.panelH = p.h;
+        const f = footprintSize(tracked.state, tracked.view, wa);
+        const cx = Math.round(wa.x + (wa.width - f.w) / 2);
+        tracked.x = -cx; tracked.y = wa.y;
+        tracked.collapsed = f.name === "strip";
+        tracked.lastName = f.name;
+        tracked.appliedKey = `${f.name}x${f.w}x${f.h}`;
+        win.setBounds({ x: -cx, y: wa.y, width: f.w, height: f.h }, false);
+        console.log("[island-reposition]", JSON.stringify({ why, ask: [f.w, f.h] }));
+        return;
+      }
+      syncWindow(true);
+      console.log("[island-reposition]", JSON.stringify({ why, sheet: true }));
+    } catch { /* window gone */ }
+  };
+  screen.on("display-added", () => repositionCurrent("added"));
+  screen.on("display-removed", () => repositionCurrent("removed"));
+  screen.on("display-metrics-changed", () => repositionCurrent("metrics"));
   const tray = new Tray(
     path.join(__dirname, "..", "island-ui", "public", "icon-192.png"),
   );
