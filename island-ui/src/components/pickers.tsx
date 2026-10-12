@@ -1,6 +1,24 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { BoltIcon, ChevronDownIcon, ResetIcon } from "./icons";
 
+// Card shell — the ONE view card (home/daily + chat + shelf + boards).
+// Radius + padding live in `.card` (index.css) only; variants add
+// width/state via className, never geometry.
+export function Card({
+  className = "",
+  children,
+  ...rest
+}: {
+  className?: string;
+  children?: ReactNode;
+} & React.HTMLAttributes<HTMLDivElement>) {
+  return (
+    <div className={`card${className ? ` ${className}` : ""}`} {...rest}>
+      {children}
+    </div>
+  );
+}
+
 // PillButton — the ONE pill button: composer pills, home buttons, history
 // "+ New" all reuse it. Shape/size live in `.effort-pill` (index.css);
 // variants add tone, never geometry.

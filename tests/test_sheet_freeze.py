@@ -13,7 +13,7 @@ import os
 import unittest
 
 MANIFEST = {
-    'island-app/main.js': '96175b3ee105a0ac',
+    'island-app/main.js': '476f9aa436488a81',
     'island-app/kwin-pin.js': '3563990bad9dbf9e',
     'island-app/preload.js': '78d2a359adbe28dc',
     'island-app/run.sh': 'e697d9dd4d394a25',

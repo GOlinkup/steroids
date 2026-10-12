@@ -1,4 +1,4 @@
-import { forwardRef, lazy, Suspense, useEffect, useState } from "react";
+import { forwardRef, lazy, Suspense, useEffect, useRef, useState } from "react";
 import Mascot, { type MascotHandle } from "./Mascot";
 import { ApprovalCard, QuestionCard, ChatPanel, ExploreView, FeedView, SettingsView, type SettingsState, type SettingsPage } from "./Cards";
 import { TeamGrid, TeamMinis, useTeam, useSessionProgress } from "./TeamGrid";
@@ -12,6 +12,7 @@ const LensView = lazy(() => import("./LensView").then((m) => ({ default: m.LensV
 import { HomeSkeleton } from "./HomeSkeleton";
 import type { Shot } from "./LensView";
 import type { AgentSession, Approval, Attachment, ChatMessage, ChatSession, ExploreFeed, FeedEvent, IslandView, Question, SkillHit } from "../store";
+import type { GigListing } from "../money";
 import type { IslandState } from "../fsm";
 
 // Nicki groove: while any player runs, the island mascot bobs on the
@@ -73,6 +74,9 @@ interface Props {
   foot?: string;
   mascotRef: React.Ref<MascotHandle>;
   routeHint: string;
+  /** Copy/paste popup: transient "Copied/Pasted — …" preview in the navbar middle. Plain, no neon. */
+  echo?: string | null;
+  echoKind?: "copied" | "pasted";
   approval: Approval | null;
   question: Question | null;
   messages: ChatMessage[];
@@ -109,15 +113,18 @@ interface Props {
   onDeleteAgentSession: (sid: string) => void;
   onRefreshSessions?: () => void;
   exploreLive: boolean;
-  providers?: { opencode: boolean; claude: boolean } | null;
-  installState?: "idle" | "working" | "error";
+  providers?: { opencode: boolean; claude: boolean } | null;  installState?: "idle" | "working" | "error";
   onInstall?: () => void;
   exploreFeed: ExploreFeed | null;
+  gigs?: GigListing[];
+  gigNotice?: string | null;
+  onPickGig?: (id: string) => void;
   feedEvents: FeedEvent[];
   onSearchSkills: (q: string) => Promise<SkillHit[]>;
   settings: SettingsState;
-  settingsPage?: SettingsPage;
-  onSettingsPage?: (p: SettingsPage) => void;
+  provider: string;
+  onProvider: (id: string) => void;
+  settingsPage?: SettingsPage;  onSettingsPage?: (p: SettingsPage) => void;
   zoomShot: string | null;
   // stepped-glow frame (PC strip only): measured px box + notch half-width.
   // Renders the glance amber outline tracing the steps — CSS can't do it.
@@ -141,7 +148,7 @@ interface Props {
 // Island shell — steroids spotter bar. Ranked routes, plate snap.
 const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
   const {
-    fsmState, view, foot = "", mascotRef, routeHint,
+    fsmState, view, foot = "", mascotRef, routeHint, echo = null, echoKind = "copied",
     approval, question, messages, thinking, liveActivity, livePartial, turnEngine, attachments,
     onFiles, onRemoveAttachment, shots,
     onMouseEnter, onMouseLeave, onMascotTap,
@@ -150,9 +157,9 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     histHint = null,
     agentSessions, onResumeAgentSession, onDeleteAgentSession,
     onBackToNicki,
-    exploreLive, exploreFeed, feedEvents, onSearchSkills,
-    providers = null, installState = "idle", onInstall = () => {},
+    exploreLive, exploreFeed, gigs = [], gigNotice = null, onPickGig = () => {}, feedEvents, onSearchSkills,    providers = null, installState = "idle", onInstall = () => {},
     settings, onSettings, onTab, unread, zoomShot,
+    provider, onProvider,
     settingsPage = "general", onSettingsPage = () => {},
     onDropToPhone, onDropFilesToPhone, phoneLinked, pairNode, accountNode, shelfNode,
     staged = [], onAttachStaged,
@@ -180,7 +187,28 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     const t = setInterval(poll, 3000);
     return () => { dead = true; clearInterval(t); };
   }, []);
+  // provider arrives from App (single switch for picker + tile menus).
   const showHuddle = messages.length === 0;
+  // mini EQ loudness: while minimized + playing, ride --e off the same
+  // /audio-energy tap the Daily dancer uses (150ms, silent when idle).
+  const eqRef = useRef<HTMLSpanElement>(null);
+  useEffect(() => {
+    if (!musicLive || fsmState === "jacked") return;
+    let dead = false;
+    const tick = () => {
+      fetch(`${window.location.origin}/audio-energy`, { cache: "no-store" })
+        .then((r) => r.json())
+        .then((j) => {
+          if (dead) return;
+          const e = typeof j?.energy === "number" ? Math.max(0, Math.min(1, j.energy)) : 0;
+          eqRef.current?.style.setProperty("--e", e.toFixed(2));
+        })
+        .catch(() => {});
+    };
+    tick();
+    const t = setInterval(tick, 150);
+    return () => { dead = true; clearInterval(t); };
+  }, [musicLive, fsmState]);
   // level pill number: glides to each new destination (volume keys land in
   // steps) instead of jumping. Runs at top level; hidden pills ignore it.
   const avatarNav = (page: "profile" | "explore" | "settings" | "account" | "phone") => {
@@ -230,6 +258,9 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             unread={unread}
             onTab={onTab}
             hiddenViews={settings.hiddenViews}
+            middle={echo ? (
+              <span className="nav-echo" role="status">✓ {echoKind === "pasted" ? "Pasted" : "Copied"} — {echo}</span>
+            ) : undefined}
             sessions={sessions}
             histHint={histHint}
             activeSessionId={activeSessionId}
@@ -250,7 +281,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             onToggleSound={() => onSettings({ ...settings, soundOn: !settings.soundOn })}
           />
           <div className="jacked-body">
-          {view !== "daily" && view !== "chat" && (
+          {view !== "daily" && view !== "chat" && view !== "shelf" && (
             <div className="mascot-top">
               <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />
             </div>
@@ -262,6 +293,9 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             <ExploreView
               live={exploreLive}
               feed={exploreFeed}
+              gigs={gigs}
+              gigNotice={gigNotice}
+              onPickGig={onPickGig}
               onSearch={onSearchSkills}
               onPickSkill={(label) => onSend(`What can ${label} do?`, undefined, undefined, [])}
               agentSessions={agentSessions}
@@ -297,6 +331,8 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             <ChatPanel
               messages={messages}
               onSend={onSend}
+              provider={provider}
+              onProvider={onProvider}
               onEditMessage={onEditMessage}
               threadKey={activeSessionId ?? "live"}
               thinking={thinking}
@@ -325,7 +361,7 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
                   )}
                   {/* crew rail: the huddle above is nicki's hello (crew ready),
                       the grid below leads with nicki, then the mates. */}
-                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} onPick={onResumeAgentSession} onPickNicki={onBackToNicki} detail="none" compact={messages.length > 0} />
+                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} onPick={onResumeAgentSession} onPickNicki={onBackToNicki} detail="none" compact={messages.length > 0} provider={provider} onProvider={onProvider} />
                 </div>
               }
             />
@@ -360,9 +396,11 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
       ) : (
         <>
           {/* minimized pill: nicki + mates grid. Playing: one mascot
-              only (human order — no double buddy), wave bars ride right. */}
+              only (human order — no double buddy), voice wave rides right. */}
           {musicLive ? (
-            <span className="wavebars" title="now playing" aria-hidden><i /><i /><i /><i /><i /></span>
+            <span ref={eqRef} className="gemwave" title="now playing" aria-hidden>
+              <i /><i /><i /><i /><i />
+            </span>
           ) : (
           <TeamMinis members={team.members} title={routeHint} />
           )}

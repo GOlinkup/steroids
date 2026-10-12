@@ -1,11 +1,13 @@
 import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon, PhoneIcon, BoltIcon, StopIcon } from "./icons";
-import { EffortPicker, PillButton, ProviderPicker, useDismiss, useEngines, ENGINES, displayModel } from "./pickers";
-export { EffortPicker, ProviderPicker, ENGINES, displayModel } from "./pickers";
+import { EffortPicker, PillButton, ProviderPicker, useDismiss, useEngines, ENGINES, displayModel, Card } from "./pickers";
+export { EffortPicker, ProviderPicker, ENGINES, displayModel, Card } from "./pickers";
 import { SafeOrb } from "../orb";
+import { GigList } from "../gigs";
+import type { GigListing } from "../money";
 import { chatOrbFor } from "../orb_state";
 import { LensBlock, StepsList, useSessionProgress } from "./TeamGrid";
-import { HiveBoard, LoopTile, LoopTasks, LiveLoops, SchedulesSection, useLoopTasks } from "./Loop";
+import { HiveBoard, useLoopTasks } from "./Loop";
 import {
   classifyAttachment,
   formatSize,
@@ -20,30 +22,15 @@ import {
   type SkillHit,
 } from "../store";
 
-// Card shell — one OOP base for every view card (home/daily + chat +
-// approval/question/finished). Radius + side/bottom padding live in
-// `.card` (index.css) only; variants add width/state, never geometry.
-export function Card({
-  className = "",
-  children,
-  ...rest
-}: {
-  className?: string;
-  children: React.ReactNode;
-} & React.HTMLAttributes<HTMLDivElement>) {
-  return (
-    <div className={`card${className ? ` ${className}` : ""}`} {...rest}>
-      {children}
-    </div>
-  );
-}
-
 // Explore view — the live surface: search all 1,357 skills, trending,
 // recent routes, agent sessions. Everything taps through to chat.
 // Needs the bridge; offline it says so instead of showing mock shelves.
 export function ExploreView({
   live,
   feed,
+  gigs = [],
+  gigNotice = null,
+  onPickGig = () => {},
   onSearch,
   onPickSkill,
   agentSessions = [],
@@ -51,6 +38,9 @@ export function ExploreView({
 }: {
   live: boolean;
   feed: ExploreFeed | null;
+  gigs?: GigListing[];
+  gigNotice?: string | null;
+  onPickGig?: (id: string) => void;
   onSearch: (q: string) => Promise<SkillHit[]>;
   onPickSkill: (label: string) => void;
   agentSessions?: AgentSession[];
@@ -104,10 +94,12 @@ export function ExploreView({
           </div>
         </>
       )}
+      {live && gigs.length > 0 && (
+        <GigList gigs={gigs} seedNotice={gigNotice} onPick={onPickGig} />
+      )}
       {!!feed?.trending.length && (
         <>
-          <div className="explore-label">Trending</div>
-          <div className="trend-row">
+          <div className="explore-label">Trending</div>          <div className="trend-row">
             {feed.trending.map((t) => (
               <button key={t.skill} className="trend-chip" onClick={() => onPickSkill(t.skill)}>
                 {t.skill}<em>{t.n}</em>
@@ -271,9 +263,15 @@ function DropFrame({ rx = 20 }: { rx?: number }) {
   );
 }
 
+// Turn start survives panel remounts (minimize/reopen): the working timer
+// keeps counting instead of restarting at zero. Stamped on false→true.
+let turnStart = 0;
+
 export function ChatPanel({
   messages,
   onSend,
+  provider,
+  onProvider,
   thinking,
   attachments,
   onFiles,
@@ -300,6 +298,9 @@ export function ChatPanel({
   // the composer's pending chips; [] = text-only (skill taps must never
   // steal chips you staged for another question).
   onSend: (text: string, provider?: string, opts?: { model: string; effort: string }, filesOverride?: Attachment[] | null) => void;
+  // provider lives in Island (tile ⋯ menus flip the same switch).
+  provider: string;
+  onProvider: (id: string) => void;
   // edit-in-place: truncate the log at the edited message; the panel then
   // re-sends the new text as a fresh turn (stale replies below are dropped).
   onEditMessage?: (id: number) => void;
@@ -335,8 +336,15 @@ export function ChatPanel({
   threadKey?: string | number | null;
 }) {
   const engines = useEngines();
-  const [provider, setProvider] = useState(ENGINES[0].id);
   const [model, setModel] = useState(ENGINES[0].models[0]);
+  // provider prop changed under us (tile menu switch): keep the model
+  // when it exists on the new engine, else fall back to its first.
+  const [prevProv, setPrevProv] = useState(provider);
+  if (provider !== prevProv) {
+    setPrevProv(provider);
+    const eng = engines.find((e) => e.id === provider) ?? engines[0];
+    setModel((cur) => (eng.models.includes(cur) ? cur : eng.models[0]));
+  }
   const [effort, setEffort] = useState<string>("med");
   const [openPicker, setOpenPicker] = useState<null | "provider" | "effort">(null);
   // Composer draft survives view switches + reloads: the panel unmounts
@@ -368,13 +376,16 @@ export function ChatPanel({
   const [dragOver, setDragOver] = useState(false);
   const [recording, setRecording] = useState(false);
   const [recSecs, setRecSecs] = useState(0);
-  const [workSecs, setWorkSecs] = useState(0);
+  const [workSecs, setWorkSecs] = useState(() => (thinking && turnStart ? Math.floor((Date.now() - turnStart) / 1000) : 0));
   // ponytail: reset-on-prop-change via render-adjust, not an effect —
   // sync setState in useEffect double-renders every turn start.
   const [prevThinking, setPrevThinking] = useState(thinking);
   if (thinking !== prevThinking) {
     setPrevThinking(thinking);
-    if (thinking) setWorkSecs(0);
+    if (thinking) {
+      turnStart = Date.now();
+      setWorkSecs(0);
+    }
   }
   // Live strip (Atoll live activities): mic / queued drops / battery poll.
   // Rows render only while live — nothing live, no strip.
@@ -397,8 +408,9 @@ export function ChatPanel({
   }, []);
   useEffect(() => {
     if (!thinking) return;
-    const t0 = Date.now();
-    const timer = setInterval(() => setWorkSecs(Math.floor((Date.now() - t0) / 1000)), 1000);
+    if (!turnStart) turnStart = Date.now();
+    setWorkSecs(Math.floor((Date.now() - turnStart) / 1000));
+    const timer = setInterval(() => setWorkSecs(Math.floor((Date.now() - turnStart) / 1000)), 1000);
     return () => clearInterval(timer);
   }, [thinking]);
   // working bubble reuses the home live-progress hook: same steps/lens the
@@ -415,6 +427,12 @@ export function ChatPanel({
     partial: livePartial,
     stepsActive: (liveProgress?.steps ?? []).some((s) => s.status === "active"),
   });
+  // idle shimmer: before the CLI streams, show the steroids process
+  // (skill check → CLI route) on the existing shimmer line. Rotates
+  // with workSecs, no extra fetch. Real activity wins when it lands.
+  const idlePhase = ["checking skills", "routing to CLI", "reading context"][Math.floor(workSecs / 2) % 3];
+  const engineTag = turnEngine || `${provider}/${displayModel(model)}`;
+  const workCap = liveActivity || liveProgress?.activity || `${idlePhase}… · ${engineTag}`;
   useEffect(() => {
     if (!thinking || !liveSession) return;
     // instant, not next-tick: fetch now so steps/lens/code show what the
@@ -455,17 +473,18 @@ export function ChatPanel({
   // newest reply visible while stuck: pin the log to the bottom as turns
   // stream. layout effect, not passive: passive fires after paint, flashing
   // the log top for one frame on every open with history (chat-open flash).
-  // Per-chunk growth is followed by the ResizeObserver below — livePartial
-  // stays out of these deps so streaming never yanks pre-paint.
+  // livePartial rides the deps so every streamed chunk pins to the bubble
+  // bottom while stuck — still stick-gated, so scrolled-up readers are
+  // never yanked (the removed yank was a forced re-stick, not this pin).
   useLayoutEffect(() => {
     const el = logRef.current;
     if (el && stick.current) el.scrollTop = el.scrollHeight;
-  }, [messages, thinking]);
-  // work starts: re-stick so the run pushes focus to the latest text, same
-  // as an own send (edits/regens re-stick at their call sites below).
+  }, [messages, thinking, livePartial]);
+  // work starts: while stuck, the run pushes focus to the latest text.
+  // Scrolled-up readers are NEVER yanked — stick stays theirs alone
+  // (own sends/edits/regens re-stick at their own call sites).
   useEffect(() => {
-    if (!thinking) return;
-    stick.current = true;
+    if (!thinking || !stick.current) return;
     const el = logRef.current;
     if (el) el.scrollTop = el.scrollHeight;
   }, [thinking]);
@@ -492,7 +511,7 @@ export function ChatPanel({
   const recRef = useRef<{ rec: MediaRecorder; chunks: Blob[]; timer: ReturnType<typeof setInterval> } | null>(null);
   const pickProvider = (id: string) => {
     const eng = engines.find((e) => e.id === id) ?? engines[0];
-    setProvider(eng.id);
+    onProvider(eng.id);
     // keep the current model when it exists on the new engine (e.g. the
     // live opencode list); otherwise fall back to its first model.
     setModel((cur) => (eng.models.includes(cur) ? cur : eng.models[0]));
@@ -688,7 +707,10 @@ export function ChatPanel({
                     rows={2}
                     onChange={(e) => setEditDraft(e.target.value)}
                     onKeyDown={(e) => {
-                      if (e.key === "Enter" && (e.metaKey || e.ctrlKey)) saveEdit();
+                      if (e.key === "Enter" && !e.shiftKey) {
+                        e.preventDefault();
+                        saveEdit();
+                      }
                       if (e.key === "Escape") setEditingId(null);
                     }}
                   />
@@ -724,7 +746,6 @@ export function ChatPanel({
               )}
               {m.role === "assistant" && m.content && (
                 <div className="msg-actions">
-                  <span className="reply-pill" aria-hidden>nicki</span>
                   <button
                     className="msg-act"
                     title={copiedId === m.id ? "Copied" : "Copy reply"}
@@ -772,7 +793,7 @@ export function ChatPanel({
               <div className="work-meta">
                 <span className="work-cap">
                   <span className="shimmer">
-                    {bridgeOn ? (liveActivity || `talking to nicki · ${turnEngine || `${provider}/${displayModel(model)}`}`) : "bridge down — nothing running"}
+                    {bridgeOn ? workCap : "bridge down — nothing running"}
                   </span>
                 </span>
                 <span className="work-sub">
@@ -1304,9 +1325,27 @@ export function ShelfView({
 }) {
   const pickRef = useRef<HTMLInputElement>(null);
   const [loopTasks, addLoopTask] = useLoopTasks();
+  // Drop → report: staged shots carry their own Send (receipt rides the
+  // button, same lazy sync import as the Support section).
+  const [reported, setReported] = useState<Record<string, string>>({});
+  const report = (it: ShelfItem) => {
+    if (reported[it.url] && reported[it.url] !== "images only") return;
+    if (!it.file.type.startsWith("image/")) {
+      setReported((r) => ({ ...r, [it.url]: "images only" }));
+      return;
+    }
+    setReported((r) => ({ ...r, [it.url]: "sending…" }));
+    import("../sync").then(
+      (s) => s.sendSupportReport("", it.file),
+      () => { throw new Error("no cloud"); },
+    ).then(
+      (r) => setReported((x) => ({ ...x, [it.url]: r })),
+      (e) => setReported((x) => ({ ...x, [it.url]: e instanceof Error ? e.message : "failed" })),
+    );
+  };
   return (
     <div
-      className="card shelf"
+      className="shelf"
       onDragOver={(e) => {
         e.preventDefault();
         e.stopPropagation();
@@ -1320,19 +1359,13 @@ export function ShelfView({
         if (files.length) onStage(files);
       }}
     >
-      <HiveBoard />
-      <LoopTile onDone={addLoopTask} />
-      <LiveLoops />
-      <SchedulesSection />
+      <HiveBoard loopTasks={loopTasks} onLoopDone={addLoopTask} />
       {loopTasks.length === 0 && items.length === 0 ? (
         <div className="card-detail">
-          Nothing shelved yet — run the team above, or stage error
-          screenshots, logs, docs, anything you&apos;ll attach or beam.
-          Drop files here or stage them. Session only, clears on reload.
+          Nothing shelved yet — drop files here.
         </div>
       ) : (
         <>
-          <LoopTasks tasks={loopTasks} />
           <div className="btn-row">
         <PillButton onClick={() => pickRef.current?.click()}>+ Stage files</PillButton>
         <input
@@ -1350,8 +1383,7 @@ export function ShelfView({
       </div>
       {!items.length ? (
         <div className="card-detail">
-          No staged files — drop error screenshots, logs, or docs here,
-          or stage them for later.
+          No staged files — drop some here.
         </div>
       ) : (
         <div className="try-col">
@@ -1368,6 +1400,9 @@ export function ShelfView({
               </span>
               <button className="menu-act" title="Attach to composer" onClick={() => onAttach(it.file)}>
                 Attach
+              </button>
+              <button className="menu-act" title="Report bug with this shot" onClick={() => report(it)}>
+                {reported[it.url] ?? "Report"}
               </button>
               <button className="menu-act" title="Send to phone" onClick={() => onSendToPhone(it.file)}>
                 <DropIcon size={14} />
@@ -1513,6 +1548,7 @@ export function SettingsView({
   return (
     <div className="card settings">
         <div id="island-account">{extra}</div>
+        <div className="am-sep" aria-hidden />
         <div className="set-head">Preferences</div>
       <div className="menu-card" aria-label="Preferences">
         <button className="menu-row action" onClick={cycleProvider} aria-label="Chat provider">
@@ -1540,10 +1576,89 @@ export function SettingsView({
           </button>
         </div>
       </div>
+        <div className="am-sep" aria-hidden />
         <div className="set-head">Automation</div>
         <RulesSection />
+        <div className="am-sep" aria-hidden />
         <div className="set-head" id="island-phone">Phone link</div>
         {pair}
+        <div className="am-sep" aria-hidden />
+        <div className="set-head">Support</div>
+        <SupportSection />
+    </div>
+  );
+}
+
+// Support — bug/feedback with a dropped screenshot. End to end on the same
+// Supabase project (Storage, not R2): browser uploads to the private
+// `support-reports` bucket, then inserts one `support_reports` row.
+// Lazy sync import keeps the heavy client out of the main bundle;
+// needs the *_support_reports.sql migration + login, says so honestly.
+function SupportSection() {
+  const [body, setBody] = useState("");
+  const [shot, setShot] = useState<File | null>(null);
+  const [msg, setMsg] = useState("");
+  const [busy, setBusy] = useState(false);
+  const pickRef = useRef<HTMLInputElement>(null);
+  const send = () => {
+    if (busy) return;
+    setBusy(true);
+    setMsg("");
+    import("../sync").then(
+      (s) => s.sendSupportReport(body, shot),
+      () => { throw new Error("cloud not configured (island-ui/.env missing)"); },
+    ).then(
+      (r) => { setMsg(r); setBody(""); setShot(null); setBusy(false); },
+      (e) => { setMsg(e instanceof Error ? e.message : "send failed"); setBusy(false); },
+    );
+  };
+  return (
+    <div
+      className="menu-card"
+      aria-label="Support"
+      onDragOver={(e) => e.preventDefault()}
+      onDrop={(e) => {
+        e.preventDefault();
+        const f = Array.from(e.dataTransfer?.files ?? [])[0];
+        if (!f) return;
+        if (!f.type.startsWith("image/")) { setMsg("images only"); return; }
+        setShot(f);
+        setMsg("");
+      }}
+    >
+      <div className="menu-row col">
+        <textarea
+          className="team-edit"
+          aria-label="What went wrong"
+          rows={2}
+          value={body}
+          disabled={busy}
+          onChange={(e) => setBody(e.target.value)}
+          placeholder="What went wrong…"
+        />
+      </div>
+      <div className="menu-row">
+        <input
+          ref={pickRef}
+          type="file"
+          accept="image/*"
+          hidden
+          aria-hidden
+          tabIndex={-1}
+          onChange={(e) => {
+            const f = e.target.files?.[0];
+            if (f) { setShot(f); setMsg(""); }
+            e.target.value = "";
+          }}
+        />
+        <button className="menu-act" disabled={busy} onClick={() => pickRef.current?.click()}>
+          {shot ? shot.name.slice(0, 24) : "Attach shot"}
+        </button>
+        <button className="menu-act primary" disabled={busy || (!body.trim() && !shot)} onClick={send}>
+          Send
+        </button>
+      </div>
+      {!!msg && <div className="menu-note">{msg}</div>}
     </div>
   );
 }

@@ -24,7 +24,7 @@ OBLIGATED = ("request", "query", "propose")
 # Past this many reply-hops the router escalates to nicki instead of
 # letting two mates loop forever.
 HOP_CAP = 5
-TASK_OPEN = ("todo", "running")
+TASK_OPEN = ("todo", "running", "blocked")
 
 
 def root():
@@ -197,6 +197,42 @@ def update_task(tid, **patch):
             _write_json(_tasks_path(), doc)
             append_log("task", id=tid, **{k: row.get(k)
                                           for k in ("status", "assignee")})
+            return row
+    return None
+
+
+def delete_task(tid):
+    """Remove a ledger row. Returns True when something was removed."""
+    ensure()
+    doc = _read_json(_tasks_path(), {"tasks": []})
+    if not isinstance(doc, dict) or not isinstance(doc.get("tasks"), list):
+        return False
+    kept = [row for row in doc["tasks"] if row.get("id") != tid]
+    if len(kept) == len(doc["tasks"]):
+        return False
+    _write_json(_tasks_path(), {"tasks": kept})
+    append_log("task", id=tid, status="deleted")
+    return True
+
+
+def comment_task(tid, text, by="you"):
+    """Append one dated comment line to a task's spec. Returns row or None."""
+    ensure()
+    line = str(text or "").strip().replace("\n", " ")[:300]
+    if not line:
+        return None
+    doc = _read_json(_tasks_path(), {"tasks": []})
+    if not isinstance(doc, dict) or not isinstance(doc.get("tasks"), list):
+        return None
+    for row in doc["tasks"]:
+        if row.get("id") == tid:
+            prev = str(row.get("spec") or "")
+            stamp = "%s — %s: %s" % (time.strftime("%Y-%m-%d"),
+                                     str(by)[:40], line)
+            row["spec"] = (prev + "\n" + stamp if prev else stamp)[:2000]
+            row["updated"] = time.time()
+            _write_json(_tasks_path(), doc)
+            append_log("task", id=tid, status="comment")
             return row
     return None
 

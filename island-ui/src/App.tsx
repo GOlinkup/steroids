@@ -8,10 +8,12 @@ import {
   type AgentSession, type Approval, type Attachment, type ChatMessage, type ChatSession, type ExploreFeed, type FeedEvent, type IslandView, type Pill, type Question, type SkillHit,
 } from "./store";
 import type { Shot } from "./components/LensView";
+import type { GigListing } from "./money";
 import { PairPanel, ShelfView, isPcSide, type LinkRequest, type SettingsState, type ShelfItem } from "./components/Cards";
 import { AccountPanel } from "./components/Account";
 import type { SettingsPage } from "./components/Cards";
 import type { CloudRow, DisplayName } from "./sync";
+import { ENGINES } from "./components/Cards";
 // ponytail: supabase rides a lazy chunk — the ONLY heavy dep left in the
 // main bundle. Every cloud call below goes through loadSync(), so boot
 // stays lean and the chunk loads on first login/sync tap, never at startup.
@@ -130,6 +132,12 @@ export default function App() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [fsmState, view]);
   const [, setPills] = useState<Pill[]>(HARNESS_PILLS);
+  // Copy/paste popup (no neon): transient "Copied/Pasted — …" in the navbar
+  // middle. Plain chip, melts back after 1.4s.
+  const ECHO_MS = 1400;
+  const [echo, setEcho] = useState<string | null>(null);
+  const [echoKind, setEchoKind] = useState<"copied" | "pasted">("copied");
+  const echoTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [initialDraft] = useState(loadDraft);
   const [messages, setMessages] = useState<ChatMessage[]>(() => initialDraft?.messages ?? []);
   const [sessions, setSessions] = useState<ChatSession[]>(loadSessions);
@@ -187,9 +195,14 @@ export default function App() {
   const [drivingSid, setDrivingSid] = useState<string | null>(null);
   const drivingRef = useRef<string | null>(null);
   drivingRef.current = drivingSid;
-  const stashRef = useRef<{ messages: ChatMessage[]; sid: string | null } | null>(null);
+  const stashRef = useRef<{ messages: ChatMessage[]; sid: string | null; prov: string | null } | null>(null);
   const [agentSessions, setAgentSessions] = useState<AgentSession[]>([]);
   const [exploreFeed, setExploreFeed] = useState<ExploreFeed | null>(null);
+  // provider lives here (not in the composer): tile ⋯ menus, the picker,
+  // resumes and hand-offs all flip ONE switch — UI and turns never drift.
+  const [provider, setProvider] = useState(ENGINES[0].id);
+  const [gigs, setGigs] = useState<GigListing[]>([]);
+  const [gigNotice, setGigNotice] = useState<string | null>(null);
   const [feedEvents, setFeedEvents] = useState<FeedEvent[]>([]);
   const [approval, setApproval] = useState<Approval | null>(null);
   const [question, setQuestion] = useState<Question | null>(null);
@@ -387,6 +400,48 @@ export default function App() {
     }
   }, [fsm]);
 
+  // Copy/paste popup wiring (no neon): system copy/paste + in-app
+  // programmatic copies (message copy button, sync code) announce via the
+  // navbar middle. Shell poll in main.js covers copies while focused.
+  useEffect(() => {
+    const showEcho = (t: string, kind: "copied" | "pasted" = "copied") => {
+      const s = t.trim().replace(/\s+/g, " ").slice(0, 48);
+      if (!s) return;
+      setEcho(s);
+      setEchoKind(kind);
+      mascotRef.current?.celebrate();
+      if (echoTimer.current) clearTimeout(echoTimer.current);
+      echoTimer.current = window.setTimeout(() => setEcho(null), ECHO_MS);
+    };
+    (window as unknown as { island?: { onEcho?: (fn: (text: string) => void) => void } })
+      .island?.onEcho?.((t) => showEcho(t));
+    const onCopy = () => {
+      try {
+        showEcho(window.getSelection()?.toString() ?? "");
+      } catch { /* selection unreadable */ }
+    };
+    const onPaste = (e: Event) => {
+      try {
+        showEcho((e as ClipboardEvent).clipboardData?.getData("text") ?? "", "pasted");
+      } catch { /* nothing pasted */ }
+    };
+    const onEchoEvent = (e: Event) => {
+      try {
+        showEcho((e as CustomEvent<string>).detail ?? "");
+      } catch { /* bad detail */ }
+    };
+    document.addEventListener("copy", onCopy);
+    document.addEventListener("paste", onPaste);
+    document.addEventListener("steroids:copied", onEchoEvent);
+    return () => {
+      document.removeEventListener("copy", onCopy);
+      document.removeEventListener("paste", onPaste);
+      document.removeEventListener("steroids:copied", onEchoEvent);
+      if (echoTimer.current) clearTimeout(echoTimer.current);
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   useEffect(() => {
     // Nicki bridge: if it's up, chat goes to real local opencode, else mock.
     let dead = false;
@@ -453,6 +508,16 @@ export default function App() {
         }
       })
       .catch(() => {});
+    fetch(`${BRIDGE}/gigs?limit=10`)
+      .then((r) => r.json())
+      .then((j) => {
+        if (!dead && Array.isArray(j.gigs)) {
+          // online-only for now: skip our DB rows, show live web gigs.
+          setGigs(j.gigs.filter((g: GigListing) => g.origin === "remotiveSeed"));
+          setGigNotice(typeof j.seed_notice === "string" ? j.seed_notice : null);
+        }
+      })
+      .catch(() => {});
     // live lens feed: real shots or honest empty (never stale demo).
     const pullShots = () => {
       fetch(`${BRIDGE}/shots`)
@@ -504,22 +569,21 @@ export default function App() {
       say(initialDraft.session ? "draft restored — same session continues" : "draft restored");
     }
     if (APP_MODE) {
-      const q = new URLSearchParams(window.location.search);
       // Electron island: transparent window, only the pill paints (Glance
       // notch idiom). ?bg=black is legacy brave --app fallback (opaque).
-      const opaque = q.get("bg") === "black";
+      const opaque = new URLSearchParams(window.location.search).get("bg") === "black";
       const bg = opaque ? "#000" : "transparent";
       document.documentElement.style.background = bg;
       document.body.style.background = bg;
       // distinct title so the window manager can pin the app window
       // (top-center, frameless) without touching browser tabs.
       document.title = "Steroids Island";
-      // explicit ?state= wins (QA); otherwise the installed app starts flexed.
-      if (!q.get("state")) fsm.forceFlex();
-      // coucou status first (left work card + right 2x2 crew grid), chat
-      // one tap away. Explicit ?view= wins (QA).
-      if (!q.get("view")) setView("daily");
     }
+    // boot open everywhere (app + browser): the island itself, with
+    // the boot view. Explicit ?state= / ?view= still win for QA.
+    const q = new URLSearchParams(window.location.search);
+    if (!q.get("state")) fsm.forceFlex();
+    if (!q.get("view")) setView("daily");
     return () => stopGreet();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -1552,6 +1616,11 @@ export default function App() {
     // the agent mid-work is what the old 160s abort did.
     let poll: ReturnType<typeof setInterval> | null = null;
     let finished = false;
+    // consecutive failed polls: the .catch below used to swallow them
+    // forever, leaving the working bubble on stale text with climbing
+    // seconds and no word on what happened.
+    let fails = 0;
+    const dead = (turnId: string) => finished || liveTurnCtl.current?.id !== turnId;
     const finish = () => {
       finished = true;
       if (poll) clearInterval(poll);
@@ -1579,9 +1648,12 @@ export default function App() {
         const boot = j.boot as string | undefined;
         liveTurnCtl.current = { id, abort: () => ctl.abort() };
         poll = setInterval(() => {
+          if (dead(id)) { if (poll) clearInterval(poll); return; }
           fetch(`${BRIDGE}/turn?id=${id}`, { signal: ctl.signal })
             .then((r) => r.json())
             .then((s) => {
+              if (dead(id)) { if (poll) clearInterval(poll); return; }
+              fails = 0;
               if (s.session) setOcSession(s.session);
               // Bridge swept/restarted the turn (no `done` field, has error):
               // exit honestly instead of spinning on a dead job forever.
@@ -1613,9 +1685,21 @@ export default function App() {
               deliverBot(s.text, myThread);
             })
             .catch(() => {
-              // transient poll blip (bridge hiccup, laptop sleep): the turn
-              // is server-side and still running — keep waiting for the
-              // next tick, never kill it from here.
+              // poll failed (bridge hiccup, sleep, or bridge down). A blip
+              // or two keeps waiting; sustained silence says so in the
+              // working bubble, then exits honestly instead of spinning
+              // forever on stale text.
+              if (dead(id)) { if (poll) clearInterval(poll); return; }
+              fails += 1;
+              if (fails >= 30) {
+                finish();
+                pushBot("Connection lost mid-turn — send again, it continues the same session.");
+                say("chat lost: connection failed 30s");
+                return;
+              }
+              if (fails >= 3) {
+                setLiveTurn((prev) => (prev ? { activity: `reconnecting… (${fails}s)`, partial: prev.partial } : prev));
+              }
             });
         }, 1000);
       })
@@ -1632,7 +1716,7 @@ export default function App() {
     stopGreet();
     // stash nicki's live draft once (mate→mate keeps the same stash).
     setMessages((cur) => {
-      if (!drivingRef.current) stashRef.current = { messages: cur, sid: ocSessionRef.current };
+      if (!drivingRef.current) stashRef.current = { messages: cur, sid: ocSessionRef.current, prov: ocProvider.current };
       return cur;
     });
     setDrivingSid(sid);
@@ -1643,6 +1727,7 @@ export default function App() {
         ? "claude"
         : "opencode";
     ocProvider.current = agent;
+    setProvider(agent);
     setUnread(0);
     setView("chat");
     fsm.forceJacked();
@@ -1681,6 +1766,8 @@ export default function App() {
     if (stash) {
       setMessages(stash.messages);
       setOcSession(stash.sid);
+      ocProvider.current = stash.prov ?? null;
+      if (stash.prov) setProvider(stash.prov);
     }
     setUnread(0);
     setView("chat");
@@ -2026,6 +2113,8 @@ export default function App() {
         foot={foot}
         mascotRef={mascotRef}
         routeHint={hint}
+        echo={echo}
+        echoKind={echoKind}
         approval={approval}
         question={question}
         messages={messages}
@@ -2085,6 +2174,13 @@ export default function App() {
         onNewChat={newChat}
         exploreLive={bridgeOn}
         exploreFeed={exploreFeed}
+        gigs={gigs}
+        gigNotice={gigNotice}
+        onPickGig={(id) => {
+          const g = gigs.find((x) => x.id === id);
+          sendChat(`How do I land this gig: ${g?.title ?? id}?`);
+          setView("chat");
+        }}
         feedEvents={feedEvents}
         onSearchSkills={searchSkills}
         providers={bridgeOn ? caps : null}
@@ -2096,6 +2192,8 @@ export default function App() {
         onDeleteAgentSession={deleteAgentSession}
         settings={settings}
         onSettings={applySettings}
+        provider={provider}
+        onProvider={setProvider}
         settingsPage={settingsPage}
         onSettingsPage={setSettingsPage}
         onTab={handleTab}

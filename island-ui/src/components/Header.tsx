@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { AgentSession, Approval, ChatSession, IslandView, Question } from "../store";
 import type { SettingsPage } from "./Cards";
 import {
-  BellIcon, ChatIcon, GearIcon, HistoryIcon, HomeIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ShelfIcon, SoundOffIcon, SoundOnIcon, TrashIcon,
+  BellIcon, ChatIcon, GearIcon, HistoryIcon, HomeIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ShelfIcon, TrashIcon,
 } from "./icons";
 import { useDismiss, MenuRow } from "./pickers";
 
@@ -15,8 +15,8 @@ interface IconProps {
 
 const TABS: Array<{ view: IslandView; title: string; Icon: ComponentType<IconProps> }> = [
   { view: "chat", title: "Chat", Icon: ChatIcon },
-  { view: "daily", title: "Daily", Icon: HomeIcon },
-  { view: "shelf", title: "Shelf", Icon: ShelfIcon },
+  { view: "daily", title: "Office", Icon: HomeIcon },
+  { view: "shelf", title: "Tasks", Icon: ShelfIcon },
 ];
 
 // "3m" / "2h" / "5d" — iOS recents style right-aligned meta.
@@ -166,8 +166,6 @@ export function Header({
   question = null,
   hiddenViews = [],
   settingsPage = "general",
-  soundOn = true,
-  onToggleSound = () => {},
 }: {
   view: IslandView;
   unread: number;
@@ -226,13 +224,6 @@ export function Header({
       <div className="nav-middle">{middle}</div>
       <div className="nav-actions">
         <HeaderIconButton
-          active={!soundOn}
-          title={soundOn ? "Mute sounds" : "Unmute sounds"}
-          onClick={() => onToggleSound()}
-        >
-          {soundOn ? <SoundOnIcon size={22} /> : <SoundOffIcon size={22} />}
-        </HeaderIconButton>
-        <HeaderIconButton
           active={histOpen}
           title="Chat history"
           badge={sessions.length}
@@ -251,7 +242,7 @@ export function Header({
         <AvatarMenu email={email} avatarUrl={avatarUrl} view={view} settingsPage={settingsPage} onAvatarNav={onAvatarNav} onSignOut={onSignOut} onOpen={closeBoth} />
       </div>
       {notifOpen && (
-        <div className="hist-panel" role="dialog" aria-label="Notifications">
+        <div className="sheet hist-panel" role="dialog" aria-label="Notifications">
           <div className="hist-head">
             <span>Notifications</span>
           </div>
@@ -285,7 +276,7 @@ export function Header({
         </div>
       )}
       {histOpen && (
-        <div className="hist-panel" role="dialog" aria-label="Chat history">
+        <div className="sheet hist-panel" role="dialog" aria-label="Chat history">
           <div className="hist-head">
             <span>History</span>
             <button className="hist-new" title="Start a new chat" onClick={() => { onNewChat?.(); setHistOpen(false); }}>

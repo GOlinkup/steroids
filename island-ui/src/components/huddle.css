@@ -28,24 +28,25 @@
   animation: huddle-idle 2.2s ease-in-out 400ms infinite;
 }
 
-/* B5: leader bubble typewriter. */
+/* B5: leader line — plain text under nicki, never a chat bubble. */
 .huddle-bubble {
   max-width: 100%;
   text-align: center;
 }
 .huddle-bubble-text {
-  display: inline-block;
-  overflow: hidden;
-  white-space: nowrap;
-  text-align: center;
-  width: 26ch;
-  animation: huddle-type var(--huddle-type) steps(26) backwards;
-  animation-delay: 1600ms;
+  display: block;
+  font-size: .92rem;
+  line-height: 1.55;
+  letter-spacing: -.01em;
+  color: var(--text);
+  white-space: normal;
+  overflow-wrap: break-word;
+  animation: huddle-fade var(--huddle-type) ease-out;
 }
 
-@keyframes huddle-type {
-  from { width: 0; }
-  to { width: 26ch; }
+@keyframes huddle-fade {
+  from { opacity: 0; }
+  to { opacity: 1; }
 }
 @keyframes huddle-stage-in {
   from { opacity: 0; }
@@ -76,6 +77,6 @@
     transform: none !important;
   }
   .huddle-stage .huddle-bubble-text {
-    width: auto;
+    animation: none !important;
   }
 }

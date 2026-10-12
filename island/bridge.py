@@ -1987,6 +1987,53 @@ class Handler(SimpleHTTPRequestHandler):
             row = _hive.add_task(title, str(req.get("spec") or "")[:1000],
                                  str(req.get("assignee") or "nicki")[:40])
             return self._send({"ok": True, "task": row})
+        if parts.path == "/hive/task/update":
+            # office board moves: todo->running->done (+assignee).
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            tid = str(req.get("id") or "").strip()
+            if not tid:
+                return self._send({"ok": False, "error": "id required"}, 400)
+            patch = {}
+            if "status" in req:
+                st = str(req.get("status") or "").strip()[:40]
+                if st not in ("todo", "running", "blocked", "done", "failed"):
+                    return self._send({"ok": False, "error": "bad status"}, 400)
+                patch["status"] = st
+            if "assignee" in req:
+                patch["assignee"] = str(req.get("assignee") or "")[:40]
+            if not patch:
+                return self._send({"ok": False, "error": "nothing to update"}, 400)
+            row = _hive.update_task(tid, **patch)
+            if row is None:
+                return self._send({"ok": False, "error": "no such task"}, 404)
+            return self._send({"ok": True, "task": row})
+        if parts.path == "/hive/task/delete":
+            # office board delete (no undo — the log keeps the tombstone).
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            tid = str(req.get("id") or "").strip()
+            if not tid:
+                return self._send({"ok": False, "error": "id required"}, 400)
+            ok = _hive.delete_task(tid)
+            if not ok:
+                return self._send({"ok": False, "error": "no such task"}, 404)
+            return self._send({"ok": True})
+        if parts.path == "/hive/task/comment":
+            # office board comment: dated line appended to the task spec.
+            req = self._read_json()
+            if req is None:
+                return self._send({"ok": False, "error": "bad json"}, 400)
+            tid = str(req.get("id") or "").strip()
+            text = str(req.get("text") or "").strip()[:300]
+            if not tid or not text:
+                return self._send({"ok": False, "error": "id + text required"}, 400)
+            row = _hive.comment_task(tid, text)
+            if row is None:
+                return self._send({"ok": False, "error": "no such task"}, 404)
+            return self._send({"ok": True, "task": row})
         if parts.path != "/chat":
             return self._send({"ok": False, "error": "use POST /chat"}, 404)
         try:

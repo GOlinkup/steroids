@@ -1,8 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import Mascot, { type MascotHandle, type MascotMood } from "./Mascot";
 import { DotsIcon } from "./icons";
-import { useDismiss, MenuRow } from "./pickers";
-import { BashIcon, CheckIcon, PencilIcon, ReadIcon, XIcon } from "./icons";
+import { useDismiss, MenuRow, ENGINES } from "./pickers";
+import { BashIcon, CheckIcon, ChevronDownIcon, PencilIcon, PlusIcon, ReadIcon, XIcon } from "./icons";
 
 // Team grid — minimal ref-style tiles (dot + name). Selection drives the
 // main left container (Daily work card); Lens renders the same detail
@@ -423,7 +423,7 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
   );
 }
 
-export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoChat, sel, onSel, detail = "below", team: teamProp, live: liveProp, compact = false }: {
+export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoChat, sel, onSel,   detail = "below", team: teamProp, live: liveProp, compact = false, provider, onProvider }: {
   sessions?: AgentMini[];
   onResume?: (sid: string, first: string) => void;
   // pick mode (chat view): tapping a live tile opens that agent's chat
@@ -441,6 +441,10 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
   // compact (chat view): start collapsed so the crew costs one header row
   // while chatting; the user can expand. Null = follow compact.
   compact?: boolean;
+  // island-wide provider (lifted to Island): tile menus flip the same
+  // switch the composer picker owns. Absent = no provider rows.
+  provider?: string;
+  onProvider?: (id: string) => void;
 }) {
   const teamInternal = useTeam();
   const liveInternal = useSessionProgress(sessions);
@@ -461,11 +465,14 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
   const cur = onSel ? sel ?? null : inner;
   // ⋯ menu: resume / rename / remove without leaving the grid.
   const [menuId, setMenuId] = useState<string | null>(null);
+  // provider flyout (touch tap; hover handled in CSS).
+  const [fly, setFly] = useState<string | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
   const [draft, setDraft] = useState("");
   const menuDismiss = useDismiss<HTMLDivElement>(menuId !== null, () => {
     setMenuId(null);
     setRenaming(null);
+    setFly(null);
   });
   // every mate keeps our face: a live mini that looks around, blinks,
   // and feels its own session (working → bright, error → annoyed).
@@ -497,11 +504,10 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
 
   const selIdx = members.findIndex((m) => m.id === cur);
   const selSession = selIdx >= 0 ? slotSession(members, sessions, selIdx) : undefined;
-  // grid stays visible while chatting (compact class shrinks it);
-  // toggle only hides on explicit tap. compact no longer auto-collapses.
+  // grid starts collapsed in chat pick mode (one header row under the
+  // navbar — chats stay visible); explicit toggle wins from then on.
   const [shut, setShut] = useState<boolean | null>(null);
-  const collapsed = shut ?? false;
-  void compact;
+  const collapsed = shut ?? compact;
   // nicki leads the grid visually (this chat is hers). Visual-only: she
   // takes no session slot, so slotSession indexing below is untouched.
   const nickiOn = !cur && !onPickNicki;
@@ -532,9 +538,13 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
           onClick={() => setShut(!collapsed)}
         >
           TEAM {members.length + 1}
+          <span className={collapsed ? "team-chev shut" : "team-chev"} aria-hidden>
+            <ChevronDownIcon size={12} />
+          </span>
         </button>
         <button className="effort-pill team-add" onClick={add} title={members.length >= 8 ? "Team is full (8)" : "Add a mate"}>
-          {collapsed ? "+" : "+ Add mate"}
+          <PlusIcon size={14} />
+          {!collapsed && <span>Add mate</span>}
         </button>
       </div>
       {!collapsed && (
@@ -703,6 +713,43 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
                     >
                       ↩ Resume in chat
                     </MenuRow>
+                  )}
+                  <MenuRow
+                    role="menuitem"
+                    onClick={() => {
+                      cycleRole(m.id);
+                      setMenuId(null);
+                    }}
+                  >
+                    ⇄ Role: {m.role}
+                  </MenuRow>
+                  {onProvider && (
+                    <div className={fly === m.id ? "fly-wrap open" : "fly-wrap"}>
+                      <MenuRow
+                        role="menuitem"
+                        aria-haspopup="menu"
+                        onClick={() => setFly(fly === m.id ? null : m.id)}
+                      >
+                        ⌁ Provider: {provider}
+                        <span className="fly-arrow" aria-hidden>▸</span>
+                      </MenuRow>
+                      <div className="sheet flyout" role="menu" aria-label="Provider">
+                        {ENGINES.map((e) => (
+                          <MenuRow
+                            key={e.id}
+                            role="menuitemradio"
+                            active={provider === e.id}
+                            onClick={() => {
+                              onProvider(e.id);
+                              setFly(null);
+                              setMenuId(null);
+                            }}
+                          >
+                            {provider === e.id ? "● " : "○ "}{e.id}
+                          </MenuRow>
+                        ))}
+                      </div>
+                    </div>
                   )}
                   <MenuRow
                     role="menuitem"

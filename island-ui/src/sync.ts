@@ -357,6 +357,51 @@ export async function pullChats(): Promise<PullResult> {
   return { rows, skipped };
 }
 
+// Support reports — bug/feedback with an optional screenshot. Same project
+// auth, same uid-folder storage rule as safety-recordings: the browser
+// uploads straight to the private `support-reports` bucket, then inserts
+// one `support_reports` row. Needs the migration in
+// supabase/migrations/*_support_reports.sql (dashboard SQL editor).
+export const SUPPORT_BUCKET = "support-reports";
+
+// Pure path rule (unit-tested): <uid>/<ms>-<sanitized name>. Slashes and
+// dots collapse so the uid-folder RLS match can never break.
+export function buildSupportPath(uid: string, name: string, ms: number): string {
+  const safe = name.trim().toLowerCase().replace(/[^a-z0-9._-]+/g, "-").replace(/-+/g, "-").slice(-64) || "shot.png";
+  return `${uid}/${ms}-${safe}`;
+}
+
+export async function sendSupportReport(body: string, file: File | null, appVersion = ""): Promise<string> {
+  const s = supa();
+  if (!s) throw new Error("cloud not configured (island-ui/.env missing)");
+  const text = body.trim().slice(0, 2000);
+  if (!text && !file) throw new Error("write something or attach a shot");
+  if (file && file.size > 8 * 1024 * 1024) throw new Error("shot too big (8MB max)");
+  const { data: { session } } = await s.auth.getSession();
+  const uid = session?.user?.id;
+  if (!uid) throw new Error("sign in first (avatar menu)");
+  let image_path: string | null = null;
+  if (file) {
+    const path = buildSupportPath(uid, file.name || "shot.png", Date.now());
+    const { error } = await s.storage.from(SUPPORT_BUCKET).upload(path, file, {
+      contentType: file.type || "image/png",
+      upsert: false,
+    });
+    if (error) throw new Error(error.message);
+    image_path = path;
+  }
+  const { error } = await s.from("support_reports").insert({
+    user_id: uid, body: text, image_path, app_version: appVersion,
+  });
+  if (error) {
+    // Row failed after the upload landed: leave the file (harmless,
+    // private, uid-scoped) and say so honestly.
+    if (image_path) throw new Error(`shot uploaded, report not saved: ${error.message}`);
+    throw new Error(error.message);
+  }
+  return image_path ? "sent with shot ✓" : "sent ✓";
+}
+
 // Tombstone: deleting a chat removes the cloud row too, or the next login
 // pulls it right back (sync is additive upsert — local-only delete loses).
 export async function deleteCloudChat(chatId: string): Promise<void> {

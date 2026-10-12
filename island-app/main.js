@@ -118,7 +118,7 @@ const STRIP = { w: 228, h: 44 };
 // Measured live: card ran 368 in a 320 body and the sticky composer buried
 // the log tail 39px deep. Chat fits its card exactly: no body scroll, the
 // sticky never engages, overlap structurally impossible.
-const FOOT_H = { approval: 320, question: 445, chat: 425, daily: 435, explore: 805, settings: 850, lens: 880, shelf: 925, feed: 925 };
+const FOOT_H = { approval: 312, question: 437, chat: 417, daily: 427, explore: 797, settings: 842, lens: 872, shelf: 917, feed: 917 };
 function panelFor(wa) {
   return { w: Math.min(1020, wa.width - 16), h: Math.max(500, wa.height - 120) };
 }

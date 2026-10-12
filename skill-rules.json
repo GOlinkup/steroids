@@ -3,6 +3,7 @@
   "min_stars": 1000,
   "max_recommendations": 3,
   "semantic_weight": 2.0,
+  "reference_first": "Before any skill builds, name the best in class reference for that task and copy its tokens first. Motion copies docs/ANIMATION.md. No reference found means abstain or ask, never invent values.",
   "mcp_needs": {    "query-or-url": {"server": "exa-web-search", "tool": "web_search"},
     "topic-or-url": {"server": "exa-web-search", "tool": "web_search"},
     "source-file-or-url": {"server": "firecrawl", "tool": "scrape"},

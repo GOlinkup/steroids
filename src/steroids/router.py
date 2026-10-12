@@ -1204,12 +1204,21 @@ I18N = {
 }
 
 
-def render_inject(skills, lang="en"):
+def render_inject(skills, lang="en", rules=None):
     # ponytail: G70 — one skill (or list) rendered in the requested language.
     s = I18N.get(lang, I18N["en"])
+    pre = reference_preamble(rules)
     if not skills:
-        return s["none"]
-    return f"{s['hint']}: " + ", ".join(f"{s['load']}: {skill}" for skill in skills)
+        return pre + s["none"] if pre else s["none"]
+    body = f"{s['hint']}: " + ", ".join(f"{s['load']}: {skill}" for skill in skills)
+    return f"{pre}\n{body}" if pre else body
+
+
+def reference_preamble(rules):
+    # ponytail: reference-first — rules["reference_first"] rides every skill
+    # injection (hint, autoinject, MCP, render_inject). Missing/empty = off.
+    pre = (rules or {}).get("reference_first") or ""
+    return pre.strip()
 
 
 def pack_skills(role, rules, idx=None):
@@ -2301,6 +2310,9 @@ def _mcp_serve(rules, idx):
             trigs = sorted({h for _, _, hs in top for h in hs})
             names = [s for _, s, _ in top]
             hint = f"Possibly relevant skills (load what applies, skip rest): {','.join(trigs)} -> {'/'.join(names)}" if top else ""
+            pre = reference_preamble(rules)
+            if pre and top:
+                hint = f"{pre}\n{hint}"
             res = {"content": [{"type": "text", "text": json.dumps(
                 {"skills": names, "triggers": trigs, "hint": hint})}]}
         elif m == "ping":
@@ -2354,6 +2366,9 @@ def autoinject(top, rules, idx, query=""):
                     section, hit = extract_section(content, query)
                     if hit:
                         content = section
+                pre = reference_preamble(rules)
+                if pre:
+                    content = f"{pre}\n{content}"
                 return {"skill": name, "score": score, "path": md, "content": content,
                         "section": bool(section)}
             except OSError:
@@ -2782,6 +2797,9 @@ def main():
         log_impression(prompt, trigs, names)
 
         hint = f"Possibly relevant skills (load what applies, skip rest): {trigs} -> {names}"
+        pre = reference_preamble(rules)
+        if pre:
+            hint = f"{pre}\n{hint}"
         if session["dropped"]:
             # ponytail: A06 — tell the harness what left context on pivot.
             hint += f" (dropped: {','.join(session['dropped'])})"

@@ -32,17 +32,19 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .pill-wave{width:20px;height:20px;flex:none;display:grid;place-items:center;overflow:visible}
 .pill-wave .mascot{width:20px;height:20px;cursor:default}
 .pill-wave .m-fx svg{width:20px;height:20px}
-/* ponytail: now-playing wave bars (human order — one mascot in the pill,
-   animated wav icon rides right where the mates grid sits when idle). */
-.wavebars{display:inline-flex;align-items:flex-end;gap:2px;height:20px;margin-left:16px;flex:none}
-.wavebars i{width:3px;border-radius:2px;background:var(--brand,#fb923c);transform-origin:50% 100%;animation:eqbounce .9s ease-in-out infinite}
-.wavebars i:nth-child(1){height:40%;animation-delay:0s}
-.wavebars i:nth-child(2){height:75%;animation-delay:.12s}
-.wavebars i:nth-child(3){height:100%;animation-delay:.24s}
-.wavebars i:nth-child(4){height:60%;animation-delay:.36s}
-.wavebars i:nth-child(5){height:35%;animation-delay:.48s}
-@keyframes eqbounce{0%,100%{transform:scaleY(.4)}50%{transform:scaleY(1)}}
-@media (prefers-reduced-motion:reduce){.wavebars i{animation:none}}
+/* mini wave: GoLinkup AnimatedWaveIcon port (Gemini Live language) — 5
+   slender rounded bars, harmonic phases, 1600ms loop. Container swells
+   with live loudness (--e from /audio-energy). Paused = flat
+   (no musicLive, no wave at all). */
+.gemwave{display:inline-flex;align-items:center;gap:2.5px;height:20px;margin-left:auto;flex:none;transform:scale(calc(.7 + .5 * var(--e, .7)));transform-origin:center}
+.gemwave i{width:3px;border-radius:2px;background:#fb923c;transform-origin:center;animation:gemw 1.6s ease-in-out infinite}
+.gemwave i:nth-child(1){height:5px;animation-delay:0s}
+.gemwave i:nth-child(2){height:9.5px;animation-delay:-.36s}
+.gemwave i:nth-child(3){height:14.5px;animation-delay:-.72s}
+.gemwave i:nth-child(4){height:9.5px;animation-delay:-.36s}
+.gemwave i:nth-child(5){height:5px;animation-delay:0s}
+@keyframes gemw{0%,100%{transform:scaleY(.55)}50%{transform:scaleY(1.3)}}
+@media (prefers-reduced-motion:reduce){.gemwave i{animation:none}}
 .pill-face .m-fx svg{width:20px;height:20px}
 #island[data-state="hidden"] > .mascot.mascot-svg{display:none}
 #island[data-state="hidden"] .pill-team .mascot{visibility:visible}
@@ -62,6 +64,9 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 
 /* cards: approval / question / finished / chat */
 .card{background:var(--card,var(--surface));border:1px solid var(--border);border-radius:var(--radius);box-shadow:0 8px 28px rgba(0,0,0,.45);padding:.7rem;display:flex;flex-direction:column;gap:.55rem}
+/* ponytail: board shell + 3-col — one class each, no inline styles. */
+.board-cols{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:.4rem;align-items:start}
+.board-cols > *{min-width:0}
 .card-title{font-weight:var(--weight-em);font-size:.85rem;letter-spacing:-.02em}
 .card-detail{opacity:.6;font-size:.78rem;font-family:var(--font-ui)}
 .btn-row{display:flex;gap:.45rem;align-items:center;flex-wrap:wrap}
@@ -109,7 +114,7 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .team-wrap{display:flex;flex-direction:column;gap:.4rem;margin-top:.55rem}
 .hm-team .team-wrap{margin-top:0}
 .team-head{display:flex;align-items:center;gap:.5rem;min-width:0}
-.team-title{font-size:.72rem;font-weight:800;letter-spacing:.08em;color:#fff;flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
+.team-title{font-size:.72rem;font-weight:700;letter-spacing:.08em;color:var(--text-dim);flex:1 1 auto;min-width:0;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;text-align:left}
 .team-head .explore-label{font-weight:700}
 .team-head .team-add{margin-left:auto;flex:none}
 .team-head .team-title{margin-left:0}
@@ -118,6 +123,18 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .team-pack{height:26px;font-size:.7rem;background:rgba(255,255,255,.07);color:var(--text-dim);border:0;border-radius:99px;padding:0 .5rem;cursor:pointer;max-width:92px}
 .team-hearts{font-size:.62rem;color:var(--brand-light);margin-left:.25rem}
 .team-grid{display:grid;grid-template-columns:1fr 1fr;gap:.4rem}
+/* office rail: same tiles as the mate grid, 3-across (never the chat
+   sideways strip — tasks wrap in place). */
+.team-grid.office-grid{grid-template-columns:repeat(3,1fr)}
+.team-mini .team-grid.office-grid{grid-template-columns:repeat(3,1fr);grid-auto-flow:row;overflow:visible}
+/* filter tiles: 4-across (Todo/Doing/Stuck/Done), same team tiles. */
+.team-grid.filter-grid{grid-template-columns:repeat(4,1fr)}
+.team-mini .team-grid.filter-grid{grid-template-columns:repeat(4,1fr);grid-auto-flow:row;overflow:visible}
+/* task lines: one full-width team tile per row under the active filter. */
+.task-lines{display:flex;flex-direction:column;gap:.4rem}
+.task-lines .team-cellwrap{width:100%}
+/* office tiles keep full finger height even inside mini text scope. */
+.team-mini .office-grid .team-cell,.team-mini .filter-grid .team-cell,.team-mini .task-lines .team-cell{min-height:44px;padding:.45rem .6rem}
 /* uneven roster: the lead tile goes full-width hero so the mates below
    always land even (5 tiles → 1 big + 2+2, never a lone orphan). */
 .team-grid:has(> .team-cellwrap:last-child:nth-child(odd)) > .team-cellwrap:first-child{grid-column:1/-1}
@@ -135,6 +152,13 @@ body{margin:0;background:var(--bg);color:var(--text);font-family:var(--font-ui);
 .team-dots{position:absolute;right:.3rem;top:50%;transform:translateY(-50%);background:transparent;border:none;color:rgba(255,255,255,.45);font-size:.95rem;line-height:1;padding:.3rem .25rem;cursor:pointer;border-radius:8px}
 .team-dots:hover{color:#fff}
 .team-menu{position:absolute;right:0;top:calc(100% + 4px);min-width:170px;display:flex;flex-direction:column;gap:.1rem;z-index:60}
+/* Windows-style flyout: hover Provider and the engine list pops on the
+   side (opens left — the menu sits at the tile's right edge). Tap
+   toggles .open for touch; same .sheet look as every other menu. */
+.team-menu .fly-wrap{position:relative}
+.team-menu .flyout{display:none;position:absolute;right:calc(100% + 6px);top:-4px;min-width:150px;z-index:70}
+.team-menu .fly-wrap:hover .flyout,.team-menu .fly-wrap.open .flyout{display:flex;flex-direction:column;gap:.1rem}
+.fly-arrow{margin-left:auto;opacity:.55}
 .team-menu .attach-opt{color:var(--text)}
 .team-edit{flex:1;min-width:0;background:transparent;border:none;border-bottom:1px solid var(--brand);color:#fff;font-size:.82rem;font-weight:700;outline:none}
 /* ponytail: ONE selector (human order) — one thin grey highlight ring for
@@ -398,7 +422,7 @@ button:disabled{opacity:.4;cursor:default}
 .sparkles i{width:3px;height:3px;border-radius:50%;background:#e9d5ff;animation:blink .8s infinite}
 .sparkles i:nth-child(2){animation-delay:.15s}
 .sparkles i:nth-child(3){animation-delay:.3s}
-.chat-log{display:flex;flex-direction:column;gap:.65rem;max-height:400px;overflow:auto;padding:.1rem;scrollbar-width:thin;overscroll-behavior:contain;scrollbar-gutter:stable}
+.chat-log{display:flex;flex-direction:column;gap:.65rem;max-height:400px;overflow:auto;padding:.1rem;scrollbar-width:auto;overscroll-behavior:contain;scrollbar-gutter:stable}
 .chat-row{display:flex;padding:0}
 .chat-row.user{justify-content:flex-end}
 /* motion (un-held loop3): rows land 35ms apart (keys stable, animation runs
@@ -411,8 +435,6 @@ button:disabled{opacity:.4;cursor:default}
 .chat-log > .chat-row:nth-child(n+6){animation-delay:.175s}
 .bubble{box-shadow:none;color:var(--text);font-size:.92rem;line-height:1.55;letter-spacing:-.01em;max-width:85%;text-align:left;background:var(--field);border:1px solid transparent;border-radius:12px 4px 12px 12px;padding:.55rem .8rem;overflow-wrap:break-word;white-space:pre-wrap}
 .reply{font-size:.92rem;line-height:1.6;letter-spacing:-.01em;color:var(--text);max-width:100%;background:var(--field);border:1px solid transparent;border-radius:4px 12px 12px 12px;padding:.6rem .85rem;overflow-wrap:break-word;white-space:pre-wrap}
-/* assistant pill: who answered, first in the action row. */
-.reply-pill{display:inline-flex;align-items:center;height:22px;padding:0 .55rem;margin-right:.15rem;border-radius:99px;background:rgba(255,255,255,.06);font-size:.65rem;font-weight:700;color:var(--text-dim);text-transform:lowercase}
 .reply .inline-code{overflow-wrap:break-word;white-space:pre-wrap}
 /* chatting = text owns the space: mascot + team shrink, log grows.
    Empty chat keeps everything full size. */
@@ -422,9 +444,18 @@ button:disabled{opacity:.4;cursor:default}
 #island[data-state="jacked"] .team-mini .team-face .mascot{width:20px;height:20px}
 #island[data-state="jacked"] .team-mini .team-face .m-fx svg{width:20px;height:20px}
 #island[data-state="jacked"] .team-mini .team-cell{min-height:0;padding:.25rem .35rem;padding-right:1.4rem}
-.team-mini .team-head .team-toggle{display:inline-flex;color:var(--text-dim)}
-.team-toggle{background:none;border:0;padding:0;cursor:pointer;font:inherit}
+.team-mini .team-head .team-toggle{display:inline-flex;color:var(--text-dim);font-weight:700}
+/* board + crew tiles: no orange focus ring (field/tiles glitch when
+   selected) — pressed state already reads via .on + content. */
+.team-mini button:focus-visible,.team-mini input:focus-visible{outline:none}
+.team-mini .team-wrap{margin-top:0}
+/* open tile menu must escape the sideways scroller (overflow-x:auto clips
+   absolute dropdowns) — same .sheet look as the profile menu, just visible. */
+.team-mini .team-grid:has(.team-menu){overflow:visible}
+.team-toggle{background:none;border:0;padding:0;cursor:pointer;font-family:inherit;font-size:inherit;line-height:inherit;letter-spacing:inherit;font-weight:700;display:inline-flex;align-items:center;gap:.3rem}
 .team-toggle:hover{color:var(--text)}
+.team-chev{display:inline-grid;place-items:center;transition:transform .15s ease-out}
+.team-chev.shut{transform:rotate(-90deg)}
 /* chatting = same grid, smaller containers: 5-across single row (4 mates
    + nicki lead), tighter tiles/faces/type than home. Extra mates scroll
    sideways instead of wrapping below. */
@@ -433,11 +464,12 @@ button:disabled{opacity:.4;cursor:default}
 .team-mini .team-face{width:20px;height:20px}
 .team-mini .team-name{font-size:.68rem}
 .team-mini .team-meta .team-sub,.team-mini .team-prov{font-size:.55rem}
-.team-mini .team-add{height:22px;line-height:22px;font-size:.66rem;padding:0 .55rem}
+.team-mini .team-add{height:26px;line-height:26px;font-size:.66rem;padding:0 .65rem}
 /* inline bubble edit: textarea matches the closed bubble exactly (same width,
    type metrics, padding) so opening edit never reflows the text. */
 .bubble-edit{display:flex;flex-direction:column;gap:.4rem;width:100%}
-.bubble-textarea{background:rgba(0,0,0,.3);border:1px solid var(--brand);border-radius:8px;color:var(--text);font-size:.92rem;font-family:var(--font-ui);line-height:1.55;letter-spacing:-.01em;padding:.55rem .8rem;resize:vertical;outline:none;min-height:3.2em;width:100%;box-sizing:border-box}
+.bubble-textarea{background:var(--field);border:1px solid var(--border);border-radius:var(--radius);color:var(--text);font-size:.92rem;font-family:var(--font-ui);line-height:1.55;letter-spacing:-.01em;padding:.55rem .8rem;resize:none;outline:none;min-height:3.2em;width:100%;box-sizing:border-box;overflow-y:auto}
+.bubble-textarea:focus{border-color:rgba(255,255,255,.25)}
 .edit-row{display:flex;gap:.4rem;justify-content:flex-end}
 
 .reply.working{display:flex;flex-direction:row;align-items:flex-start;gap:.6rem;max-width:100%;background:var(--field);border:1px solid transparent}
@@ -527,11 +559,11 @@ p.hint{opacity:.6;font-size:.78rem;margin:0;text-align:center;letter-spacing:.01
 .chat-log::-webkit-scrollbar-track,.composer-input::-webkit-scrollbar-track,.bubble-textarea::-webkit-scrollbar-track,.work-partial::-webkit-scrollbar-track,.md-pre::-webkit-scrollbar-track,.lens-diff::-webkit-scrollbar-track{background:transparent}
 .chat-log::-webkit-scrollbar-thumb,.composer-input::-webkit-scrollbar-thumb,.bubble-textarea::-webkit-scrollbar-thumb,.work-partial::-webkit-scrollbar-thumb,.md-pre::-webkit-scrollbar-thumb,.lens-diff::-webkit-scrollbar-thumb{background:rgba(255,255,255,.18);border-radius:99px;border:2px solid transparent;background-clip:content-box}
 .chat-log::-webkit-scrollbar-thumb:hover,.composer-input::-webkit-scrollbar-thumb:hover,.bubble-textarea::-webkit-scrollbar-thumb:hover,.work-partial::-webkit-scrollbar-thumb:hover,.md-pre::-webkit-scrollbar-thumb:hover,.lens-diff::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.32);border:2px solid transparent;background-clip:content-box}
-/* ponytail: message log reads modern — slimmer overlay thumb than the
+/* ponytail: message log reads modern — wider grab thumb than the
    shared 8px, transparent track (above), no layout shift (gutter stable),
    no scroll chaining into the card (overscroll contain). Brighter than the
    shared chrome: the bar must be SEEN on chat (human order). */
-.chat-log::-webkit-scrollbar{width:6px}
+.chat-log::-webkit-scrollbar{width:12px}
 .chat-log{scrollbar-color:rgba(255,255,255,.38) transparent}
 .chat-log::-webkit-scrollbar-thumb{background:rgba(255,255,255,.30);border-radius:99px;border:2px solid transparent;background-clip:content-box}
 .chat-log::-webkit-scrollbar-thumb:hover{background:rgba(255,255,255,.48);border:2px solid transparent;background-clip:content-box}
@@ -581,6 +613,8 @@ button.live-pill:hover{border-color:var(--brand)}
 .tab:hover{background:transparent;border-color:transparent;color:var(--text)}
 .tab.on{background:rgba(255,255,255,.09);border-color:transparent;color:var(--brand)}
 .nav-middle{display:flex;align-items:center;justify-content:center;justify-self:center;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+/* ponytail: copy/paste popup — plain chip in the navbar middle, no neon/glow/sweep. */
+.nav-echo{display:inline-flex;align-items:center;gap:.4rem;background:#000;border-radius:99px;padding:.3rem .9rem;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:46vw;color:#fff;font-size:.8rem;font-weight:700;pointer-events:none}
 .nav-actions{display:flex;gap:.5rem;justify-self:end;align-items:center}
 .icon-btn{background:transparent;border:1px solid transparent;border-radius:12px;width:40px;height:40px;display:grid;place-items:center;color:var(--text-dim);cursor:pointer;padding:0}
 .icon-btn:hover{background:transparent;border-color:transparent;color:var(--text)}
@@ -626,24 +660,27 @@ button.live-pill:hover{border-color:var(--brand)}
 
 /* chat history — calm iOS popover: one flat translucent surface, no glass
    stack, no gradient tiles. Rows read directly on the panel; nothing nests. */
-.hist-panel{position:absolute;top:calc(100% + 8px);right:0;width:min(280px,calc(100vw - 32px));max-height:min(400px,60dvh);overflow:auto;display:flex;flex-direction:column;gap:.15rem;padding:.3rem;z-index:50;background:rgba(23,24,28,.92);backdrop-filter:blur(12px);-webkit-backdrop-filter:blur(12px);border:1px solid var(--border-strong);border-radius:12px;box-shadow:0 12px 32px rgba(0,0,0,.42)}
-.hist-head{display:flex;align-items:center;justify-content:space-between;padding:.15rem .45rem .35rem}
-.hist-head span{font-size:var(--size-floor);font-weight:var(--weight-em);text-transform:uppercase;letter-spacing:.1em;color:var(--text-faint)}
+.hist-panel{position:absolute;top:calc(100% + 8px);right:0;width:min(320px,calc(100vw - 32px));max-height:min(400px,60dvh);overflow:auto;display:flex;flex-direction:column;gap:.25rem;padding:.5rem;z-index:50}
+/* ponytail: ONE dropdown surface (.sheet owns bg/border/shadow) — history,
+   notifications + avatar all render sheet; this keeps position/size only. */
+.hist-head{display:flex;align-items:center;justify-content:space-between;padding:.25rem .5rem .5rem}
+.hist-head span{font-size:var(--size-floor);font-weight:var(--weight-em);text-transform:uppercase;letter-spacing:.1em;color:var(--text-mute)}
 .hist-new{display:inline-flex;align-items:center;gap:.3rem;background:var(--surface-2);border:0;border-radius:99px;color:var(--text-dim);font-size:.72rem;font-weight:var(--weight-em);padding:.3rem .7rem .3rem .55rem;cursor:pointer}
 .hist-new:hover{color:var(--text);background:#2e2f35}
 .hist-new span{line-height:1}
-.hist-row{display:flex;align-items:center;min-height:32px;border-radius:10px;transition:background .12s}
+.hist-row{display:flex;align-items:center;min-height:40px;border-radius:12px;transition:background .12s}
 .hist-row:hover{background:rgba(255,255,255,.05)}
 .hist-row.on{background:rgba(255,255,255,.07)}
 .hist-row.on .hist-label{color:var(--brand)}
-.hist-title{flex:1;min-width:0;display:flex;align-items:center;gap:.45rem;text-align:left;font-size:.75rem;font-weight:450;background:transparent;border:0;padding:.2rem .35rem;cursor:pointer}
-.hist-label{min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
-.hist-meta{flex:none;margin-left:auto;font-size:var(--size-floor);font-variant-numeric:tabular-nums;color:var(--text-faint)}
-.hist-del{flex:none;background:transparent;border:0;color:var(--text-faint);padding:0;width:32px;height:32px;margin-right:.25rem;display:grid;place-items:center;border-radius:9px;cursor:pointer;opacity:0;transition:opacity .12s,color .12s}
+.hist-title{flex:1;min-width:0;display:flex;align-items:center;gap:.5rem;text-align:left;font-size:.82rem;font-weight:600;line-height:1.4;background:transparent;border:0;padding:.45rem .55rem;cursor:pointer;color:var(--text)}
+.hist-title .kind-tag{margin-right:0;flex:none}
+.hist-label{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.hist-meta{flex:none;margin-left:.5rem;font-size:.72rem;font-variant-numeric:tabular-nums;color:var(--text-mute)}
+.hist-del{flex:none;background:transparent;border:0;color:var(--text-faint);padding:0;width:32px;height:32px;margin-right:.25rem;display:grid;place-items:center;border-radius:9px;cursor:pointer;opacity:.45;transition:opacity .12s,color .12s}
 .hist-row:hover .hist-del,.hist-row:focus-within .hist-del{opacity:1}
 .hist-del:hover{color:var(--danger);background:rgba(248,113,113,.09)}
 .hist-sep{height:1px;background:var(--border);margin:.3rem .45rem}
-.history-empty{font-size:var(--size-note);opacity:.45;padding:.55rem .45rem}
+.history-empty{font-size:.8rem;line-height:1.5;opacity:.6;padding:.75rem .5rem}
 /* touch (phone): no hover — delete always visible, 44px hit targets */
 @media (pointer:coarse){
   .hist-del{opacity:1;width:40px;height:40px}
@@ -767,6 +804,7 @@ button.hpill:hover{border-color:var(--brand)}
 .auth-email{display:flex;align-items:center;justify-content:center;width:100%;height:52px;border-radius:12px;background:transparent;color:var(--text);font-size:1rem;font-weight:600;letter-spacing:-.02em;border:1px solid var(--border-strong);cursor:pointer}
 .auth-email:disabled{opacity:.6;cursor:wait}
 /* shelf rows: thumb, name, per-file actions */
+.shelf{display:flex;flex-direction:column;gap:.4rem}
 .shelf-row{display:flex;align-items:center;gap:.5rem;padding:.4rem 0}
 /* compact now-playing row (Vorssaint track label): cover + title/artist */
 .music-now{display:flex;align-items:center;gap:.55rem;margin:.4rem 0}
@@ -1027,12 +1065,12 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
 .stage.app.pc #island[data-state="hidden"] .mascot,
 .stage.app.pc #island[data-state="hidden"] .pill,
 .stage.app.pc #island[data-state="hidden"] .pill-team{display:none}
-.stage.app.pc #island[data-state="jacked"]{flex-direction:column;align-items:stretch;width:min(960px,calc(100vw - 70px));background:#000;border:0;border-radius:0 0 22px 22px;box-shadow:none;padding:4px 12px 12px}
+.stage.app.pc #island[data-state="jacked"]{flex-direction:column;align-items:stretch;width:min(960px,calc(100vw - 70px));background:#000;border:0;border-radius:0 0 22px 22px;box-shadow:none;padding:4px 6px 4px;padding-bottom:6px}
 /* ponytail: fill only when settled — during the flight (data-swapping) the
    card must glide with its content (coucou: island animates first, window
    follows). A fill pinned through the close flight held a tall black slab
    for 340ms before the snap: the close glitch. */
-.stage.app.pc #island[data-state="jacked"]:not([data-swapping]){min-height:calc(100dvh - 16px)}
+.stage.app.pc #island[data-state="jacked"]{min-height:calc(100dvh - 8px)}
 .stage.app.pc .jacked-body{max-width:980px;margin:0 auto;width:100%}
 /* open card paints the whole fixed footprint (coucou: dead area inside the
    island is painted card, never transparent click-eater): per-view body caps
@@ -1049,10 +1087,13 @@ button:focus-visible, input:focus-visible{outline:2px solid var(--brand);outline
    Card fills the body exactly so the body never scrolls in chat; only the
    log scrolls, internally. */
 .stage.app.pc #island[data-foot="chat"] .jacked-body{height:calc(100dvh - 62px);max-height:calc(100dvh - 62px);overflow:hidden}
-.stage.app.pc #island[data-foot="chat"] .chat-card{height:100%;display:flex;flex-direction:column;min-height:0}
-.stage.app.pc #island[data-foot="chat"] .chat-log{flex:1 1 auto;min-height:0;max-height:none}
+.stage.app.pc #island[data-foot="chat"] .chat-card{height:100%;flex:1 1 auto;display:flex;flex-direction:column;justify-content:flex-end;min-height:0}
+.stage.app.pc #island[data-foot="chat"] .chat-log{flex:0 1 auto;min-height:0;max-height:100%}
 .stage.app.pc #island[data-foot="chat"] .composer-box{flex:none;position:relative}
-.stage.app.pc #island[data-foot="daily"] .jacked-body{max-height:380px}
+.stage.app.pc #island[data-foot="daily"] .jacked-body{height:100%;max-height:100%;overflow:hidden}
+.stage.app.pc #island[data-foot="daily"] .jacked-body > .card{flex:1 1 auto;min-height:0}
+.stage.app.pc #island[data-foot="daily"] .hm-grid{flex:1 1 auto;min-height:0}
+.stage.app.pc #island[data-foot="daily"] .hm-right{justify-content:space-between}
 .stage.app.pc #island[data-foot="explore"] .jacked-body{max-height:750px}
 .stage.app.pc #island[data-foot="settings"] .jacked-body{max-height:795px}
 .stage.app.pc #island[data-foot="lens"] .jacked-body{max-height:825px}

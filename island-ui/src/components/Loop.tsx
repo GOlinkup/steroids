@@ -1,8 +1,13 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { Card, MenuRow, useDismiss } from "./pickers";
+import { CheckIcon, DotsIcon, HandIcon, PencilIcon, PlayIcon, XIcon, ChevronDownIcon } from "./icons";
+import type { ComponentType } from "react";
 
 // "3m" / "2h" / "5d" — same recents language as the header meta.
+// Hive timestamps are unix seconds, loop tasks are ms: normalize both.
 function ago(ts: number): string {
-  const s = Math.max(0, (Date.now() - ts) / 1000);
+  const ms = ts < 1e12 ? ts * 1000 : ts;
+  const s = Math.max(0, (Date.now() - ms) / 1000);
   if (s < 60) return "now";
   if (s < 3600) return `${Math.floor(s / 60)}m`;
   if (s < 86400) return `${Math.floor(s / 3600)}h`;
@@ -148,9 +153,10 @@ export function LoopTile({ onDone }: { onDone: (t: LoopTask) => void }) {
   };
 
   return (
-    <div>
-      <div className="card-title">Run the team</div>
-      <div className="card-detail">One command — skills, plan, run, verify.</div>
+    <div className="team-wrap">
+      <div className="team-head">
+        <span className="team-title">RUN THE TEAM</span>
+      </div>
       <div className="btn-row">
         <input
           className="team-edit"
@@ -162,9 +168,9 @@ export function LoopTile({ onDone }: { onDone: (t: LoopTask) => void }) {
           disabled={busy}
         />
         {busy ? (
-          <button onClick={() => void stop()}>Stop</button>
+          <button className="menu-act" onClick={() => void stop()}>Stop</button>
         ) : (
-          <button className="primary" onClick={() => void run()}>
+          <button className="menu-act primary" onClick={() => void run()}>
             Run
           </button>
         )}
@@ -201,13 +207,36 @@ function fmtElapsed(s: number): string {
   return `${Math.floor(m / 60)}h${m % 60}m`;
 }
 
+// One card, both boards: LoopTasks + HiveBoard share it (same dot +
+// tag + ago + clamped body). Extra rows (steps, stats, buttons) ride
+// children so neither board re-invents the shell.
+export function BoardCard({ dot, status, tag, at, title, body, children }: {
+  dot: string; status: string; tag: string; at: number; title: string;
+  body?: string; children?: React.ReactNode;
+}) {
+  return (
+    <Card>
+      <div className="card-title">
+        <span style={{ color: dot }}>●</span>{" "}
+        {status} <b className="kind-tag">{tag}</b>
+        <span style={{ marginLeft: "auto", fontWeight: 400, opacity: .55 }}>{ago(at)}</span>
+      </div>
+      <div className="card-detail"><b>{title}</b></div>
+      {!!body && (
+        <div className="card-detail">{body.length > 100 ? `${body.slice(0, 100)}…` : body}</div>
+      )}
+      {children}
+    </Card>
+  );
+}
+
 // Bento grid of task cards, newest first. Home work-card language:
 // verdict dot + team chip + ago, step checklist, stat row, clamped detail.
 export function LoopTasks({ tasks }: { tasks: LoopTask[] }) {
   if (!tasks.length) {
     return (
       <div className="card-detail">
-        No team tasks yet — run one above and its card lands here.
+        No tasks yet — run one above.
       </div>
     );
   }
@@ -217,13 +246,7 @@ export function LoopTasks({ tasks }: { tasks: LoopTask[] }) {
         const done = t.steps.filter((s) => s.status === "done" || s.status === "recovered").length;
         const tries = t.steps.reduce((n, s) => n + (s.attempts ?? 1), 0);
         return (
-          <div className="card" key={t.id}>
-            <div className="card-title">
-              <span style={{ color: DOT[t.verdict] ?? "#8b949e" }}>●</span>{" "}
-              {t.verdict} <b className="kind-tag">team</b>
-              <span style={{ marginLeft: "auto", fontWeight: 400, opacity: .55 }}>{ago(t.at)}</span>
-            </div>
-            <div className="card-detail"><b>{t.prompt}</b></div>
+          <BoardCard key={t.id} dot={DOT[t.verdict] ?? "#8b949e"} status={t.verdict} tag="team" at={t.at} title={t.prompt} body={t.detail}>
             <div className="card-detail">
               {t.steps.slice(-5).map((s) => (
                 <div key={s.name}>
@@ -237,8 +260,7 @@ export function LoopTasks({ tasks }: { tasks: LoopTask[] }) {
               <span><b>{fmtElapsed(t.elapsed)}</b></span>
               {tries > t.steps.length && <span><b>{tries}</b> tries</span>}
             </div>
-            <div className="card-detail">{t.detail.length > 140 ? t.detail.slice(0, 140) + "…" : t.detail}</div>
-          </div>
+          </BoardCard>
         );
       })}
     </div>
@@ -252,17 +274,31 @@ export interface HiveTask {
   status: string; result: string; at: number; updated: number;
 }
 
-const HIVE_DOT: Record<string, string> = {
-  ...DOT, todo: "#8b949e", running: "#fb923c",
+// Status icons, not dots: pencil = queued, play = moving, hand = stuck,
+// check = landed, cross = failed. Shared by filter tiles + task tiles.
+const STATUS_META: Record<string, { Icon: ComponentType<{ size?: number }>; color: string }> = {
+  todo: { Icon: PencilIcon, color: "#8b949e" },
+  running: { Icon: PlayIcon, color: "#fb923c" },
+  blocked: { Icon: HandIcon, color: "#facc15" },
+  done: { Icon: CheckIcon, color: "#34d399" },
+  failed: { Icon: XIcon, color: "#f87171" },
 };
 
-export function HiveBoard() {
+// One live hive feed for both office surfaces (full board in Shelf +
+// compact rail in chat): same poll, same tasks, same move. Hook, not copy.
+export function useHive() {
   const [tasks, setTasks] = useState<HiveTask[]>([]);
+  const [board, setBoard] = useState("");
+  const [roster, setRoster] = useState<Array<{ id: string; role: string; status: string }>>([]);
+  const [feed, setFeed] = useState<Array<{ ts?: number; type?: string; title?: string; status?: string; frm?: string; to?: string }>>([]);
   const pull = useCallback(() => {
     fetch(`${BRIDGE}/hive`)
       .then((r) => r.json())
       .then((j) => {
         if (Array.isArray(j.tasks)) setTasks(j.tasks);
+        if (typeof j.board === "string") setBoard(j.board);
+        if (Array.isArray(j.roster)) setRoster(j.roster.slice(0, 8));
+        if (Array.isArray(j.log)) setFeed(j.log.slice(-5).reverse());
       })
       .catch(() => {});
   }, []);
@@ -271,34 +307,352 @@ export function HiveBoard() {
     const t = setInterval(pull, 5000);
     return () => clearInterval(t);
   }, [pull]);
+  const add = (title: string) => {
+    const v = title.trim().slice(0, 200);
+    if (!v) return;
+    fetch(`${BRIDGE}/hive/task`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ title: v }),
+    })
+      .catch(() => {})
+      .finally(() => setTimeout(pull, 600));
+  };
+  const move = (id: string, patch: Record<string, string>) => {
+    fetch(`${BRIDGE}/hive/task/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, ...patch }),
+    })
+      .catch(() => {})
+      .finally(() => setTimeout(pull, 600));
+  };
+  return { tasks, board, roster, feed, pull, add, move };
+}
+
+// One task tile for every office surface (chat rail + shelf columns):
+// the SAME team-cell tile the mates use — dot + title + assignee — with
+// the ⋯ menu carrying the moves. Text sizing follows .team-mini,
+// identical to the chat TEAM section.
+export function TaskTile({ t, move, roster = [], onEdit, onDelete, onComment }: {
+  t: HiveTask;
+  move: (id: string, patch: Record<string, string>) => void;
+  roster?: Array<{ id: string; role: string }>;
+  onEdit?: (id: string, title: string) => void;
+  onDelete?: (id: string) => void;
+  onComment?: (id: string, text: string) => void;
+}) {
+  const s = (t.status || "todo").toLowerCase();
+  const [open, setOpen] = useState(false);
+  const [fly, setFly] = useState(false);
+  const [editing, setEditing] = useState(false);
+  const [commenting, setCommenting] = useState(false);
+  const [draft, setDraft] = useState("");
+  const dismiss = useDismiss<HTMLDivElement>(open, () => { setOpen(false); setFly(false); setEditing(false); setCommenting(false); });
+  const go = (status: string) => { move(t.id, { status }); setOpen(false); };
+  const advance = () => go(s === "todo" ? "running" : s === "running" ? "done" : "todo");
+  const meta = STATUS_META[s] ?? STATUS_META.todo;
+  const StatusIcon = meta.Icon;
   return (
-    <div>
-      <div className="card-title">Floor board</div>
-      <div className="card-detail">Crew ledger — tell the team in chat, rows land here.</div>
-      {!tasks.length ? (
-        <div className="card-detail">
-          Nothing on the floor yet — add a todo above or run the team.
-        </div>
-      ) : (
-        <div className="team-grid">
-          {[...tasks].reverse().slice(0, 8).map((t) => (
-            <div className="card" key={t.id}>
-              <div className="card-title">
-                <span style={{ color: HIVE_DOT[t.status] ?? "#8b949e" }}>●</span>{" "}
-                {t.status} <b className="kind-tag">{t.assignee}</b>
-                <span style={{ marginLeft: "auto", fontWeight: 400, opacity: .55 }}>{ago(t.updated || t.at)}</span>
-              </div>
-              <div className="card-detail"><b>{t.title}</b></div>
-              {(t.spec || t.result) && (
-                <div className="card-detail">
-                  {((t.result || t.spec) ?? "").length > 140
-                    ? `${(t.result || t.spec).slice(0, 140)}…`
-                    : (t.result || t.spec)}
-                </div>
-              )}
+    <div className="team-cellwrap">
+      <button
+        className="team-cell"
+        title={`${t.title} — ${t.status} · tap to advance`}
+        onClick={advance}
+      >
+        <span style={{ color: meta.color, display: "inline-flex", flex: "none" }} aria-hidden>
+          <StatusIcon size={17} />
+        </span>
+        <span className="team-meta">
+          <span className="team-name">{t.title}</span>
+          <span className="team-sub">{t.assignee}</span>
+        </span>
+      </button>
+      <button
+        className="team-dots"
+        aria-label={`Options for ${t.title}`}
+        aria-expanded={open}
+        onClick={(e) => {
+          e.stopPropagation();
+          setDraft(t.title);
+          setOpen((o) => !o);
+        }}
+      >
+        <DotsIcon size={15} />
+      </button>
+      {open && (
+        <div ref={dismiss} className="sheet team-menu" role="menu" aria-label={`Options for ${t.title}`}>
+          {editing ? (
+            <div className="menu-row">
+              <input
+                className="team-edit"
+                aria-label="Edit title"
+                value={draft}
+                autoFocus
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && draft.trim() && onEdit) { onEdit(t.id, draft.trim().slice(0, 200)); setEditing(false); setOpen(false); }
+                  if (e.key === "Escape") { setEditing(false); setOpen(false); }
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
             </div>
-          ))}
+          ) : commenting ? (
+            <div className="menu-row">
+              <input
+                className="team-edit"
+                aria-label="Add a comment"
+                value={draft}
+                autoFocus
+                placeholder="Comment…"
+                onChange={(e) => setDraft(e.target.value)}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter" && draft.trim() && onComment) { onComment(t.id, draft.trim().slice(0, 300)); setDraft(""); setCommenting(false); setOpen(false); }
+                  if (e.key === "Escape") { setCommenting(false); setOpen(false); }
+                }}
+                onClick={(e) => e.stopPropagation()}
+              />
+            </div>
+          ) : (
+            <>
+            <>
+              <MenuRow role="menuitem" onClick={() => go("running")}>
+                ▶ Start
+              </MenuRow>
+              <MenuRow role="menuitem" onClick={() => go("blocked")}>
+                ✋ Blocked
+              </MenuRow>
+            </>
+          {s === "running" && (
+            <>
+              <MenuRow role="menuitem" onClick={() => go("done")}>
+                ✓ Done
+              </MenuRow>
+              <MenuRow role="menuitem" onClick={() => go("blocked")}>
+                ✋ Blocked
+              </MenuRow>
+              <MenuRow role="menuitem" onClick={() => go("todo")}>
+                ◀ Back to todo
+              </MenuRow>
+            </>
+          )}
+          {s === "blocked" && (
+            <>
+              <MenuRow role="menuitem" onClick={() => go("running")}>
+                ▶ Unblock
+              </MenuRow>
+              <MenuRow role="menuitem" onClick={() => go("done")}>
+                ✓ Done
+              </MenuRow>
+            </>
+          )}
+          {(s === "done" || s === "failed") && (
+            <MenuRow role="menuitem" onClick={() => go("todo")}>
+              ↺ Reopen
+            </MenuRow>
+          )}
+          {!!roster.length && (
+            <div className={fly ? "fly-wrap open" : "fly-wrap"}>
+              <MenuRow role="menuitem" aria-haspopup="menu" onClick={() => setFly((v) => !v)}>
+                👤 {t.assignee}
+                <span className="fly-arrow" aria-hidden>▸</span>
+              </MenuRow>
+              <div className="sheet flyout" role="menu" aria-label="Assignee">
+                {roster.map((m) => (
+                  <MenuRow
+                    key={m.id}
+                    role="menuitemradio"
+                    active={t.assignee === m.id}
+                    onClick={() => { move(t.id, { assignee: m.id }); setFly(false); setOpen(false); }}
+                  >
+                    {t.assignee === m.id ? "● " : "○ "}{m.id} · {m.role}
+                  </MenuRow>
+                ))}
+              </div>
+            </div>
+          )}
+          {onEdit && (
+            <MenuRow role="menuitem" onClick={() => { setDraft(t.title); setEditing(true); }}>
+              ✎ Edit
+            </MenuRow>
+          )}
+          {onComment && (
+            <MenuRow role="menuitem" onClick={() => { setDraft(""); setCommenting(true); }}>
+              💬 Comment
+            </MenuRow>
+          )}
+          {onDelete && (
+            <MenuRow role="menuitem" danger onClick={() => { onDelete(t.id); setOpen(false); }}>
+              ✕ Delete
+            </MenuRow>
+          )}
+            </>
+          )}
         </div>
+      )}
+    </div>
+  );
+}
+
+export function HiveBoard({ loopTasks = [], onLoopDone = () => {} }: {
+  loopTasks?: LoopTask[];
+  onLoopDone?: (t: LoopTask) => void;
+}) {
+  const { tasks, roster, pull, move } = useHive();
+  const cols: Array<{ key: string; label: string; items: HiveTask[] }> = [
+    { key: "todo", label: "Todo", items: [] },
+    { key: "doing", label: "Doing", items: [] },
+    { key: "blocked", label: "Blocked", items: [] },
+    { key: "done", label: "Done", items: [] },
+    { key: "failed", label: "Failed", items: [] },
+  ];
+  for (const t of [...tasks].reverse().slice(0, 30)) {
+    if (t.title.startsWith("crew step ")) continue; // machine rows — count below
+    const s = (t.status || "todo").toLowerCase();
+    if (s === "running") cols[1].items.push(t);
+    else if (s === "todo") cols[0].items.push(t);
+    else if (s === "blocked") cols[2].items.push(t);
+    else if (s === "failed") cols[4].items.push(t);
+    else cols[3].items.push(t);
+  }
+  for (const c of cols) c.items = c.items.slice(0, 6);
+  const crewHidden = tasks.filter((t) => t.title.startsWith("crew step ")).length;
+  // 4 groups, not 5: blocked + failed ride ONE "Stuck" tile.
+  const groups = [
+    { key: "todo", label: "Todo", meta: STATUS_META.todo, items: cols[0].items },
+    { key: "doing", label: "Doing", meta: STATUS_META.running, items: cols[1].items },
+    { key: "stuck", label: "Stuck", meta: STATUS_META.blocked, items: [...cols[2].items, ...cols[4].items] },
+    { key: "done", label: "Done", meta: STATUS_META.done, items: cols[3].items },
+  ];
+  const [shutGroups, setShutGroups] = useState<Record<string, boolean>>({});
+  const editTask = (id: string, title: string) => {
+    fetch(`${BRIDGE}/hive/task/update`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, title }),
+    })
+      .catch(() => {})
+      .finally(() => setTimeout(pull, 600));
+  };
+  const deleteTask = (id: string) => {
+    fetch(`${BRIDGE}/hive/task/delete`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    })
+      .catch(() => {})
+      .finally(() => setTimeout(pull, 600));
+  };
+  const commentTask = (id: string, text: string) => {
+    fetch(`${BRIDGE}/hive/task/comment`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id, text }),
+    })
+      .catch(() => {})
+      .finally(() => setTimeout(pull, 600));
+  };
+  // section pill: Tasks / Automations / Team runs — one obvious switcher
+  // (pill + dropdown) instead of stacked sections nobody can tell apart.
+  const [section, setSection] = useState<"tasks" | "automations" | "runs">("tasks");
+  const [shut, setShut] = useState(false);
+  const [secOpen, setSecOpen] = useState(false);
+  const secDismiss = useDismiss<HTMLDivElement>(secOpen, () => setSecOpen(false));
+  const sectionLabel = section === "tasks" ? "Tasks" : section === "automations" ? "Automations" : "Team runs";
+  // team-mini scope: shelf board text sizes match the chat TEAM section.
+  return (
+    <div className="team-wrap team-mini">
+      <div className="team-head">
+        <button
+          className="team-title team-toggle"
+          aria-expanded={!shut}
+          title={shut ? "Show board" : "Hide board"}
+          onClick={() => setShut((v) => !v)}
+        >
+          OFFICE BOARD
+        </button>
+        <div style={{ position: "relative", marginLeft: "auto", flex: "none" }}>
+          <button
+            className="effort-pill"
+            aria-haspopup="menu"
+            aria-expanded={secOpen}
+            title="Switch section"
+            onClick={() => setSecOpen((o) => !o)}
+          >
+            {sectionLabel} <ChevronDownIcon size={12} />
+          </button>
+          {secOpen && (
+            <div ref={secDismiss} className="sheet team-menu" role="menu" aria-label="Board section">
+              {(["tasks", "automations", "runs"] as const).map((k) => (
+                <MenuRow
+                  key={k}
+                  role="menuitemradio"
+                  active={section === k}
+                  onClick={() => { setSection(k); setSecOpen(false); }}
+                >
+                  {k === "tasks" ? "Tasks" : k === "automations" ? "Automations" : "Team runs"}
+                </MenuRow>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+      {!shut && (
+      <>
+      {section === "tasks" && (
+      <>
+      <div className="team-grid filter-grid">
+        {groups.map((g) => {
+          const closed = !!shutGroups[g.key];
+          const GIcon = g.meta.Icon;
+          return (
+            <div key={g.key} className="team-cellwrap">
+              <button
+                className="team-cell"
+                aria-expanded={!closed}
+                title={closed ? `Show ${g.label}` : `Hide ${g.label}`}
+                onClick={() => setShutGroups((s) => ({ ...s, [g.key]: !s[g.key] }))}
+              >
+                <span style={{ color: g.meta.color, display: "inline-flex", flex: "none" }} aria-hidden>
+                  <GIcon size={17} />
+                </span>
+                <span className="team-meta">
+                  <span className="team-name">{g.label}</span>
+                </span>
+              </button>
+            </div>
+          );
+        })}
+      </div>
+      <div className="board-cols">
+        {groups.map((g) => (
+          !shutGroups[g.key] && (
+            <div key={g.key}>
+              <div className="task-lines">
+                {g.items.map((t) => (
+                  <TaskTile key={t.id} t={t} move={move} roster={roster} onEdit={editTask} onDelete={deleteTask} onComment={commentTask} />
+                ))}
+              </div>
+            </div>
+          )
+        ))}
+      </div>
+      {crewHidden > 0 && (
+        <div className="card-detail">crew steps file under Live loops below.</div>
+      )}
+      </>
+      )}
+      {section === "automations" && (
+        <SchedulesSection />
+      )}
+      {section === "runs" && (
+        <>
+          <LoopTile onDone={onLoopDone} />
+          <LiveLoops />
+          <LoopTasks tasks={loopTasks} />
+        </>
+      )}
+      </>
       )}
     </div>
   );
@@ -363,9 +717,10 @@ export function LiveLoops() {
       .finally(() => setTimeout(pull, 1500));
   };
   return (
-    <div>
-      <div className="card-title">Live loops</div>
-      <div className="card-detail">Running right now — chat, shelf, anywhere. Stop one here, resume the interrupted.</div>
+    <div className="team-wrap">
+      <div className="team-head">
+        <span className="team-title">LIVE LOOPS</span>
+      </div>
       {loops.map((l) => (
         <div className="menu-row" key={l.id}>
           <i className="live-dot" />
@@ -426,9 +781,10 @@ export function SchedulesSection() {
   if (scheds === null) return null; // dots down — no dead section
   const when = (iso: string) => iso.replace("T", " ").slice(0, 16);
   return (
-    <div>
-      <div className="card-title">Automations</div>
-      <div className="card-detail">Recurring prompts — pause, resume, run now. Rows fire when the dots runner is up.</div>
+    <div className="team-wrap">
+      <div className="team-head">
+        <span className="team-title">AUTOMATIONS</span>
+      </div>
       <div className="menu-row">
         <select
           className="team-edit"
@@ -507,7 +863,7 @@ export function SchedulesSection() {
         </div>
       ))}
       {!scheds.length && (
-        <div className="card-detail">No automations yet — add one above, same as /schedule in chat.</div>
+        <div className="card-detail">None yet — add one above.</div>
       )}
       {err && <div className="card-detail error">{err}</div>}
     </div>

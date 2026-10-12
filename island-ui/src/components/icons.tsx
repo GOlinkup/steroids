@@ -209,7 +209,7 @@ export function BellIcon({ size = 20, bold = false }: P) {
 }
 export function XIcon({ size = 12 }: P) {  return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth={1.5} strokeLinecap="round" aria-hidden
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round" aria-hidden
       style={{ display: "block" }}>
       <path d="M6 6l12 12M18 6L6 18" />
     </svg>
@@ -286,7 +286,7 @@ export function CopyIcon({ size = 14 }: P) {
 export function CheckIcon({ size = 14 }: P) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
       aria-hidden style={{ display: "block", flex: "none" }}>
       <path d="m4.5 12.5 5 5 10-11" />
     </svg>
@@ -361,7 +361,7 @@ export function StopIcon({ size = 12 }: P) {
 export function HandIcon({ size = 14 }: P) {
   return (
     <svg width={size} height={size} viewBox="0 0 24 24" fill="none"
-      stroke="currentColor" strokeWidth={1.6} strokeLinecap="round" strokeLinejoin="round"
+      stroke="currentColor" strokeWidth={1.8} strokeLinecap="round" strokeLinejoin="round"
       aria-hidden style={{ display: "block", flex: "none" }}>
       <path d="M8 12V5.5a1.5 1.5 0 0 1 3 0V11m0-5.5v-1a1.5 1.5 0 0 1 3 0V11m0-4.5a1.5 1.5 0 0 1 3 0V12m0-3a1.5 1.5 0 0 1 3 0v5a7 7 0 0 1-7 7h-1a7 7 0 0 1-6-3.3l-2-3.6a1.6 1.6 0 0 1 2.6-1.8L8 14" />
     </svg>

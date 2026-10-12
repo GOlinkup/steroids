@@ -33,8 +33,8 @@ class ChatFollowTest(unittest.TestCase):
         self.assertIn('el.scrollHeight - el.scrollTop - el.clientHeight',
                       src, "CHAT FOLLOW FROZEN: scroll-up manual override "
                            "threshold missing from onLogScroll.")
-        self.assertIn('}, [messages, thinking]);', src,
-                      "CHAT FOLLOW FROZEN: bottom-pin on messages/thinking "
+        self.assertIn('}, [messages, thinking, livePartial]);', src,
+                      "CHAT FOLLOW FROZEN: bottom-pin on messages/thinking/partial "
                       "effect missing.")
 
     def test_stream_follow_intact(self):
