@@ -1,0 +1,97 @@
+/* Ported from OpenMausBot (Apache-2.0, github.com/milind-soni/OpenMausBot
+   src/styles.css) — theme tokens + motion keyframes only, Midnight defaults.
+   Modified for Steroids island: no preflight, no skins, no app chrome. */
+@import "tailwindcss/theme.css";
+
+@theme {
+  --animate-panel-in: panel-in 0.24s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-workspace-in: workspace-in 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-pop-in: pop-in 0.2s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-pop-out: pop-out 0.2s cubic-bezier(0.22, 1, 0.36, 1) forwards;
+  --animate-caret: caret-blink 1s step-end infinite;
+  --animate-msg-in: msg-in 0.18s cubic-bezier(0.22, 1, 0.36, 1);
+  --animate-shimmer: shimmer 2s linear infinite;
+  --animate-status-pulse: status-pulse 1.6s steps(2, jump-none) infinite;
+  --animate-rise: rise 0.32s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-spot-in: spot-in 0.24s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-ripple: ripple 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+  --animate-bolt: bolt 0.9s cubic-bezier(0.77, 0, 0.175, 1) infinite;
+
+  --color-app: #070707;
+  --color-panel: #111111;
+  --color-raised: #2f2f2f;
+  --color-raised-hover: #3d3d3d;
+  --color-composer: #2f2f2f;
+  --color-composer-ring: transparent;
+  --color-menu: #262626;
+  --color-card: #262626;
+  --color-inset: #191919;
+  --color-control: #2f2f2f;
+  --color-hairline: #333333;
+  --color-ink: #fcfcfc;
+  --color-ink-secondary: #fcfcfc99;
+  --color-ink-tertiary: #fcfcfc90;
+  --color-accent: #ff4d1c;
+  --color-accent-border: #fb923c;
+  --color-focus: #fb923c;
+  --color-accent-text: #ffa25e;
+  --color-bubble-user: #5a5a5a;
+  --color-success: #38d591;
+  --color-danger: #ff5667;
+  --color-warning: #ff9800;
+
+  --transition-property-rounded: border-radius;
+}
+
+@import "tailwindcss/utilities.css";
+
+@keyframes panel-in {
+  from { transform: translateX(28px); opacity: 0; }
+  to { transform: translateX(0); opacity: 1; }
+}
+@keyframes workspace-in {
+  from { opacity: 0.92; }
+  to { opacity: 1; }
+}
+@keyframes pop-in {
+  from { transform: scale(0.96) translateY(6px); opacity: 0; }
+  to { transform: scale(1) translateY(0); opacity: 1; }
+}
+@keyframes pop-out {
+  from { transform: scale(1) translateY(0); opacity: 1; }
+  to { transform: scale(0.96) translateY(6px); opacity: 0; }
+}
+@keyframes caret-blink {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0; }
+}
+@keyframes msg-in {
+  from { transform: translateY(4px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+@keyframes rise {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes ripple {
+  from { box-shadow: 0 0 0 0 color-mix(in oklab, var(--color-accent) 55%, transparent); }
+  to { box-shadow: 0 0 0 14px color-mix(in oklab, var(--color-accent) 0%, transparent); }
+}
+@keyframes bolt {
+  0% { transform: translateX(-4px) scale(0.9); opacity: 0.2; }
+  40% { transform: translateX(6px) scale(1.05); opacity: 1; }
+  100% { transform: translateX(22px) scale(0.85); opacity: 0; }
+}
+@keyframes spot-in {
+  from { transform: scale(0.94); opacity: 0; }
+  to { transform: none; opacity: 1; }
+}
+@keyframes shimmer {
+  from { background-position: 200% 50%; }
+  to { background-position: -200% 50%; }
+}
+@keyframes status-pulse {
+  0%, 100% { opacity: 0.25; }
+  30% { opacity: 1; }
+  60% { opacity: 0.25; }
+}

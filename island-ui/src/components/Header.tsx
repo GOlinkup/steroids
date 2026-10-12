@@ -2,7 +2,7 @@ import { useState } from "react";
 import type { AgentSession, Approval, ChatSession, IslandView, Question } from "../store";
 import type { SettingsPage } from "./Cards";
 import {
-  BellIcon, ChatIcon, GearIcon, HistoryIcon, HomeIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ShelfIcon, TrashIcon,
+  BellIcon, BoltIcon, ChatIcon, GearIcon, HistoryIcon, HomeIcon, LogoutIcon, PersonIcon, PhoneIcon, PlusIcon, ResetIcon, TrashIcon,
 } from "./icons";
 import { useDismiss, MenuRow } from "./pickers";
 
@@ -14,9 +14,7 @@ interface IconProps {
 }
 
 const TABS: Array<{ view: IslandView; title: string; Icon: ComponentType<IconProps> }> = [
-  { view: "chat", title: "Chat", Icon: ChatIcon },
-  { view: "daily", title: "Office", Icon: HomeIcon },
-  { view: "shelf", title: "Tasks", Icon: ShelfIcon },
+  { view: "maus", title: "Maus", Icon: HomeIcon },
 ];
 
 // "3m" / "2h" / "5d" — iOS recents style right-aligned meta.
@@ -217,8 +215,17 @@ export function Header({
             <Icon bold={view === v} size={22} />
           </NavButton>
         ))}
-        <HeaderIconButton title="Start a new chat" onClick={() => onNewChat?.()}>
-          <PlusIcon size={22} />
+        <HeaderIconButton title="Chat" onClick={() => onTab("chat")}>
+          <ChatIcon size={22} />
+        </HeaderIconButton>
+        <HeaderIconButton title="Bots" onClick={() => onTab("bots")}>
+          <PersonIcon size={22} />
+        </HeaderIconButton>
+        <HeaderIconButton title="Computers" onClick={() => onTab("computer")}>
+          <BoltIcon size={22} />
+        </HeaderIconButton>
+        <HeaderIconButton title="Routines" onClick={() => onTab("routines")}>
+          <ResetIcon size={22} />
         </HeaderIconButton>
       </div>
       <div className="nav-middle">{middle}</div>

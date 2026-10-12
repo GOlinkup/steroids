@@ -17,7 +17,7 @@ export interface AgentMini { session: string; agent: string; first: string }
 // Crew roles (Munder-Dufflin-style: every mate grabs a lane). Slot-owned,
 // cycled from the tile menu — the mate keeps it across sessions.
 export const ROLE_POOL = ["lead", "scout", "coder", "critic", "scribe", "runner", "sage", "relay"];
-export interface Member { id: string; name: string; color: string; role: string; sid?: string }
+export interface Member { id: string; name: string; color: string; role: string; sid?: string; pinned?: boolean; hidden?: boolean }
 // Slot → live session: a bound sid wins (assign/relay pin it); otherwise
 // the legacy positional slot. Missing session reads idle, never a stranger.
 export function slotSession(members: Member[], sessions: AgentMini[], idx: number): AgentMini | undefined {
@@ -132,6 +132,8 @@ function loadTeam(): Member[] {
             sid: typeof (m as Member).sid === "string" && (m as Member).sid
               ? (m as Member).sid
               : undefined,
+            pinned: (m as Member).pinned === true,
+            hidden: (m as Member).hidden === true,
           }));
         }
       }
@@ -174,7 +176,7 @@ export function useSessionProgress(sessions: AgentMini[]) {
   return { prog, refresh };
 }
 
-export function useTeam(): { members: Member[]; rename: (id: string, name: string) => void; remove: (id: string) => void; cycleRole: (id: string) => void; setSid: (id: string, sid: string) => void; add: () => void } {
+export function useTeam(): { members: Member[]; rename: (id: string, name: string) => void; remove: (id: string) => void; cycleRole: (id: string) => void; setSid: (id: string, sid: string) => void; add: () => void; pin: (id: string) => void; hide: (id: string) => void; unhide: (id: string) => void; duplicate: (id: string) => void } {
   const [members, setMembers] = useState<Member[]>(loadTeam);
   useEffect(() => {
     try {
@@ -200,7 +202,31 @@ export function useTeam(): { members: Member[]; rename: (id: string, name: strin
       const color = TEAM_COLORS[NAME_POOL.indexOf(name) % TEAM_COLORS.length] ?? TEAM_COLORS[ms.length % TEAM_COLORS.length];
       return [...ms, { id: `m${Date.now()}`, name, color, role: ROLE_POOL[ms.length % ROLE_POOL.length] ?? "mate" }];
     });
-  return { members, rename, remove, cycleRole, setSid, add };
+  // OpenMausBot roster parity: pin keeps the tile first, hide parks it
+  // (unhide from the header count), duplicate clones lane+color with a
+  // fresh pool name. All slot-local, no bridge round-trip.
+  const pin = (id: string) =>
+    setMembers((ms) => {
+      const m = ms.find((x) => x.id === id);
+      if (!m) return ms;
+      const rest = ms.filter((x) => x.id !== id);
+      return m.pinned
+        ? [...rest, { ...m, pinned: false }]
+        : [{ ...m, pinned: true }, ...rest];
+    });
+  const hide = (id: string) =>
+    setMembers((ms) => (ms.length <= 1 ? ms : ms.map((m) => (m.id === id ? { ...m, hidden: true } : m))));
+  const unhide = (id: string) =>
+    setMembers((ms) => ms.map((m) => (m.id === id ? { ...m, hidden: false } : m)));
+  const duplicate = (id: string) =>
+    setMembers((ms) => {
+      if (ms.length >= 8) return ms;
+      const src = ms.find((x) => x.id === id);
+      if (!src) return ms;
+      const name = nextName(ms);
+      return [...ms, { id: `m${Date.now()}`, name, color: src.color, role: src.role }];
+    });
+  return { members, rename, remove, cycleRole, setSid, add, pin, hide, unhide, duplicate };
 }
 
 // Step glyph — one icon per kind (navbar stroke family), shared by
@@ -287,10 +313,15 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
   // crew dispatch: give-a-task posts a real turn; relay hands this
   // mate's latest work to the target mate (bridge /handoff brief).
   team?: Member[];
-  onAssign?: (targetId: string, text: string) => Promise<{ ok: boolean; error?: string }>;
-  onRelay?: (fromId: string, targetId: string, text: string) => Promise<{ ok: boolean; error?: string }>;
+  onAssign?: (targetId: string, text: string) => Promise<{ ok: boolean; files?: string[]; error?: string }>;
+  onRelay?: (fromId: string, targetId: string, text: string) => Promise<{ ok: boolean; files?: string[]; error?: string }>;
   manage?: boolean;
 }) {
+  // ponytail: one success line — sandbox box files prove the turn ran.
+  const doneNote = (r: { ok: boolean; files?: string[]; error?: string }, verb: string) =>
+    r.ok
+      ? (r.files?.length ? `${verb} — box: ${r.files.slice(0, 3).join(", ")}` : `${verb} — watch the tile light up`)
+      : `stuck: ${r.error || "bridge refused"}`;
   const [task, setTask] = useState("");
   const [target, setTarget] = useState(member.id);
   const [busy, setBusy] = useState(false);
@@ -374,7 +405,7 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
                 setNote("sending…");
                 onAssign(target, task.trim()).then((r) => {
                   setBusy(false);
-                  setNote(r.ok ? "sent — watch the tile light up" : `stuck: ${r.error || "bridge refused"}`);
+                  setNote(doneNote(r, "sent"));
                   if (r.ok) setTask("");
                 });
               }
@@ -390,7 +421,7 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
                 setNote("sending…");
                 onAssign(target, task.trim()).then((r) => {
                   setBusy(false);
-                  setNote(r.ok ? "sent — watch the tile light up" : `stuck: ${r.error || "bridge refused"}`);
+                  setNote(doneNote(r, "sent"));
                   if (r.ok) setTask("");
                 });
               }}
@@ -408,7 +439,7 @@ export function MemberDetail({ member, session, progress, onResume, onRename, on
                 setNote("relaying…");
                 onRelay(member.id, target, task.trim()).then((r) => {
                   setBusy(false);
-                  setNote(r.ok ? "relayed — brief handed over" : `stuck: ${r.error || "nothing to relay"}`);
+                  setNote(doneNote(r, "relayed — brief handed over"));
                   if (r.ok) setTask("");
                 });
               }}
@@ -448,7 +479,7 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
 }) {
   const teamInternal = useTeam();
   const liveInternal = useSessionProgress(sessions);
-  const { members, rename, remove, cycleRole, setSid, add } = teamProp ?? teamInternal;
+  const { members, rename, remove, cycleRole, setSid, add, pin, hide, unhide, duplicate } = teamProp ?? teamInternal;
   const { prog, refresh } = liveProp ?? liveInternal;
   // affection: drives per mate id (see AFF_KEY). Bumped on explicit
   // Resume; tiles show one heart at 3+ drives.
@@ -504,6 +535,7 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
 
   const selIdx = members.findIndex((m) => m.id === cur);
   const selSession = selIdx >= 0 ? slotSession(members, sessions, selIdx) : undefined;
+  const hiddenCount = members.filter((m) => m.hidden).length;
   // grid starts collapsed in chat pick mode (one header row under the
   // navbar — chats stay visible); explicit toggle wins from then on.
   const [shut, setShut] = useState<boolean | null>(null);
@@ -546,6 +578,15 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
           <PlusIcon size={14} />
           {!collapsed && <span>Add mate</span>}
         </button>
+        {hiddenCount > 0 && (
+          <button
+            className="effort-pill team-add"
+            title={`${hiddenCount} hidden — tap to restore`}
+            onClick={() => members.filter((m) => m.hidden).forEach((m) => unhide(m.id))}
+          >
+            {!collapsed && <span>{hiddenCount} hidden</span>}
+          </button>
+        )}
       </div>
       {!collapsed && (
       <div className="team-grid">
@@ -591,7 +632,9 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
           )}
         </div>
         {members.map((m, i) => {
+          if (m.hidden) return null;
           const s = slotSession(members, sessions, i);
+          const unclaimed = !!s && !m.sid;
           const p = s ? prog[s.session] : undefined;
           const mood: MascotMood =
             p?.state === "error" ? "annoyed"
@@ -599,6 +642,10 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
             : p?.state === "thinking" ? "thinking"
             : p?.state === "finished" ? "joyful-wide"
             : "neutral";
+          // Maus tile parity: engine + live state under the name.
+          // Ours keeps the role lane (title + menu), theirs adds the
+          // PC model + status — both now read on one line.
+          const engineState = p?.state ?? "starting";
           return (
             <div key={m.id} className="team-cellwrap">
               <button
@@ -655,7 +702,7 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
                   />
                 ) : (
                   <span className="team-meta">
-                    <span className="team-name">{m.name}{(aff[m.id] ?? 0) >= 3 && <span className="team-hearts" title={`${aff[m.id]} drives`}>♥</span>}</span>
+                    <span className="team-name">{unclaimed && <span className="st-dot" title="unclaimed session" aria-label="unclaimed session" />}{m.name}{m.pinned && <span title="pinned"> 📌</span>}{(aff[m.id] ?? 0) >= 3 && <span className="team-hearts" title={`${aff[m.id]} drives`}>♥</span>}</span>
                     {!s && <span className="team-sub">{m.role}</span>}
                   </span>
                 )}
@@ -681,10 +728,10 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
                         }
                       }}
                     >
-                      {s.agent}
+                      {s.agent} · {engineState}
                     </span>
                   ) : (
-                    <span className="team-sub team-wide">{s.agent}</span>
+                    <span className="team-sub team-wide">{s.agent} · {engineState}</span>
                   )
                 )}
               </button>
@@ -754,11 +801,39 @@ export function TeamGrid({ sessions = [], onResume, onPick, onPickNicki, onGoCha
                   <MenuRow
                     role="menuitem"
                     onClick={() => {
+                      pin(m.id);
+                      setMenuId(null);
+                    }}
+                  >
+                    {m.pinned ? "Unpin from front" : "📌 Pin to front"}
+                  </MenuRow>
+                  <MenuRow
+                    role="menuitem"
+                    onClick={() => {
+                      duplicate(m.id);
+                      setMenuId(null);
+                    }}
+                  >
+                    ⧉ Duplicate mate
+                  </MenuRow>
+                  <MenuRow
+                    role="menuitem"
+                    onClick={() => {
                       setDraft(m.name);
                       setRenaming(m.id);
                     }}
                   >
                     ✎ Rename
+                  </MenuRow>
+                  <MenuRow
+                    role="menuitem"
+                    onClick={() => {
+                      hide(m.id);
+                      if (cur === m.id) pick(null);
+                      setMenuId(null);
+                    }}
+                  >
+                    🙈 Hide mate
                   </MenuRow>
                   {members.length > 1 && (
                     <MenuRow

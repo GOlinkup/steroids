@@ -213,6 +213,8 @@ def _execute(step_prompt, box_dir, provider="opencode", model=None):
     """
     order = [provider] + ([p for p in ("opencode", "claude") if p != provider])
     last_error = ""
+    # ponytail: global HOME cwd, per-box dirs if isolation matters
+    cwd = os.path.expanduser("~") if os.environ.get("STEROIDS_PC_FULL", "").lower() in ("1", "true", "yes", "on") else box_dir
     for prov in order:
         try:
             argv, stdin_data = agentlog.describe_command(prov, step_prompt, None, model=model)
@@ -221,7 +223,7 @@ def _execute(step_prompt, box_dir, provider="opencode", model=None):
             continue
         try:
             proc = subprocess.run(argv, input=stdin_data, capture_output=True,
-                                  text=True, timeout=STEP_TIMEOUT, cwd=box_dir)
+                                  text=True, timeout=STEP_TIMEOUT, cwd=cwd)
         except FileNotFoundError as exc:
             last_error = f"{prov}: {exc}"
             continue

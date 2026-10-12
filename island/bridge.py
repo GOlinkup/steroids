@@ -45,6 +45,7 @@ import demo as _demo  # noqa: E402  (scripted fixtures)
 import fleet as _fleet  # noqa: E402  (attention ranking + overlap)
 import echo as _echo  # noqa: E402  (command-echo levels: volume+brightness)
 import hive as _hive  # noqa: E402  (team floor: ledger + inbox/outbox)
+import sandbox as _sandbox  # noqa: E402  (provider factory: local|cloud)
 
 HOST, PORT = "127.0.0.1", 8096
 BODY_LIMIT = 64 * 1024
@@ -782,6 +783,15 @@ def _turn_snapshot(t):
     out = {"done": t["done"], "activity": t["activity"],
            "partial": t["partial"][-4000:], "session": t.get("session"),
            "elapsed": round(time.time() - t["started"], 1)}
+    # computer preview: sandbox box working-dir listing (capped, no dots).
+    try:
+        bd = t.get("box_dir")
+        if bd and os.path.isdir(bd):
+            out["box"] = t.get("box")
+            out["files"] = sorted(f for f in os.listdir(bd)
+                                  if not f.startswith("."))[:20]
+    except OSError:
+        pass
     if t["done"]:
         out["ok"] = t.get("ok", True)
         if t.get("text") is not None:
@@ -924,8 +934,9 @@ def _pump_turn_file(tid, logpath, pid, provider, proc=None, gen=0):
     _finalize_turn(tid, lines, partials, result)
 
 
-def _pump_turn(tid, argv, stdin_data, provider):
-    """Spawn detached (survives us) to a log file, then tail it."""
+def _pump_turn(tid, argv, stdin_data, provider, box_dir=None):
+    """Spawn detached (survives us) to a log file, then tail it.
+    cwd-jailed to the turn's sandbox box (end-to-end local sandbox)."""
     t = TURNS.get(tid)
     if t is None:
         return
@@ -943,10 +954,12 @@ def _pump_turn(tid, argv, stdin_data, provider):
         _turn_save()
         return
     try:
+        cwd = _sandbox.run_cwd(box_dir) if box_dir else None
         p = subprocess.Popen(
             argv, stdin=subprocess.PIPE if stdin_data else None,
             stdout=lf, stderr=subprocess.DEVNULL,
-            text=True, bufsize=1, start_new_session=True)
+            text=True, bufsize=1, start_new_session=True,
+            cwd=cwd if cwd and os.path.isdir(cwd) else None)
     except FileNotFoundError:
         try:
             lf.close()
@@ -1023,15 +1036,23 @@ def start_turn(msg, session_id=None, provider="opencode", model=None):
     except ValueError as e:
         return {"ok": False, "error": str(e)}
     tid = os.urandom(8).hex()
+    try:  # end-to-end sandbox: each turn gets its own box, CLI cwd-jailed.
+        _boxes = _sandbox.create_provider(_sandbox.pick_backend(True, False))
+        _box = _boxes.create_box()
+        box_dir = _boxes._dir(_box["id"])
+        box_id = _box["id"]
+    except Exception:
+        _boxes, box_dir, box_id = None, None, None
     with TURNS_LOCK:
         _turn_sweep()
         TURNS[tid] = {"done": False, "ok": True, "activity": "starting…",
                       "partial": "", "session": session_id,
                       "provider": provider, "gen": 1,
-                      "started": time.time(), "proc": None}
+                      "started": time.time(), "proc": None,
+                      "box": box_id, "box_dir": box_dir}
     _turn_save()
     th = threading.Thread(target=_pump_turn,
-                           args=(tid, argv, stdin_data, provider), daemon=True)
+                           args=(tid, argv, stdin_data, provider, box_dir), daemon=True)
     th.start()
     return {"ok": True, "turn": tid, "boot": _BOOT_ID}
 
@@ -1058,6 +1079,18 @@ def stop_turn(tid):
 class Handler(SimpleHTTPRequestHandler):
     server_version = "NickiBridge/0.1"
 
+    def end_headers(self):
+        # UI shell must never stick: after `pnpm build` the hashed assets
+        # change but a cached index.html points at deleted files (stale UI
+        # that looks exactly like "still the old skin"). Hashed /assets/* stay
+        # cacheable — only the shell entry is pinned fresh.
+        try:
+            if urlparse(self.path).path in ("/", "/index.html"):
+                self.send_header("Cache-Control", "no-store")
+        except Exception:
+            pass
+        super().end_headers()
+
     def _send(self, obj, code=200):
         body = json.dumps(obj).encode()
         self.send_response(code)
@@ -1073,11 +1106,77 @@ class Handler(SimpleHTTPRequestHandler):
     def _local(self):
         return self.client_address[0] in ("127.0.0.1", "::1")
 
+    # ponytail: one-app absorb — /api/* (not ours) rides the headless
+    # Maus node backend on :8799. Ours (/api/daily/*) always wins.
+    API_UPSTREAM = "http://127.0.0.1:8799"
+
+    def _proxy_api(self, parts):
+        if not parts.path.startswith("/api/") or parts.path.startswith("/api/daily/"):
+            return False
+        if not self._local():
+            return self._send({"ok": False, "error": "local only"}, 403)
+        length = int(self.headers.get("Content-Length") or 0)
+        if length > 8 * 1024 * 1024:
+            return self._send({"ok": False, "error": "body too big"}, 413)
+        body = self.rfile.read(length) if length > 0 else None
+        url = self.API_UPSTREAM + self.path
+        fwd = {}
+        for h in ("Content-Type", "Authorization", "Cookie"):
+            if self.headers.get(h):
+                fwd[h] = self.headers.get(h)
+        try:
+            req = urllib.request.Request(url, data=body, headers=fwd, method=self.command)
+            res = urllib.request.urlopen(req, timeout=300)
+        except Exception as e:
+            code = getattr(getattr(e, "hdrs", None), "status", None) or 502
+            try:
+                code = e.code  # type: ignore[attr-defined]
+            except AttributeError:
+                pass
+            return self._send({"ok": False, "error": "backend down"}, code if isinstance(code, int) else 502)
+        ctype = res.headers.get("Content-Type", "application/json")
+        self.send_response(res.status)
+        self.send_header("Content-Type", ctype)
+        self.send_header("Access-Control-Allow-Origin", "*")
+        self.send_header("Cache-Control", "no-store")
+        stream = "text/event-stream" in ctype
+        if not stream:
+            raw = res.read()
+            self.send_header("Content-Length", str(len(raw)))
+            self.end_headers()
+            self.wfile.write(raw)
+            return True
+        self.end_headers()
+        try:
+            while True:
+                chunk = res.read(4096)
+                if not chunk:
+                    break
+                self.wfile.write(chunk)
+                self.wfile.flush()
+        except (BrokenPipeError, ConnectionResetError):
+            pass
+        return True
+
+    def do_PATCH(self):
+        parts = urlparse(self.path)
+        if self._proxy_api(parts):
+            return
+        return self._send({"ok": False, "error": "unknown endpoint"}, 404)
+
+    def do_PUT(self):
+        parts = urlparse(self.path)
+        if self._proxy_api(parts):
+            return
+        return self._send({"ok": False, "error": "unknown endpoint"}, 404)
+
     def do_DELETE(self):
         # agent-session hides: the island history panel gets a delete affordance
         # for terminal sessions too (opencode/claude rows). Hide, don't rm —
         # the provider's own store stays intact.
         parts = urlparse(self.path)
+        if self._proxy_api(parts):
+            return
         if parts.path == "/agent-sessions":
             # hides rewrite this PC's display state: owner-only.
             if not self._local():
@@ -1118,6 +1217,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_GET(self):
         parts = urlparse(self.path)
+        if self._proxy_api(parts):
+            return
         if parts.path == "/health":
             self._send({"ok": True,
                         "opencode": agentlog.opencode_available(),
@@ -1620,6 +1721,8 @@ class Handler(SimpleHTTPRequestHandler):
 
     def do_POST(self):
         parts = urlparse(self.path)
+        if self._proxy_api(parts):
+            return
         if parts.path == "/hand":
             # hand cursor daemon: only the PC owner may start/stop it.
             if not self._local():

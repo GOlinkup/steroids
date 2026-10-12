@@ -2,12 +2,12 @@ import { useEffect, useLayoutEffect, useMemo, useRef, useState } from "react";
 import { PlusIcon, MicIcon, XIcon, ArrowUpIcon, DropIcon, CopyIcon, CheckIcon, ThumbUpIcon, ThumbDownIcon, PencilIcon, ResetIcon, PhoneIcon, BoltIcon, StopIcon } from "./icons";
 import { EffortPicker, PillButton, ProviderPicker, useDismiss, useEngines, ENGINES, displayModel, Card } from "./pickers";
 export { EffortPicker, ProviderPicker, ENGINES, displayModel, Card } from "./pickers";
+import Mascot from "./Mascot";
 import { SafeOrb } from "../orb";
 import { GigList } from "../gigs";
 import type { GigListing } from "../money";
 import { chatOrbFor } from "../orb_state";
 import { LensBlock, StepsList, useSessionProgress } from "./TeamGrid";
-import { HiveBoard, useLoopTasks } from "./Loop";
 import {
   classifyAttachment,
   formatSize,
@@ -679,6 +679,12 @@ export function ChatPanel({
         )}
         {messages.map((m) => (
           <div key={m.id} className={m.role === "user" ? "chat-row user" : "chat-row"}>
+            {m.role !== "user" && (
+              <div className="msg-head">
+                <span className="msg-face"><Mascot mood="neutral" /></span>
+                <span className="msg-who">{turnEngine || provider || "agent"}</span>
+              </div>
+            )}
             <div className={m.role === "user" ? "bubble" : "reply"}>
               {m.attachments?.filter((a) => a.kind === "image" && a.url).map((a) => (
                 <img
@@ -1324,7 +1330,6 @@ export function ShelfView({
   onRemove: (url: string) => void;
 }) {
   const pickRef = useRef<HTMLInputElement>(null);
-  const [loopTasks, addLoopTask] = useLoopTasks();
   // Drop → report: staged shots carry their own Send (receipt rides the
   // button, same lazy sync import as the Support section).
   const [reported, setReported] = useState<Record<string, string>>({});
@@ -1359,8 +1364,7 @@ export function ShelfView({
         if (files.length) onStage(files);
       }}
     >
-      <HiveBoard loopTasks={loopTasks} onLoopDone={addLoopTask} />
-      {loopTasks.length === 0 && items.length === 0 ? (
+      {items.length === 0 ? (
         <div className="card-detail">
           Nothing shelved yet — drop files here.
         </div>

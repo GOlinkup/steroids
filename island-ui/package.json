@@ -12,13 +12,19 @@
   "dependencies": {
     "@mediapipe/hands": "^0.4.1675469240",
     "@supabase/supabase-js": "^2.117.2",
+    "@tailwindcss/vite": "^4.3.3",
     "@tensorflow-models/hand-pose-detection": "^2.0.1",
     "@tensorflow/tfjs-backend-webgl": "^4.22.0",
     "@tensorflow/tfjs-converter": "^4.22.0",
     "@tensorflow/tfjs-core": "^4.22.0",
+    "clsx": "^2.1.1",
+    "lucide-react": "^1.55.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
-    "thinking-orbs": "^0.3.2"
+    "tailwind-merge": "^3.7.0",
+    "tailwindcss": "^4.3.3",
+    "thinking-orbs": "^0.3.2",
+    "zod": "^4.6.6"
   },
   "devDependencies": {
     "@types/node": "^24.13.3",
@@ -26,6 +32,7 @@
     "@types/react-dom": "^19.2.7",
     "@vitejs/plugin-react": "^6.1.1",
     "oxlint": "^1.81.0",
+    "puppeteer-core": "^25.13.0",
     "typescript": "~6.0.2",
     "vite": "^8.3.0"
   }

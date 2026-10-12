@@ -7,7 +7,7 @@ import {
   tombstones, addTombstone,
   type AgentSession, type Approval, type Attachment, type ChatMessage, type ChatSession, type ExploreFeed, type FeedEvent, type IslandView, type Pill, type Question, type SkillHit,
 } from "./store";
-import type { Shot } from "./components/LensView";
+type Shot = { name: string; src: string; label: string; time: string };
 import type { GigListing } from "./money";
 import { PairPanel, ShelfView, isPcSide, type LinkRequest, type SettingsState, type ShelfItem } from "./components/Cards";
 import { AccountPanel } from "./components/Account";
@@ -365,7 +365,7 @@ export default function App() {
     const q = new URLSearchParams(window.location.search);
     const v = q.get("view");
     const s = q.get("state");
-    if (v === "explore" || v === "approval" || v === "question" || v === "chat" || v === "daily" || v === "lens" || v === "shelf" || v === "settings" || v === "finished" || v === "feed") setView(v);
+    if (v === "explore" || v === "approval" || v === "question" || v === "chat" || v === "daily" || v === "lens" || v === "shelf" || v === "settings" || v === "finished" || v === "feed" || v === "bots" || v === "computer" || v === "routines" || v === "runs" || v === "maus") setView(v);
     if (s === "jacked") fsm.forceJacked();
     else if (s === "flex") fsm.forceFlex();
     else if (s === "hidden") fsm.forceHidden();
@@ -583,7 +583,7 @@ export default function App() {
     // the boot view. Explicit ?state= / ?view= still win for QA.
     const q = new URLSearchParams(window.location.search);
     if (!q.get("state")) fsm.forceFlex();
-    if (!q.get("view")) setView("daily");
+    if (!q.get("view")) setView("maus");
     return () => stopGreet();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);

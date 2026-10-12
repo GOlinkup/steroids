@@ -9,6 +9,11 @@ export type IslandView =
   | "daily"
   | "lens"
   | "shelf"
+  | "bots"
+  | "computer"
+  | "routines"
+  | "runs"
+  | "maus"
   | "settings"
   | "finished"
   | "feed";

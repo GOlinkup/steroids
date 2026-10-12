@@ -128,7 +128,7 @@ export function DailyView({ agentSessions = [], onResumeAgent, onGoChat, onRefre
   const selSession = selIdx >= 0 ? slotSession(team.members, agentSessions, selIdx) : undefined;
   // Quiet turn poll for crew dispatch (assign/relay run in the
   // background — no chat UX, the tile lights up instead).
-  const pollTurn = async (turn: string): Promise<{ ok: boolean; session?: string; error?: string }> => {
+  const pollTurn = async (turn: string): Promise<{ ok: boolean; session?: string; files?: string[]; error?: string }> => {
     const t0 = Date.now();
     for (;;) {
       await new Promise((r) => setTimeout(r, 2000));
@@ -138,7 +138,7 @@ export function DailyView({ agentSessions = [], onResumeAgent, onGoChat, onRefre
         const s = await r.json();
         if (!s.done) continue;
         if (!s.ok) return { ok: false, error: s.error || "agent failed" };
-        return { ok: true, session: s.session };
+        return { ok: true, session: s.session, files: Array.isArray(s.files) ? s.files : [] };
       } catch { /* transient blip — keep polling */ }
     }
   };
@@ -162,7 +162,7 @@ export function DailyView({ agentSessions = [], onResumeAgent, onGoChat, onRefre
         live.refresh(s.session);
         onRefreshSessions?.();
       }
-      return { ok: true };
+      return { ok: true, files: s.files };
     } catch {
       return { ok: false, error: "bridge unreachable" };
     }
@@ -193,7 +193,7 @@ export function DailyView({ agentSessions = [], onResumeAgent, onGoChat, onRefre
         live.refresh(s.session);
         onRefreshSessions?.();
       }
-      return { ok: true };
+      return { ok: true, files: s.files };
     } catch {
       return { ok: false, error: "bridge unreachable" };
     }

@@ -1,16 +1,12 @@
-import { forwardRef, lazy, Suspense, useEffect, useRef, useState } from "react";
+import { forwardRef, useEffect, useRef, useState } from "react";
 import Mascot, { type MascotHandle } from "./Mascot";
-import { ApprovalCard, QuestionCard, ChatPanel, ExploreView, FeedView, SettingsView, type SettingsState, type SettingsPage } from "./Cards";
-import { TeamGrid, TeamMinis, useTeam, useSessionProgress } from "./TeamGrid";
+import { ApprovalCard, QuestionCard, type SettingsState, type SettingsPage } from "./Cards";
+import { TeamMinis, useTeam } from "./TeamGrid";
 import { fetchNowPlaying } from "../music";
-import Huddle from "./Huddle";
 import { Header } from "./Header";
+import { MausViews, type MausNavView } from "../maus/MausViews";
 // ponytail: lens + daily ride separate chunks — default chat view stays lean,
 // vite warns over 500KB and these views load on tab tap, never at boot.
-const DailyView = lazy(() => import("./Daily").then((m) => ({ default: m.DailyView })));
-const LensView = lazy(() => import("./LensView").then((m) => ({ default: m.LensView })));
-import { HomeSkeleton } from "./HomeSkeleton";
-import type { Shot } from "./LensView";
 import type { AgentSession, Approval, Attachment, ChatMessage, ChatSession, ExploreFeed, FeedEvent, IslandView, Question, SkillHit } from "../store";
 import type { GigListing } from "../money";
 import type { IslandState } from "../fsm";
@@ -92,7 +88,7 @@ interface Props {
   onRemoveAttachment: (id: number) => void;
   // hover is DOM-driven (Linux has no cursor click-through API, so the
   // poll model can't run here; the strip fits the pill, always hoverable).
-  shots: Shot[];
+  shots: Array<{ name: string; src: string; label: string; time: string }>;
   onMouseEnter: () => void;
   onMouseLeave: () => void;
   onIslandClick?: (e: React.MouseEvent) => void;
@@ -149,20 +145,14 @@ interface Props {
 const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
   const {
     fsmState, view, foot = "", mascotRef, routeHint, echo = null, echoKind = "copied",
-    approval, question, messages, thinking, liveActivity, livePartial, turnEngine, attachments,
-    onFiles, onRemoveAttachment, shots,
+    approval, question,
     onMouseEnter, onMouseLeave, onMascotTap,
-    onDecide, onAnswer, onSend, onEditMessage, liveSession = null, lastThought = null, onStop,
+    onDecide, onAnswer,
     sessions, activeSessionId, onResumeSession, onDeleteSession, onNewChat,
     histHint = null,
     agentSessions, onResumeAgentSession, onDeleteAgentSession,
-    onBackToNicki,
-    exploreLive, exploreFeed, gigs = [], gigNotice = null, onPickGig = () => {}, feedEvents, onSearchSkills,    providers = null, installState = "idle", onInstall = () => {},
-    settings, onSettings, onTab, unread, zoomShot,
-    provider, onProvider,
+    settings, onSettings, onTab, unread,
     settingsPage = "general", onSettingsPage = () => {},
-    onDropToPhone, onDropFilesToPhone, phoneLinked, pairNode, accountNode, shelfNode,
-    staged = [], onAttachStaged,
     accountEmail = null, accountAvatar = null, onSignOut = () => {}, onIslandClick,
   } = props;
   // glance light trace retired (see render below) — no path needed.
@@ -187,8 +177,6 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     const t = setInterval(poll, 3000);
     return () => { dead = true; clearInterval(t); };
   }, []);
-  // provider arrives from App (single switch for picker + tile menus).
-  const showHuddle = messages.length === 0;
   // mini EQ loudness: while minimized + playing, ride --e off the same
   // /audio-energy tap the Daily dancer uses (150ms, silent when idle).
   const eqRef = useRef<HTMLSpanElement>(null);
@@ -225,14 +213,6 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
     }
   };
 
-  // live session progress for the tiles (session id is all the fetch needs).
-  const { refresh } = useSessionProgress(liveSession && thinking ? [{ session: liveSession, agent: "", first: "" }] : []);
-  useEffect(() => {
-    if (!thinking || !liveSession) return;
-    refresh(liveSession);
-    const t = setInterval(() => refresh(liveSession), 2000);
-    return () => clearInterval(t);
-  }, [thinking, liveSession, refresh]);
 
   return (
     <>
@@ -250,9 +230,35 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
       {fsmState !== "jacked" && <Mascot key={fsmState} ref={mascotRef} px={8} mood="wave" onTap={onMascotTap} />}
       {fsmState === "hidden" ? null : fsmState === "jacked" ? (
         <>
-          {/* ponytail: one static nav (coucou-header parity) — the bar lives
-              ABOVE the scroll container, never inside it: always visible,
-              never sticking, drifting, or scrolling away. Views scroll below. */}
+          {/* ponytail: one nav only — the Maus sidebar owns the top, our bar
+              (history dates, bell, profile) rides BELOW the frame. */}
+          <div className="jacked-body">
+          {(view === "maus" || view === "bots" || view === "computer" || view === "routines") && (
+            <MausViews view={view as MausNavView} onNavigate={onTab} />
+          )}
+{view === "approval" && (approval ? (
+            <ApprovalCard approval={approval} onDecide={onDecide} />
+          ) : (
+            <div className="card">
+              <div className="card-title">Nothing waiting</div>
+              <div className="card-detail">The request cleared somewhere else.</div>
+              <div className="btn-row">
+                <button className="primary" onClick={() => onTab("chat")}>Back to chat</button>
+              </div>
+            </div>
+          ))}
+{view === "question" && (question ? (
+            <QuestionCard question={question} onAnswer={onAnswer} />
+          ) : (
+            <div className="card">
+              <div className="card-title">Nothing waiting</div>
+              <div className="card-detail">The question cleared somewhere else.</div>
+              <div className="btn-row">
+                <button className="primary" onClick={() => onTab("chat")}>Back to chat</button>
+              </div>
+            </div>
+          ))}
+        </div>
           <Header
             view={view}
             unread={unread}
@@ -280,118 +286,6 @@ const Island = forwardRef<HTMLDivElement, Props>(function Island(props, ref) {
             soundOn={settings.soundOn}
             onToggleSound={() => onSettings({ ...settings, soundOn: !settings.soundOn })}
           />
-          <div className="jacked-body">
-          {view !== "daily" && view !== "chat" && view !== "shelf" && (
-            <div className="mascot-top">
-              <Mascot key={fsmState} ref={mascotRef} px={8} onTap={onMascotTap} />
-            </div>
-          )}
-          {view === "settings" && (
-            <SettingsView settings={settings} onChange={onSettings} pair={pairNode} extra={accountNode} page={settingsPage} onPage={onSettingsPage} />
-          )}
-          {view === "explore" && (
-            <ExploreView
-              live={exploreLive}
-              feed={exploreFeed}
-              gigs={gigs}
-              gigNotice={gigNotice}
-              onPickGig={onPickGig}
-              onSearch={onSearchSkills}
-              onPickSkill={(label) => onSend(`What can ${label} do?`, undefined, undefined, [])}
-              agentSessions={agentSessions}
-              onResumeAgent={onResumeAgentSession}
-            />
-          )}
-          {view === "feed" && (
-            <FeedView events={feedEvents} />
-          )}
-          {view === "approval" && (approval ? (
-            <ApprovalCard approval={approval} onDecide={onDecide} />
-          ) : (
-            <div className="card">
-              <div className="card-title">Nothing waiting</div>
-              <div className="card-detail">The request cleared somewhere else.</div>
-              <div className="btn-row">
-                <button className="primary" onClick={() => onTab("chat")}>Back to chat</button>
-              </div>
-            </div>
-          ))}
-          {view === "question" && (question ? (
-            <QuestionCard question={question} onAnswer={onAnswer} />
-          ) : (
-            <div className="card">
-              <div className="card-title">Nothing waiting</div>
-              <div className="card-detail">The question cleared somewhere else.</div>
-              <div className="btn-row">
-                <button className="primary" onClick={() => onTab("chat")}>Back to chat</button>
-              </div>
-            </div>
-          ))}
-          {view === "chat" && (
-            <ChatPanel
-              messages={messages}
-              onSend={onSend}
-              provider={provider}
-              onProvider={onProvider}
-              onEditMessage={onEditMessage}
-              threadKey={activeSessionId ?? "live"}
-              thinking={thinking}
-              attachments={attachments}
-              onFiles={onFiles}
-              onRemoveAttachment={onRemoveAttachment}
-              onDropToPhone={onDropToPhone}
-              onDropFilesToPhone={onDropFilesToPhone}
-              phoneLinked={phoneLinked}
-              bridgeOn={exploreLive}
-              liveActivity={liveActivity}
-              livePartial={livePartial}
-              turnEngine={turnEngine}
-              lastThought={lastThought}
-              onStop={onStop}
-              liveSession={liveSession}
-              providers={providers}
-              installState={installState}
-              onInstall={onInstall}
-              teamNode={
-                <div className="team-mini">
-                  {showHuddle && (
-                    <Huddle
-                      lite={false}
-                    />
-                  )}
-                  {/* crew rail: the huddle above is nicki's hello (crew ready),
-                      the grid below leads with nicki, then the mates. */}
-                  <TeamGrid team={team} sessions={agentSessions} onResume={onResumeAgentSession} onPick={onResumeAgentSession} onPickNicki={onBackToNicki} detail="none" compact={messages.length > 0} provider={provider} onProvider={onProvider} />
-                </div>
-              }
-            />
-          )}
-          {view === "lens" && (
-            <Suspense fallback={<div className="card"><div className="card-detail">Opening lens…</div></div>}>
-              <LensView shots={shots} initialZoom={zoomShot} staged={staged} onAttachStaged={onAttachStaged} agentSessions={agentSessions} onResumeAgent={onResumeAgentSession} />
-            </Suspense>
-          )}
-          {view === "daily" && (
-            <Suspense fallback={<HomeSkeleton />}>
-              <DailyView agentSessions={agentSessions} onResumeAgent={onResumeAgentSession} onGoChat={() => onTab("chat")} />
-            </Suspense>
-          )}
-          {view === "shelf" && shelfNode}
-          {view === "finished" && (
-            <div className="card finished">
-              <div className="card-title">Route complete ✓</div>
-              <div className="stat-row">
-                <span><b>0.4s</b> latency</span>
-                <span><b>local</b> only</span>
-                <span><b>0</b> cloud calls</span>
-              </div>
-              <div className="card-detail">Spotter logged it.</div>
-              <div className="btn-row">
-                <button className="primary" onClick={() => onTab("explore")}>Back to Explore</button>
-              </div>
-            </div>
-          )}
-          </div>
         </>
       ) : (
         <>
