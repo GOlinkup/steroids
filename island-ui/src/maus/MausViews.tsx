@@ -5,9 +5,11 @@ import { useStore, StoreProvider } from "./shared/store";
 import { TeamMapPage } from "./bots/TeamMapPage";
 import { ComputerPanel } from "./computers/ComputerPanel";
 import { RoutinesPage } from "./routines/RoutineCalendarPage";
+import { Sidebar } from "./chat/Sidebar";
+import { ChatRoom } from "./chat/ChatRoom";
 import type { IslandView } from "../store";
 
-export type MausNavView = "maus" | "bots" | "computer" | "routines";
+export type MausNavView = "maus" | "bots" | "computer" | "routines" | "chat";
 
 function ComputerSlot() {
   const { state } = useStore();
@@ -25,6 +27,14 @@ function ComputerSlot() {
 
 function Active({ view, onNavigate }: { view: MausNavView; onNavigate: (v: IslandView) => void }) {
   const { dispatch } = useStore();
+  if (view === "chat") {
+    return (
+      <div className="flex h-full min-h-0 flex-1">
+        <Sidebar view="chat" onNavigate={onNavigate} />
+        <ChatRoom />
+      </div>
+    );
+  }
   if (view === "computer") return <ComputerSlot />;
   if (view === "routines") {
     return (

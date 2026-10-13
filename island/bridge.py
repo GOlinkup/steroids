@@ -66,6 +66,10 @@ REPO_ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ROUTER = os.path.join(REPO_ROOT, "src", "steroids", "router.py")
 SKILLS_DIR = os.path.join(REPO_ROOT, "skills")
 SHOTS_DIR = os.path.join(REPO_ROOT, "shots")
+# one app: Maus data backend checkout (~/openmaus-upstream today, renamed
+# into steroids later). Env override for dev. The backend serves 127.0.0.1
+# only; the bridge proxies /api/* to it (see Handler._proxy_api).
+MAUS_DIR = os.environ.get("MAUS_DIR", os.path.expanduser("~/openmaus-upstream"))
 
 _lens_lib = None
 _daily_lib = None
@@ -2174,6 +2178,31 @@ class Handler(SimpleHTTPRequestHandler):
             super().log_message(*a)
 
 
+def _port_open(port):
+    try:
+        urllib.request.urlopen("http://127.0.0.1:%d/" % port, timeout=2).read(1)
+        return True
+    except Exception:
+        return False
+
+
+def _ensure_maus():
+    """One app: boot the Maus data backend (:8799) with the island.
+    Best-effort, stdlib only. Localhost only — never exposed."""
+    if _port_open(8799):
+        return
+    if not os.path.isfile(os.path.join(MAUS_DIR, "server", "index.ts")):
+        print("maus: no backend at %s (clone it there)" % MAUS_DIR)
+        return
+    try:
+        subprocess.Popen(["node", "--experimental-strip-types", "server/index.ts"],
+                         cwd=MAUS_DIR, start_new_session=True,
+                         stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL)
+        print("maus: started data backend (:8799)")
+    except OSError as e:
+        print("maus: could not start backend (%s)" % (e,))
+
+
 def main(argv):
     port = PORT
     host = HOST
@@ -2231,6 +2260,8 @@ def main(argv):
         except Exception:
             pass
     threading.Thread(target=_warm_models, daemon=True).start()
+    if serve_dir:
+        _ensure_maus()
     if serve_dir:
         print("nicki: http://%s:%s  (UI + opencode bridge)" % (host, port))
         if host in ("0.0.0.0", "::"):

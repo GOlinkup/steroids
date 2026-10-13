@@ -1052,6 +1052,9 @@ export type Action =
   | { type: "switchTask"; botId: string; threadId: string; whole?: true }
   | { type: "switchTaskFailed"; botId: string; threadId: string }
   | { type: "taskSwitched"; bot: Bot }
+  | { type: "send"; botId: string; text: string; threadId?: string; sendId?: string; onError?: (message: string) => void }
+  | { type: "messageAdded"; threadId: string; message: Message }
+  | { type: "sendFailed"; threadId: string; sendId: string }
   | { type: "deleteTask"; botId: string; threadId: string }
   | { type: "newGroupTask"; groupId: string }
   | { type: "deleteGroupTask"; groupId: string; threadId: string }
@@ -1497,6 +1500,60 @@ export function reducer(state: AppState, action: Action): AppState {
     }
     case "connected":
       return { ...state, connected: action.value };
+    // Lean chat shell: optimistic user send over POST /api/bots/:id/messages,
+    // folded server echo/reply via messageAdded, rollback on failure.
+    // Streaming assistant turns arrive over the SSE bot frames (botPatched).
+    case "send": {
+      if (!action.sendId) return state;
+      const target = state.bots.find((b) => b.id === action.botId);
+      const threadId = action.threadId ?? target?.threadId;
+      if (!target || !threadId || threadId !== target.threadId) return state;
+      if (target.messages.some((m) => m.sendId === action.sendId)) return state;
+      const message: Message = {
+        id: action.sendId,
+        role: "user",
+        kind: "text",
+        text: action.text,
+        at: Date.now(),
+        parentId: target.activeLeafId ?? null,
+        sendId: action.sendId,
+      };
+      return updateBot(state, action.botId, (b) => ({
+        ...b,
+        messages: [...b.messages, message],
+        activeLeafId: message.id,
+      }));
+    }
+    case "messageAdded": {
+      const msg = action.message;
+      const owner = state.bots.find((b) =>
+        b.threadId === action.threadId ||
+        (b.tasks ?? []).some((t) => t.threadId === action.threadId));
+      if (!owner) return state;
+      return updateBot(state, owner.id, (b) => {
+        const idx = b.messages.findIndex((m) =>
+          (msg.sendId != null && m.sendId === msg.sendId) || m.id === msg.id);
+        if (idx < 0) return { ...b, messages: [...b.messages, msg] };
+        const prev = b.messages[idx];
+        return {
+          ...b,
+          messages: b.messages.map((m, i) => (i === idx ? msg : m)),
+          activeLeafId: b.activeLeafId === prev.id ? msg.id : b.activeLeafId,
+        };
+      });
+    }
+    case "sendFailed": {
+      const owner = state.bots.find((b) => b.messages.some((m) => m.sendId === action.sendId));
+      if (!owner) return state;
+      return updateBot(state, owner.id, (b) => {
+        const doomed = b.messages.find((m) => m.sendId === action.sendId);
+        return {
+          ...b,
+          messages: b.messages.filter((m) => m.sendId !== action.sendId),
+          activeLeafId: doomed && b.activeLeafId === doomed.id ? (doomed.parentId ?? null) : b.activeLeafId,
+        };
+      });
+    }
     case "error":
       return {
         ...(action.message && state.selectedId
@@ -2088,6 +2145,21 @@ export function StoreProvider({ children }: { children: ReactNode }) {
       action = pinBotThreadAction(action, stateRef.current.bots);
       if (action.type === "taskSwitched") action = { ...action, bot: withTaskWrites(action.bot) as Bot };
       if (action.type === "botPatched") action = { ...action, bot: withTaskWrites(action.bot) };
+      if (action.type === "send" && !action.sendId) {
+        // ponytail: backend rejects non-UUID sendIds (400) — fallback stays
+        // UUID-shaped so the send still lands where randomUUID is missing.
+        const bytes = globalThis.crypto?.getRandomValues
+          ? globalThis.crypto.getRandomValues(new Uint8Array(16))
+          : Array.from({ length: 16 }, () => Math.floor(Math.random() * 256));
+        bytes[6] = (bytes[6] & 0x0f) | 0x40;
+        bytes[8] = (bytes[8] & 0x3f) | 0x80;
+        const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, "0")).join("");
+        const fallback = `${hex.slice(0, 8)}-${hex.slice(8, 12)}-${hex.slice(12, 16)}-${hex.slice(16, 20)}-${hex.slice(20)}`;
+        action = {
+          ...action,
+          sendId: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : fallback,
+        };
+      }
       rawDispatch(action);
       switch (action.type) {
         case "notice":
@@ -2141,6 +2213,29 @@ export function StoreProvider({ children }: { children: ReactNode }) {
           } else if (group?.unread) {
             api(`/api/groups/${id}/read`, { method: "POST" }).catch(() => {});
           }
+          break;
+        }
+        case "send": {
+          const sendId = action.sendId;
+          const threadId = action.threadId ?? stateRef.current.bots.find((b) => b.id === action.botId)?.threadId;
+          if (!sendId || !threadId) {
+            action.onError?.("no thread");
+            break;
+          }
+          void api<{ message?: Message; threadId?: string }>(`/api/bots/${action.botId}/messages`, {
+            method: "POST",
+            body: JSON.stringify({ text: action.text, threadId, sendId }),
+          })
+            .then((body) => {
+              if (body?.message && typeof body.threadId === "string") {
+                rawDispatch({ type: "messageAdded", threadId: body.threadId, message: body.message });
+              }
+            })
+            .catch((error) => {
+              rawDispatch({ type: "sendFailed", threadId, sendId });
+              if (action.onError) action.onError(error instanceof Error ? error.message : String(error));
+              else showError(error);
+            });
           break;
         }
         case "updateTask":
